@@ -1,0 +1,25 @@
+{
+  "template": "https://github.com/statisticsnorway/ssb-pypitemplate.git",
+  "commit": "394fcab986f3e50be9b9f20ea8570c8daead6ad7",
+  "checkout": "2023.9.5",
+  "context": {
+    "cookiecutter": {
+      "project_name": "ssb-eimerdb",
+      "package_name": "eimerdb",
+      "friendly_name": "EimerDB",
+      "copyright_owner": "Statistics Norway",
+      "copyright_year": "2023",
+      "author": "Stian Elisenberg",
+      "email": "seg@ssb.no",
+      "github_organization": "statisticsnorway",
+      "version": "0.1.0",
+      "license": "MIT",
+      "development_status": "Development Status :: 3 - Alpha",
+      "_copy_without_render": [
+        "*.rst_t"
+      ],
+      "_template": "https://github.com/statisticsnorway/ssb-pypitemplate.git"
+    }
+  },
+  "directory": null
+}
