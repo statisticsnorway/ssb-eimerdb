@@ -3,6 +3,7 @@ from functions import (
     get_initials,
     get_json,
     arrow_schema_from_json,
+    parse_sql_query,
     create_eimerdb,
 )
 from dapla import FileClient, AuthClient
@@ -12,6 +13,8 @@ from google.cloud import storage
 import json
 import pyarrow as pa
 import pyarrow.parquet as pq
+import duckdb
+
 
 class EimerDBInstance:
     def __init__(self, bucket_name, eimer_name):
@@ -139,3 +142,49 @@ class EimerDBInstance:
             print("Data successfully inserted!")
         else:
             Exception("Cannot insert into main table. You are not an admin!")
+
+    def read_table(self, sql_query, partition_select=None):
+        parsed_query = parse_sql_query(sql_query)
+        try:
+            columns = parsed_query["columns"]
+        except:
+            columns = None
+        if columns == ["*"]:
+            columns = None
+        table_name = parsed_query["table_name"]
+        sql_filter = parsed_query["sql_filter"]
+
+        instance_name = self.eimerdb_name
+        table_config = self.tables[table_name]
+        partitions = table_config["partition_columns"]
+        bucket_name = table_config["bucket"]
+        partitions_len = len(partitions)
+        partition_levels = "**/" * partitions_len + "*"
+        fs = FileClient.get_gcs_file_system()
+        table_files = fs.glob(
+            f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name}/{partition_levels}"
+        )
+        if partition_select is not None:
+            filtered_files = []
+            for file in table_files:
+                parts = file.split("/")
+
+                all_matches = True
+
+                for key, values in partition_select.items():
+                    match_found = any(f"{key}={value}" in parts for value in values)
+
+                    if not match_found:
+                        all_matches = False
+                        break
+                if all_matches:
+                    filtered_files.append(file)
+                table_files = filtered_files
+        fs = FileClient.get_gcs_file_system()
+        dataset = pq.read_table(table_files, filesystem=fs, columns=columns)
+        if sql_query and dataset:
+            sql_query = sql_query.replace(table_name, "dataset")
+
+            con = duckdb.connect()
+            df = con.execute(sql_query).df()
+            return df
