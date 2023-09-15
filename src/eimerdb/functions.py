@@ -5,6 +5,140 @@ https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
 
 """
 
+from dapla import FileClient, AuthClient
+from datetime import datetime
+import os
+from google.cloud import storage
+import json
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+def get_datetime():
+    """A function that returns a datetime string.
+
+    Returns:
+        datetime string.
+
+    """
+    datetime_now = datetime.now()
+    datetime_str = datetime_now.strftime("%Y-%m-%d %H:%M:%S.%f")
+    return datetime_str
+
+def get_initials():
+    """A function that returns a datetime string.
+
+    Returns:
+        The users initials.
+
+    """
+    user = os.environ.get("JUPYTERHUB_USER")
+    initials = user.split("@")[0][:3]
+    return initials
+
+def get_json(bucket_name, blob_path):
+    token = AuthClient.fetch_google_credentials()
+    client = storage.Client(credentials=token)
+    bucket = client.get_bucket(bucket_name)
+    blob = bucket.blob(blob_path)
+
+    json_content = blob.download_as_text()
+
+    data = json.loads(json_content)
+    return data
+
+def arrow_schema_from_json(json_schema):
+    """A function converts a json file to an arrow schema.
+
+     Args:
+        bucket_name: A json file with variable names, types and labels
+
+    Returns:
+        Pyarrow schema.
+
+    """
+    schema_dict = json.loads(json_schema)
+
+    schema_fields = schema_dict.get("table_schema", [])
+
+    arrow_fields = []
+    for field in schema_fields:
+        name = field["name"]
+        type_str = field["type"]
+        label = field["label"]
+
+        if type_str == "string":
+            arrow_type = pa.string()
+        elif type_str == "int64":
+            arrow_type = pa.int64()
+        else:
+            raise ValueError(f"Unsupported data type: {type_str}")
+
+        arrow_field = pa.field(name, arrow_type, nullable=True, metadata={"label": label})
+        arrow_fields.append(arrow_field)
+
+    arrow_schema = pa.schema(arrow_fields)
+    return arrow_schema
+
+
+def create_eimerdb(bucket_name, db_name):
+    creator = get_initials()
+    token = AuthClient.fetch_google_credentials()
+    client = storage.Client(credentials=token)
+    bucket = client.bucket(bucket_name)
+    full_path = f"eimerdb/{db_name}"
+    about_blob = bucket.blob(f"{full_path}/config/about.json")
+    parts = db_name.split('/')
+    name = parts[-1] 
+    path = f"{db_name}/config/"
+    json_about = {
+        "eimerdb_name": f"{name}",
+        "path": f"gs://{bucket_name}/{full_path}",
+        "bucket": bucket_name,
+        "eimer_path": full_path,
+        "created_by": creator,
+        "time_created" : get_datetime()
+    }
+
+    about_blob = bucket.blob(f"{full_path}/config/about.json")
+    about_blob.upload_from_string(
+        data=json.dumps(json_about),
+        content_type='application/json')
+
+    user_roles = {
+        creator: "admin"
+    }
+    user_roles_blob = bucket.blob(f"{full_path}/config/users.json")
+    user_roles_blob.upload_from_string(
+        data=json.dumps(user_roles),
+        content_type='application/json')
+
+    role_groups = {
+        "role_groups": {
+            "admin": {
+                "operations": "all",
+                "functions": "all",
+                "tables": "all"
+            },
+            "editor": {
+                "operations": ["insert", "delete", "update", "reset"],
+                "functions": "",
+                "tables": ""
+                }
+            }
+        }
+
+    role_groups_blob = bucket.blob(f"{full_path}/config/role_groups.json")
+    role_groups_blob.upload_from_string(
+        data=json.dumps(role_groups),
+        content_type='application/json')
+
+    tables = {
+    }
+
+    tables_blob = bucket.blob(f"{full_path}/config/tables.json")
+    tables_blob.upload_from_string(
+        data=json.dumps(tables),
+        content_type='application/json')
 
 def example_function(number1: int, number2: int) -> str:
     """Example function comparing two integers.
