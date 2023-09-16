@@ -1,7 +1,8 @@
 """EimerDB Instance Module.
 
-This module contains the EimerDBInstance class, which represents an instance of the EimerDB database.
-It provides methods to interact with EimerDB, including managing users, creating tables, inserting data,
+This module contains the EimerDBInstance class, which represents an instance
+of the EimerDB database. It provides methods to interact with EimerDB,
+including managing users, creating tables, inserting data,
 and querying data.
 
 Author: Stian Elisenberg
@@ -162,7 +163,7 @@ class EimerDBInstance:
                 )
                 print(f"User {username} successfully removed!")
             else:
-                print(f"The user '{username}' does not exist.")
+                print(f"The user {username} does not exist.")
         else:
             raise Exception("Cannot remove user. You are not an admin!")
 
@@ -218,9 +219,8 @@ class EimerDBInstance:
             Exception: If the current user is not an admin.
 
         """
-        if self.is_admin == True:
+        if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
-            client = storage.Client(credentials=token)
             json_data = self.tables[table_name]
             arrow_schema = arrow_schema_from_json(json.dumps(json_data["schema"]))
 
@@ -296,7 +296,7 @@ class EimerDBInstance:
                         filtered_files.append(file)
                     table_files = filtered_files
             dataset = pq.read_table(table_files, filesystem=fs, columns=columns)
-            sql_query = sql_query.replace(f"FROM {table_name}", f"FROM dataset")
+            sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
             if columns is not None:
                 sql_query = sql_query.replace(" FROM", ", uuid FROM")
 
@@ -377,7 +377,7 @@ class EimerDBInstance:
                             pass
             return df
         elif parsed_query["operation"] == "UPDATE":
-            if editable == False:
+            if editable is False:
                 raise Exception(f"The table {table_name} is not editable!")
             try:
                 columns = parsed_query["columns"]
@@ -419,7 +419,7 @@ class EimerDBInstance:
                 print("No data")
             con = duckdb.connect()
             con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
-            sql_query = sql_query.replace(f"UPDATE {table_name}", f"UPDATE updates")
+            sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
             con.execute(sql_query)
             df = con.table("updates").df()
             df["user"] = get_initials()
