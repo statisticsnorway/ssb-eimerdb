@@ -59,11 +59,11 @@ def get_json(bucket_name, blob_path):
     return data
 
 
-def arrow_schema_from_json(json_schema):
+def arrow_schema_from_json(json_schema: list):
     """A function converts a json file to an arrow schema.
 
      Args:
-        bucket_name: Name of bucket
+        json_schema: A json schema with name, type and label
 
     Returns:
         Pyarrow schema.
@@ -81,7 +81,7 @@ def arrow_schema_from_json(json_schema):
     return pa.schema(fields)
 
 
-def parse_sql_query(sql_query):
+def parse_sql_query(sql_query: str):
     """A function that parses the given sql query.
 
      Args:
@@ -131,7 +131,7 @@ def parse_sql_query(sql_query):
         )
 
 
-def create_eimerdb(bucket_name, db_name):
+def create_eimerdb(bucket_name: str, db_name: str):
     """Creates an EimerDB instance.
 
      Args:
@@ -202,6 +202,7 @@ def create_eimerdb(bucket_name, db_name):
     tables_blob.upload_from_string(
         data=json.dumps(tables), content_type="application/json"
     )
+    print("EimerDB instance created.")
 
 
 def example_function(number1: int, number2: int) -> str:

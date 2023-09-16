@@ -220,7 +220,6 @@ class EimerDBInstance:
 
         """
         if self.is_admin is True:
-            token = AuthClient.fetch_google_credentials()
             json_data = self.tables[table_name]
             arrow_schema = arrow_schema_from_json(json.dumps(json_data["schema"]))
 
