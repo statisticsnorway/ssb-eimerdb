@@ -1,5 +1,4 @@
-"""
-EimerDB Instance Module
+"""EimerDB Instance Module.
 
 This module contains the EimerDBInstance class, which represents an instance of the EimerDB database.
 It provides methods to interact with EimerDB, including managing users, creating tables, inserting data,
@@ -26,8 +25,7 @@ from functions import parse_sql_query
 from google.cloud import storage
 
 class EimerDBInstance:
-    """
-    Represents an instance of the EimerDB database.
+    """Represents an instance of the EimerDB database.
 
     This class provides methods to interact with EimerDB, including
     managing users, creating tables, inserting data, and querying data.
@@ -61,8 +59,7 @@ class EimerDBInstance:
 
     """
     def __init__(self, bucket_name, eimer_name):
-        """
-        Initialize EimerDBInstance.
+        """Initialize EimerDBInstance.
 
         Args:
             bucket_name (str): Name of GCS bucket.
@@ -114,8 +111,7 @@ class EimerDBInstance:
             self.is_admin = False
 
     def add_user(self, username, role):
-        """
-        Add a user with a specified role.
+        """Add a user with a specified role.
 
         Args:
             username (str): Name of the user to add.
@@ -144,8 +140,7 @@ class EimerDBInstance:
             raise Exception("Cannot add user. You are not an admin!")
 
     def remove_user(self, username):
-        """
-        Remove a user by their username.
+        """Remove a user by their username.
 
         Args:
             username (str): Name of the user to remove.
@@ -172,8 +167,7 @@ class EimerDBInstance:
             raise Exception("Cannot remove user. You are not an admin!")
 
     def create_table(self, table_name, schema, partition_columns=None, editable=True):
-        """
-        Create a new table in EimerDB.
+        """Create a new table in EimerDB.
 
         Args:
             table_name (str): Name of the new table.
@@ -214,8 +208,7 @@ class EimerDBInstance:
             raise Exception("Cannot create table. You are not an admin!")
 
     def main_table_insert(self, table_name, df):
-        """
-        Insert unedited data into a main table.
+        """Insert unedited data into a main table.
 
         Args:
             table_name (str): Name of the table to insert data into.
@@ -228,9 +221,7 @@ class EimerDBInstance:
         if self.is_admin == True:
             token = AuthClient.fetch_google_credentials()
             client = storage.Client(credentials=token)
-            bucket = client.bucket(self.bucket)
             json_data = self.tables[table_name]
-            json_schema = json.dumps(json_data["schema"])
             arrow_schema = arrow_schema_from_json(json.dumps(json_data["schema"]))
 
             table = pa.Table.from_pandas(df, schema=arrow_schema)
@@ -251,8 +242,7 @@ class EimerDBInstance:
             Exception("Cannot insert into main table. You are not an admin!")
 
     def query(self, sql_query, partition_select=None, unedited=False):
-        """
-        Execute an SQL query on an EimerDB table.
+        """Execute an SQL query on an EimerDB table.
 
         Args:
             sql_query (str): SQL query to execute.
@@ -281,7 +271,6 @@ class EimerDBInstance:
             if editable is True and unedited is False and columns is not None:
                 if "uuid" not in columns:
                     columns.append("uuid")
-            sql_filter = parsed_query["sql_filter"]
             partitions = table_config["partition_columns"]
             bucket_name = table_config["bucket"]
             partitions_len = len(partitions)
@@ -298,7 +287,9 @@ class EimerDBInstance:
                     all_matches = True
 
                     for key, values in partition_select.items():
-                        match_found = any(f"{key}={value}" in parts for value in values)
+                        match_found = any(
+                            f"{key}={value}" in parts for value in values
+                        )
 
                         if not match_found:
                             all_matches = False
@@ -317,7 +308,8 @@ class EimerDBInstance:
             if editable is True and unedited is False:
                 table_name_changes = table_name + "_changes"
                 table_files_changes = fs.glob(
-                    f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes}/{partition_levels}"
+                    f"gs://{bucket_name}/eimerdb/{instance_name}/"
+                    f"{table_name_changes}/{partition_levels}"
                 )
                 if len(table_files_changes) != 0:
                     if partition_select is not None:
@@ -350,6 +342,8 @@ class EimerDBInstance:
                     dataset_changes = pq.read_table(
                         table_files_changes, filesystem=fs, columns=columns_changes
                     )
+                    if len(dataset_changes) == 0 or dataset_changes is None:
+                        print("There are no changes for this subset.")
                     sql_query = sql_query.replace("dataset", "dataset_changes")
                     if columns is not None:
                         sql_query = sql_query.replace(
@@ -369,7 +363,7 @@ class EimerDBInstance:
                     df_cols = [col for col in df.columns if col != "uuid"]
                     df.columns
 
-                    for index, row in changed_rows.iterrows():
+                    for _, row in changed_rows.iterrows():
                         if row["operation"] == "update":
                             for col in df_cols:
                                 df.loc[df["uuid"] == row["uuid"], col] = row[col + "_y"]
@@ -389,13 +383,12 @@ class EimerDBInstance:
                 raise Exception(f"The table {table_name} is not editable!")
             try:
                 columns = parsed_query["columns"]
-            except:
+            except Exception:
                 columns = None
             if columns == ["*"]:
                 columns = None
             table_name = parsed_query["table_name"]
             where_clause = parsed_query["where_clause"]
-            set_clause = parsed_query["set_clause"]
             instance_name = self.eimerdb_name
             table_config = self.tables[table_name]
             partitions = table_config["partition_columns"]
@@ -424,6 +417,8 @@ class EimerDBInstance:
                     table_files = filtered_files
             fs = FileClient.get_gcs_file_system()
             dataset = pq.read_table(table_files, filesystem=fs, columns=columns)
+            if len(dataset) == 0 or dataset is None:
+                print("No data")
             con = duckdb.connect()
             con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
             sql_query = sql_query.replace(f"UPDATE {table_name}", f"UPDATE updates")

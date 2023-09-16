@@ -39,7 +39,7 @@ def get_initials():
 
 
 def get_json(bucket_name, blob_path):
-    """A function that gets a json file from google cloud storage
+    """A function that gets a json file from google cloud storage.
 
     Args:
         bucket_name: Name of bucket
