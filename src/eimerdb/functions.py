@@ -9,11 +9,8 @@ import json
 import os
 import re
 from datetime import datetime
-import duckdb
 import pyarrow as pa
-import pyarrow.parquet as pq
 from dapla import AuthClient
-from dapla import FileClient
 from google.cloud import storage
 
 
@@ -42,6 +39,15 @@ def get_initials():
 
 
 def get_json(bucket_name, blob_path):
+    """A function that gets a json file from google cloud storage
+
+    Args:
+        bucket_name: Name of bucket
+
+    Returns:
+        The users initials.
+
+    """
     token = AuthClient.fetch_google_credentials()
     client = storage.Client(credentials=token)
     bucket = client.get_bucket(bucket_name)
@@ -57,7 +63,7 @@ def arrow_schema_from_json(json_schema):
     """A function converts a json file to an arrow schema.
 
      Args:
-        bucket_name: A json file with variable names, types and labels
+        bucket_name: Name of bucket
 
     Returns:
         Pyarrow schema.
@@ -144,7 +150,6 @@ def create_eimerdb(bucket_name, db_name):
     about_blob = bucket.blob(f"{full_path}/config/about.json")
     parts = db_name.split("/")
     name = parts[-1]
-    path = f"{db_name}/config/"
     json_about = {
         "eimerdb_name": f"{name}",
         "path": f"gs://{bucket_name}/{full_path}",

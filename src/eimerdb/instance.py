@@ -1,3 +1,15 @@
+"""
+EimerDB Instance Module
+
+This module contains the EimerDBInstance class, which represents an instance of the EimerDB database.
+It provides methods to interact with EimerDB, including managing users, creating tables, inserting data,
+and querying data.
+
+Author: Stian Elisenberg
+Date: September 16, 2023
+"""
+
+import json
 import duckdb
 import pandas as pd
 import pyarrow as pa
@@ -10,7 +22,7 @@ from functions import get_initials
 from functions import get_json
 from functions import parse_sql_query
 from google.cloud import storage
-
+from uuid import uuid4
 
 class EimerDBInstance:
     """
