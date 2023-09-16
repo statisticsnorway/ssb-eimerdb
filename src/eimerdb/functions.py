@@ -87,27 +87,35 @@ def arrow_schema_from_json(json_schema):
 
 
 def parse_sql_query(sql_query):
-    pattern = r"^SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(.*))?$"
-    match = re.match(pattern, sql_query, re.IGNORECASE)
+    select_pattern = r'^SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(.*))?$'
+    update_pattern = r'^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$'
+    
+    select_match = re.match(select_pattern, sql_query, re.IGNORECASE)
+    update_match = re.match(update_pattern, sql_query, re.IGNORECASE)
 
-    if match:
-        groups = match.groups()
+    if select_match:
+        groups = select_match.groups()
         columns_str, table_name, rest_of_query = groups
-        columns = [
-            re.sub(r"^COUNT\((.*?)\)$", r"\1", col.strip().split(" AS ")[0])
-            for col in columns_str.split(",")
-        ]
+        columns = [re.sub(r'^COUNT\((.*?)\)$', r'\1', col.strip().split(' AS ')[0]) for col in columns_str.split(',')]
+        
+        return {
+            'operation': 'SELECT',
+            'columns': columns,
+            'table_name': table_name,
+            'sql_filter': rest_of_query.strip() if rest_of_query else None
+        }
+    elif update_match:
+        groups = update_match.groups()
+        table_name, set_clause, where_clause = groups
 
         return {
-            "operation": "SELECT",
-            "columns": columns,
-            "table_name": table_name,
-            "sql_filter": rest_of_query.strip() if rest_of_query else None,
+            'operation': 'UPDATE',
+            'table_name': table_name,
+            'set_clause': set_clause,
+            'where_clause': where_clause.strip() if where_clause else None
         }
     else:
-        raise ValueError(
-            "Unsupported SQL operation. Only SELECT statements are allowed."
-        )
+        raise ValueError("Unsupported SQL operation. Only SELECT and UPDATE statements are allowed.")
 
 
 def create_eimerdb(bucket_name, db_name):

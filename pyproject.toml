@@ -25,6 +25,8 @@ duckdb = "^0.8.1"
 google-cloud-storage = "^2.10.0"
 pyarrow = "^13.0.0"
 dapla-toolbelt = "^1.8.2"
+uuid = "^1.30"
+pandas = "^2.1.0"
 
 [tool.poetry.group.dev.dependencies]
 Pygments = ">=2.10.0"

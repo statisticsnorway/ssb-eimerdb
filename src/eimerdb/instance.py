@@ -14,6 +14,8 @@ import json
 import pyarrow as pa
 import pyarrow.parquet as pq
 import duckdb
+from uuid import uuid4
+import pandas as pd
 
 
 class EimerDBInstance:
@@ -143,48 +145,163 @@ class EimerDBInstance:
         else:
             Exception("Cannot insert into main table. You are not an admin!")
 
-    def read_table(self, sql_query, partition_select=None):
+    def query(self, sql_query, partition_select=None, unedited=False):
         parsed_query = parse_sql_query(sql_query)
-        try:
-            columns = parsed_query["columns"]
-        except:
-            columns = None
-        if columns == ["*"]:
-            columns = None
-        table_name = parsed_query["table_name"]
-        sql_filter = parsed_query["sql_filter"]
+        if parsed_query["operation"] == "SELECT":
+            try:
+                columns = parsed_query["columns"]
+            except:
+                columns = None
+            if columns == ['*']:
+                columns = None
+            table_name = parsed_query["table_name"]
+            sql_filter = parsed_query["sql_filter"]
 
-        instance_name = self.eimerdb_name
-        table_config = self.tables[table_name]
-        partitions = table_config["partition_columns"]
-        bucket_name = table_config["bucket"]
-        partitions_len = len(partitions)
-        partition_levels = "**/" * partitions_len + "*"
-        fs = FileClient.get_gcs_file_system()
-        table_files = fs.glob(
-            f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name}/{partition_levels}"
-        )
-        if partition_select is not None:
-            filtered_files = []
-            for file in table_files:
-                parts = file.split("/")
+            instance_name = self.eimerdb_name
+            table_config = self.tables[table_name]
+            partitions = table_config["partition_columns"]
+            bucket_name = table_config["bucket"]
+            editable = table_config["editable"]
+            partitions_len = len(partitions)
+            partition_levels = "**/" * partitions_len + "*"
+            fs = FileClient.get_gcs_file_system()
+            table_files = fs.glob(f'gs://{bucket_name}/eimerdb/{instance_name}/{table_name}/{partition_levels}')
+            if partition_select is not None:
+                filtered_files = []
+                for file in table_files:
+                    parts = file.split('/')
 
-                all_matches = True
+                    all_matches = True
 
-                for key, values in partition_select.items():
-                    match_found = any(f"{key}={value}" in parts for value in values)
+                    for key, values in partition_select.items():
+                        match_found = any(f"{key}={value}" in parts for value in values)
 
-                    if not match_found:
-                        all_matches = False
-                        break
-                if all_matches:
-                    filtered_files.append(file)
-                table_files = filtered_files
-        fs = FileClient.get_gcs_file_system()
-        dataset = pq.read_table(table_files, filesystem=fs, columns=columns)
-        if sql_query and dataset:
-            sql_query = sql_query.replace(table_name, "dataset")
+                        if not match_found:
+                            all_matches = False
+                            break
 
-            con = duckdb.connect()
-            df = con.execute(sql_query).df()
+                    if all_matches:
+                        filtered_files.append(file)
+                    table_files = filtered_files
+            dataset = pq.read_table(table_files, filesystem=fs, columns=columns)
+            if sql_query and dataset:
+                sql_query = sql_query.replace(table_name, "dataset")
+
+                con = duckdb.connect()
+                df = con.execute(sql_query).df()
+
+            if editable == True and unedited == False:
+                table_name_changes = table_name + "_changes"
+                table_files_changes = fs.glob(f'gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes}/{partition_levels}')
+                if partition_select is not None:
+                    filtered_files_changes = []
+                    for file in table_files_changes:
+                        parts = file.split('/')
+
+                        all_matches = True
+
+                        for key, values in partition_select.items():
+                            match_found = any(f"{key}={value}" in parts for value in values)
+
+                            if not match_found:
+                                all_matches = False
+                                break
+
+                    if all_matches:
+                        filtered_files_changes.append(file)
+                    table_files_changes = filtered_files_changes
+            
+                fs = FileClient.get_gcs_file_system()
+                dataset_changes = pq.read_table(table_files_changes, filesystem=fs, columns=columns)
+                if sql_query and dataset:
+                    sql_query = sql_query.replace("dataset", "dataset_changes")
+
+                    con = duckdb.connect()
+                    df_changes = con.execute(sql_query).df()
+                df_changes['datetime'] = pd.to_datetime(df_changes['datetime']).apply(lambda x: x.timestamp())
+                df_changes.sort_values('datetime', ascending=False, inplace=True)
+                df_changes.drop_duplicates(subset='uuid', keep='first', inplace=True)
+                
+                merged = pd.merge(df, df_changes, on='uuid', how='outer')
+                changed_rows = merged[merged['operation'].notna()]
+                df_cols = df.columns[1:]
+
+                for index, row in changed_rows.iterrows():
+                    if row['operation'] == 'update':
+                        for col in df_cols:
+                            df.loc[df['uuid'] == row['uuid'], col] = row[col + '_y']
+                    elif row['operation'] == 'insert':
+                        if pd.isnull(row['uuid_x']):
+                            new_uuid = str(uuid4())
+                            new_row = {col: row[col + '_y'] for col in df_cols}
+                            new_row['uuid'] = new_uuid
+                            df = df.append(new_row, ignore_index=True)
+                    elif row['operation'] == 'delete':
+                        df = df[df['uuid'] != row['uuid']]
+                    elif row['operation'] == 'reset':
+                        pass
+
             return df
+
+        elif parsed_query["operation"] == "UPDATE":
+            try:
+                columns = parsed_query["columns"]
+            except:
+                columns = None
+            if columns == ['*']:
+                columns = None
+            table_name = parsed_query["table_name"]
+            where_clause = parsed_query["where_clause"]
+            set_clause = parsed_query["set_clause"]
+            instance_name = self.eimerdb_name
+            table_config = self.tables[table_name]
+            partitions = table_config["partition_columns"]
+            bucket_name = table_config["bucket"]
+            partitions_len = len(partitions)
+            partition_levels = "**/" * partitions_len + "*"
+            fs = FileClient.get_gcs_file_system()
+            table_files = fs.glob(f'gs://{bucket_name}/eimerdb/{instance_name}/{table_name}/{partition_levels}')
+            if partition_select is not None:
+                filtered_files = []
+                for file in table_files:
+                    parts = file.split('/')
+
+                    all_matches = True
+
+                    for key, values in partition_select.items():
+                        match_found = any(f"{key}={value}" in parts for value in values)
+
+                        if not match_found:
+                            all_matches = False
+                            break
+
+                    if all_matches:
+                        filtered_files.append(file)
+                    table_files = filtered_files
+            
+            fs = FileClient.get_gcs_file_system()
+            dataset = pq.read_table(table_files, filesystem=fs, columns=columns)
+            con = duckdb.connect()
+            con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
+            sql_query = sql_query.replace(table_name, "updates")
+            con.execute(sql_query)
+            df = con.table("updates").df()
+            df["user"] = get_initials()
+            df["datetime"] = get_datetime()
+            df["operation"] = "update"
+            
+            table_path = self.tables[table_name]["table_path"] + "_changes"
+            fs = FileClient.get_gcs_file_system()
+            update_table = pa.Table.from_pandas(df)
+            
+            uuid = uuid4()
+            filename = f'commit_{uuid}_{{i}}'
+
+            pq.write_to_dataset(
+                update_table,
+                root_path=f"gs://{self.bucket}/{table_path}",
+                partition_cols=partitions,
+                basename_template=filename,
+                filesystem=fs,
+                )
+            print("Data successfully updated!")
