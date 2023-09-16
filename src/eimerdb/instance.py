@@ -315,7 +315,9 @@ class EimerDBInstance:
                             all_matches = True
 
                             for key, values in partition_select.items():
-                                match_found = any(f"{key}={value}" in parts for value in values)
+                                match_found = any(
+                                    f"{key}={value}" in parts for value in values
+                                )
 
                                 if not match_found:
                                     all_matches = False
@@ -337,7 +339,9 @@ class EimerDBInstance:
                     )
                     sql_query = sql_query.replace("dataset", "dataset_changes")
                     if columns is not None:
-                        sql_query = sql_query.replace(" FROM", ", user, datetime, operation FROM")
+                        sql_query = sql_query.replace(
+                            " FROM", ", user, datetime, operation FROM"
+                        )
                     con = duckdb.connect()
                     df_changes = con.execute(sql_query).df()
                     df_changes["datetime"] = pd.to_datetime(

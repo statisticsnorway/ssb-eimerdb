@@ -5,6 +5,7 @@ https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
 
 """
 
+import json
 import os
 import re
 from datetime import datetime
@@ -14,7 +15,6 @@ import pyarrow.parquet as pq
 from dapla import AuthClient
 from dapla import FileClient
 from google.cloud import storage
-import json
 
 
 def get_datetime():
