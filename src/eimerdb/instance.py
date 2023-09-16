@@ -287,9 +287,7 @@ class EimerDBInstance:
                     all_matches = True
 
                     for key, values in partition_select.items():
-                        match_found = any(
-                            f"{key}={value}" in parts for value in values
-                        )
+                        match_found = any(f"{key}={value}" in parts for value in values)
 
                         if not match_found:
                             all_matches = False
