@@ -10,6 +10,8 @@ Date: September 16, 2023
 """
 
 import json
+from uuid import uuid4
+
 import duckdb
 import pandas as pd
 import pyarrow as pa
@@ -22,7 +24,6 @@ from functions import get_initials
 from functions import get_json
 from functions import parse_sql_query
 from google.cloud import storage
-from uuid import uuid4
 
 class EimerDBInstance:
     """
