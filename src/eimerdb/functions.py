@@ -5,15 +5,16 @@ https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
 
 """
 
-from dapla import FileClient, AuthClient
-from datetime import datetime
 import os
-from google.cloud import storage
-import json
+import re
+from datetime import datetime
+import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
-import re
-import duckdb
+from dapla import AuthClient
+from dapla import FileClient
+from google.cloud import storage
+import json
 
 
 def get_datetime():
@@ -67,10 +68,8 @@ def arrow_schema_from_json(json_schema):
         name = field_dict["name"]
         data_type = field_dict["type"]
         label = field_dict["label"]
-        field_type = getattr(
-            pa, data_type
-        )()  # Use PyArrow data type from "type" field
-        metadata = {"label": label}  # Include label as metadata
+        field_type = getattr(pa, data_type)()
+        metadata = {"label": label}
         field = pa.field(name, field_type, metadata=metadata)
         fields.append(field)
     return pa.schema(fields)
@@ -87,16 +86,10 @@ def parse_sql_query(sql_query):
 
     """
     select_pattern = r"^SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(.*))?$"
-    update_pattern = (
-        r"^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$"
-    )
+    update_pattern = r"^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$"
 
-    select_match = re.match(
-        select_pattern, sql_query, re.IGNORECASE
-    )
-    update_match = re.match(
-        update_pattern, sql_query, re.IGNORECASE
-    )
+    select_match = re.match(select_pattern, sql_query, re.IGNORECASE)
+    update_match = re.match(update_pattern, sql_query, re.IGNORECASE)
 
     if select_match:
         groups = select_match.groups()
@@ -114,9 +107,7 @@ def parse_sql_query(sql_query):
             "operation": "SELECT",
             "columns": columns,
             "table_name": table_name,
-            "sql_filter": rest_of_query.strip()
-            if rest_of_query
-            else None,
+            "sql_filter": rest_of_query.strip() if rest_of_query else None,
         }
     elif update_match:
         groups = update_match.groups()
@@ -126,9 +117,7 @@ def parse_sql_query(sql_query):
             "operation": "UPDATE",
             "table_name": table_name,
             "set_clause": set_clause,
-            "where_clause": where_clause.strip()
-            if where_clause
-            else None,
+            "where_clause": where_clause.strip() if where_clause else None,
         }
     else:
         raise ValueError(
@@ -196,9 +185,7 @@ def create_eimerdb(bucket_name, db_name):
         }
     }
 
-    role_groups_blob = bucket.blob(
-        f"{full_path}/config/role_groups.json"
-    )
+    role_groups_blob = bucket.blob(f"{full_path}/config/role_groups.json")
     role_groups_blob.upload_from_string(
         data=json.dumps(role_groups),
         content_type="application/json",

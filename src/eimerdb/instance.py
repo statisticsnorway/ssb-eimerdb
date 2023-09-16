@@ -1,18 +1,15 @@
-from functions import (
-    get_datetime,
-    get_initials,
-    get_json,
-    arrow_schema_from_json,
-    parse_sql_query
-)
-from dapla import FileClient, AuthClient
-from google.cloud import storage
-import json
+import duckdb
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-import duckdb
-from uuid import uuid4
-import pandas as pd
+from dapla import AuthClient
+from dapla import FileClient
+from functions import arrow_schema_from_json
+from functions import get_datetime
+from functions import get_initials
+from functions import get_json
+from functions import parse_sql_query
+from google.cloud import storage
 
 
 class EimerDBInstance:
@@ -123,9 +120,7 @@ class EimerDBInstance:
             new_user = {username: role}
             if username not in users:
                 users.update(new_user)
-                user_roles_blob = bucket.blob(
-                    f"{self.eimer_path}/config/users.json"
-                )
+                user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
                 user_roles_blob.upload_from_string(
                     data=json.dumps(users), content_type="application/json"
                 )
@@ -153,9 +148,7 @@ class EimerDBInstance:
             users = self.users
             if username in users:
                 del users[username]
-                user_roles_blob = bucket.blob(
-                    f"{self.eimer_path}/config/users.json"
-                )
+                user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
                 user_roles_blob.upload_from_string(
                     data=json.dumps(users), content_type="application/json"
                 )
@@ -165,9 +158,7 @@ class EimerDBInstance:
         else:
             raise Exception("Cannot remove user. You are not an admin!")
 
-    def create_table(
-        self, table_name, schema, partition_columns=None, editable=True
-    ):
+    def create_table(self, table_name, schema, partition_columns=None, editable=True):
         """
         Create a new table in EimerDB.
 
@@ -202,10 +193,8 @@ class EimerDBInstance:
             else:
                 new_table[table_name]["partition_columns"] = None
             tables.update(new_table)
-            tables_blob_blob = bucket.blob(
-                f"{self.eimer_path}/config/tables.json"
-            )
-            tables_blob_blob.upload_from_string(
+            tables_blob = bucket.blob(f"{self.eimer_path}/config/tables.json")
+            tables_blob.upload_from_string(
                 data=json.dumps(tables), content_type="application/json"
             )
         else:
@@ -229,9 +218,7 @@ class EimerDBInstance:
             bucket = client.bucket(self.bucket)
             json_data = self.tables[table_name]
             json_schema = json.dumps(json_data["schema"])
-            arrow_schema = arrow_schema_from_json(
-                json.dumps(json_data["schema"])
-            )
+            arrow_schema = arrow_schema_from_json(json.dumps(json_data["schema"]))
 
             table = pa.Table.from_pandas(df, schema=arrow_schema)
             fs = FileClient.get_gcs_file_system()
@@ -278,6 +265,9 @@ class EimerDBInstance:
                 columns = None
             if columns == ["*"]:
                 columns = None
+            if editable is True and unedited is False and columns is not None:
+                if "uuid" not in columns:
+                    columns.append("uuid")
             sql_filter = parsed_query["sql_filter"]
             partitions = table_config["partition_columns"]
             bucket_name = table_config["bucket"]
@@ -295,9 +285,7 @@ class EimerDBInstance:
                     all_matches = True
 
                     for key, values in partition_select.items():
-                        match_found = any(
-                            f"{key}={value}" in parts for value in values
-                        )
+                        match_found = any(f"{key}={value}" in parts for value in values)
 
                         if not match_found:
                             all_matches = False
@@ -307,11 +295,13 @@ class EimerDBInstance:
                     table_files = filtered_files
             dataset = pq.read_table(table_files, filesystem=fs, columns=columns)
             sql_query = sql_query.replace(f"FROM {table_name}", f"FROM dataset")
+            if columns is not None:
+                sql_query = sql_query.replace(" FROM", ", uuid FROM")
 
             con = duckdb.connect()
             df = con.execute(sql_query).df()
 
-            if editable == True and unedited == False:
+            if editable is True and unedited is False:
                 table_name_changes = table_name + "_changes"
                 table_files_changes = fs.glob(
                     f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes}/{partition_levels}"
@@ -325,10 +315,7 @@ class EimerDBInstance:
                             all_matches = True
 
                             for key, values in partition_select.items():
-                                match_found = any(
-                                    f"{key}={value}" in parts
-                                    for value in values
-                                )
+                                match_found = any(f"{key}={value}" in parts for value in values)
 
                                 if not match_found:
                                     all_matches = False
@@ -336,42 +323,43 @@ class EimerDBInstance:
                         if all_matches:
                             filtered_files_changes.append(file)
                         table_files_changes = filtered_files_changes
-
+                    if columns is not None:
+                        columns_changes = columns.copy()
+                    else:
+                        columns_changes = None
+                    if columns_changes is not None:
+                        columns_changes.append("user")
+                        columns_changes.append("datetime")
+                        columns_changes.append("operation")
                     fs = FileClient.get_gcs_file_system()
                     dataset_changes = pq.read_table(
-                        table_files_changes, filesystem=fs, columns=columns
+                        table_files_changes, filesystem=fs, columns=columns_changes
                     )
-                    sql_query = sql_query.replace(
-                        "dataset", "dataset_changes"
-                    )
+                    sql_query = sql_query.replace("dataset", "dataset_changes")
+                    if columns is not None:
+                        sql_query = sql_query.replace(" FROM", ", user, datetime, operation FROM")
                     con = duckdb.connect()
                     df_changes = con.execute(sql_query).df()
                     df_changes["datetime"] = pd.to_datetime(
                         df_changes["datetime"]
                     ).apply(lambda x: x.timestamp())
-                    df_changes.sort_values(
-                        "datetime", ascending=False, inplace=True
-                    )
+                    df_changes.sort_values("datetime", ascending=False, inplace=True)
                     df_changes.drop_duplicates(
                         subset="uuid", keep="first", inplace=True
                     )
-
                     merged = pd.merge(df, df_changes, on="uuid", how="outer")
                     changed_rows = merged[merged["operation"].notna()]
-                    df_cols = df.columns[1:]
+                    df_cols = [col for col in df.columns if col != "uuid"]
+                    df.columns
 
                     for index, row in changed_rows.iterrows():
                         if row["operation"] == "update":
                             for col in df_cols:
-                                df.loc[df["uuid"] == row["uuid"], col] = row[
-                                    col + "_y"
-                                ]
+                                df.loc[df["uuid"] == row["uuid"], col] = row[col + "_y"]
                         elif row["operation"] == "insert":
                             if pd.isnull(row["uuid_x"]):
                                 new_uuid = str(uuid4())
-                                new_row = {
-                                    col: row[col + "_y"] for col in df_cols
-                                }
+                                new_row = {col: row[col + "_y"] for col in df_cols}
                                 new_row["uuid"] = new_uuid
                                 df = df.append(new_row, ignore_index=True)
                         elif row["operation"] == "delete":
@@ -409,9 +397,7 @@ class EimerDBInstance:
                     all_matches = True
 
                     for key, values in partition_select.items():
-                        match_found = any(
-                            f"{key}={value}" in parts for value in values
-                        )
+                        match_found = any(f"{key}={value}" in parts for value in values)
 
                         if not match_found:
                             all_matches = False
@@ -422,9 +408,7 @@ class EimerDBInstance:
             fs = FileClient.get_gcs_file_system()
             dataset = pq.read_table(table_files, filesystem=fs, columns=columns)
             con = duckdb.connect()
-            con.execute(
-                f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}"
-            )
+            con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
             sql_query = sql_query.replace(f"UPDATE {table_name}", f"UPDATE updates")
             con.execute(sql_query)
             df = con.table("updates").df()
