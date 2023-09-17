@@ -278,6 +278,9 @@ class EimerDBInstance:
             table_files = fs.glob(
                 f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name}/{partition_levels}"
             )
+            max_depth = max(obj.count('/') for obj in table_files)
+            table_files = [obj for obj in table_files if obj.count('/') == max_depth]
+            print(table_files)
             if partition_select is not None:
                 filtered_files = []
                 for file in table_files:
@@ -308,6 +311,8 @@ class EimerDBInstance:
                     f"gs://{bucket_name}/eimerdb/{instance_name}/"
                     f"{table_name_changes}/{partition_levels}"
                 )
+                max_depth = max(obj.count('/') for obj in table_files_changes)
+                table_files_changes = [obj for obj in table_files_changes if obj.count('/') == max_depth]
                 if len(table_files_changes) != 0:
                     if partition_select is not None:
                         filtered_files_changes = []
@@ -396,6 +401,8 @@ class EimerDBInstance:
             table_files = fs.glob(
                 f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name}/{partition_levels}"
             )
+            max_depth = max(obj.count('/') for obj in table_files)
+            table_files = [obj for obj in table_files if obj.count('/') == max_depth]
             if partition_select is not None:
                 filtered_files = []
                 for file in table_files:
