@@ -25,7 +25,68 @@
 
 ## Features
 
-- TODO
+### Google Cloud Storage Integration
+
+Create your custom instance for data storage
+```python
+create_eimerdb(bucket="bucket-name", db_name="mvabasen")
+```
+Seamlessly connect to instances hosted on Google Cloud Storage.
+```python
+eimerdb = EimerDBInstance("bucket-name", "myinstance")
+```
+
+### Table Management
+
+Easily create tables with defined schemas.
+```python
+mvabasen.create_table(table_name="Hovedtabell", schema, partition_columns=["aar", "termin"], editable=True)
+```
+Partition tables for efficient data organization.
+
+### SQL Query Support
+
+Execute SQL queries directly on your data.
+```python
+mvabasen.query("SELECT * FROM hovedtabell WHERE substr(nace,1,3) = '479'")
+```
+    
+
+### Data Updates
+
+Perform data updates using SQL statements, including inserts, updates, and deletes.
+Changes are recorded as commits for versioning.
+```python
+mvabasen.query("UPDATE hovedtabell SET omsetning = 999 WHERE aar = '2022' AND termin = '2' AND orgb = '987654321'")
+```
+
+### Unedited Data Access
+
+Retrieve the unedited version of your data for auditing or historical purposes.
+```python
+mvabasen.query("SELECT * FROM hovedtabell WHERE orgb = '987654321'", unedited=True)
+```
+
+### Partition Filtering
+
+Filter data based on partition keys, allowing for precise data selection.
+Optimize query performance by narrowing down search criteria.
+```python
+partitions = {
+"aar": ["2022", "2023"],
+"termin": ["2", "3"]
+}
+
+mvabasen.query("SELECT * FROM hovedtabell WHERE orgb = '911803259'", partition_select=partitions)
+```
+
+### User Management
+
+Add and remove users from your instance.
+Assign specific roles to users for access control.
+```python
+mvabasen.add_user(username="newuser", role="admin")
+```
 
 ## Requirements
 
