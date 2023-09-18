@@ -40,7 +40,9 @@ eimerdb = EimerDBInstance("bucket-name", "myinstance")
 
 Easily create tables with defined schemas.
 ```python
-mvabasen.create_table(table_name="Hovedtabell", schema, partition_columns=["aar", "termin"], editable=True)
+mvabasen.create_table(
+    table_name="Hovedtabell", schema, partition_columns=["aar", "termin"], editable=True
+)
 ```
 Partition tables for efficient data organization.
 
@@ -57,7 +59,9 @@ mvabasen.query("SELECT * FROM hovedtabell WHERE substr(nace,1,3) = '479'")
 Perform data updates using SQL statements, including inserts, updates, and deletes.
 Changes are recorded as commits for versioning.
 ```python
-mvabasen.query("UPDATE hovedtabell SET omsetning = 999 WHERE aar = '2022' AND termin = '2' AND orgb = '987654321'")
+mvabasen.query(
+    "UPDATE hovedtabell SET omsetning = 999 WHERE aar = '2022' AND termin = '2' AND orgb = '987654321'"
+)
 ```
 
 ### Unedited Data Access
