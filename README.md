@@ -77,8 +77,8 @@ Filter data based on partition keys, allowing for precise data selection.
 Optimize query performance by narrowing down search criteria.
 ```python
 partitions = {
-"aar": ["2022", "2023"],
-"termin": ["2", "3"]
+    "aar": ["2022", "2023"],
+    "termin": ["2", "3"]
 }
 
 mvabasen.query("SELECT * FROM hovedtabell WHERE orgb = '911803259'", partition_select=partitions)
