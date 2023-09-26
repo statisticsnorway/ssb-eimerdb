@@ -33,12 +33,13 @@ create_eimerdb(bucket="bucket-name", db_name="mvabasen")
 ```
 Seamlessly connect to instances hosted on Google Cloud Storage.
 ```python
-eimerdb = EimerDBInstance("bucket-name", "myinstance")
+mvabasen = EimerDBInstance("bucket-name", "mvabasen")
 ```
 
 ### Table Management
 
 Easily create tables with defined schemas.
+Example:
 ```python
 mvabasen.create_table(
     table_name="Hovedtabell", schema, partition_columns=["aar", "termin"], editable=True
@@ -66,7 +67,7 @@ mvabasen.query(
 
 ### Unedited Data Access
 
-Retrieve the unedited version of your data for auditing or historical purposes.
+Retrieve the unedited version of your data.
 ```python
 mvabasen.query("SELECT * FROM hovedtabell WHERE orgb = '987654321'", unedited=True)
 ```
@@ -81,7 +82,7 @@ partitions = {
     "termin": ["2", "3"]
 }
 
-mvabasen.query("SELECT * FROM hovedtabell WHERE orgb = '911803259'", partition_select=partitions)
+mvabasen.query("SELECT * FROM hovedtabell WHERE orgb = '987654321'", partition_select=partitions)
 ```
 
 ### User Management
@@ -90,6 +91,7 @@ Add and remove users from your instance.
 Assign specific roles to users for access control.
 ```python
 mvabasen.add_user(username="newuser", role="admin")
+mvabasen.remove_user(username="olduser")
 ```
 
 ## Requirements
