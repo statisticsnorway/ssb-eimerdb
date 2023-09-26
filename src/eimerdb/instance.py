@@ -16,6 +16,7 @@ import duckdb
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pyarrow.dataset as ds
 from dapla import AuthClient
 from dapla import FileClient
 from functions import arrow_schema_from_json
@@ -183,15 +184,15 @@ class EimerDBInstance:
         if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
             client = storage.Client(credentials=token)
-            bucket = client.bucket(self.bucket)
             arrow_schema_from_json(schema)
-            schema = json.loads(schema)
             tables = self.tables
+            bucket = client.bucket(self.bucket)
             initials = get_initials()
             new_table = {
                 table_name: {
                     "created_by": initials,
                     "table_path": f"{self.eimer_path}/{table_name}",
+                    "bucket": self.bucket,
                     "editable": editable,
                     "schema": schema,
                 }
@@ -208,7 +209,7 @@ class EimerDBInstance:
         else:
             raise Exception("Cannot create table. You are not an admin!")
 
-    def main_table_insert(self, table_name, df):
+    def main_table_insert(self, table_name, df, raw=True):
         """Insert unedited data into a main table.
 
         Args:
@@ -221,14 +222,14 @@ class EimerDBInstance:
         """
         if self.is_admin is True:
             json_data = self.tables[table_name]
-            arrow_schema = arrow_schema_from_json(json.dumps(json_data["schema"]))
+            arrow_schema = arrow_schema_from_json(json_data["schema"])
 
             table = pa.Table.from_pandas(df, schema=arrow_schema)
             fs = FileClient.get_gcs_file_system()
 
             table_path = json_data["table_path"]
             partitions = json_data["partition_columns"]
-            filename = f"{table_name}_data_{{i}}"
+            filename = f"{table_name}_data_{{i}}.parquet"
             pq.write_to_dataset(
                 table,
                 root_path=f"gs://{self.bucket}/{table_path}",
@@ -236,6 +237,14 @@ class EimerDBInstance:
                 basename_template=filename,
                 filesystem=fs,
             )
+            if raw is True:
+                pq.write_to_dataset(
+                    table,
+                    root_path=f"gs://{self.bucket}/{table_path}_raw",
+                    partition_cols=partitions,
+                    basename_template=filename,
+                    filesystem=fs,
+                )
             print("Data successfully inserted!")
         else:
             Exception("Cannot insert into main table. You are not an admin!")
@@ -275,8 +284,12 @@ class EimerDBInstance:
             partitions_len = len(partitions)
             partition_levels = "**/" * partitions_len + "*"
             fs = FileClient.get_gcs_file_system()
+            if unedited is True:
+                table_name_parts = table_name + "_raw"
+            else:
+                table_name_parts = table_name
             table_files = fs.glob(
-                f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name}/{partition_levels}"
+                f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_parts}/{partition_levels}"
             )
             max_depth = max(obj.count("/") for obj in table_files)
             table_files = [obj for obj in table_files if obj.count("/") == max_depth]
@@ -299,18 +312,18 @@ class EimerDBInstance:
                     table_files = filtered_files
             dataset = pq.read_table(table_files, filesystem=fs, columns=columns)
             sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
-            if columns is not None and editable is True:
+            if columns is not None and editable is True and unedited is False:
                 sql_query = sql_query.replace(" FROM", ", uuid FROM")
 
             con = duckdb.connect()
             df = con.execute(sql_query).df()
-
             if editable is True and unedited is False:
                 table_name_changes = table_name + "_changes"
                 table_files_changes = fs.glob(
                     f"gs://{bucket_name}/eimerdb/{instance_name}/"
                     f"{table_name_changes}/{partition_levels}"
                 )
+            if editable is True and unedited is False and len(table_files_changes) > 0:
                 max_depth = max(obj.count("/") for obj in table_files_changes)
                 table_files_changes = [
                     obj for obj in table_files_changes if obj.count("/") == max_depth
@@ -331,9 +344,9 @@ class EimerDBInstance:
                                 if not match_found:
                                     all_matches = False
                                     break
-                        if all_matches:
-                            filtered_files_changes.append(file)
-                        table_files_changes = filtered_files_changes
+                            if all_matches:
+                                filtered_files_changes.append(file)
+                            table_files_changes = filtered_files_changes
                     if columns is not None:
                         columns_changes = columns.copy()
                     else:
@@ -347,40 +360,43 @@ class EimerDBInstance:
                         table_files_changes, filesystem=fs, columns=columns_changes
                     )
                     if len(dataset_changes) == 0 or dataset_changes is None:
-                        print("There are no changes for this subset.")
-                    sql_query = sql_query.replace("dataset", "dataset_changes")
-                    if columns is not None:
-                        sql_query = sql_query.replace(
-                            " FROM", ", user, datetime, operation FROM"
+                        pass
+                    else:
+                        sql_query = sql_query.replace("dataset", "dataset_changes")
+                        if columns is not None:
+                            sql_query = sql_query.replace(
+                                " FROM", ", user, datetime, operation FROM"
+                            )
+                        con = duckdb.connect()
+                        df_changes = con.execute(sql_query).df()
+                        df_changes["datetime"] = pd.to_datetime(
+                            df_changes["datetime"]
+                        ).apply(lambda x: x.timestamp())
+                        df_changes.sort_values("datetime", ascending=False, inplace=True)
+                        df_changes.drop_duplicates(
+                            subset="uuid", keep="first", inplace=True
                         )
-                    con = duckdb.connect()
-                    df_changes = con.execute(sql_query).df()
-                    df_changes["datetime"] = pd.to_datetime(
-                        df_changes["datetime"]
-                    ).apply(lambda x: x.timestamp())
-                    df_changes.sort_values("datetime", ascending=False, inplace=True)
-                    df_changes.drop_duplicates(
-                        subset="uuid", keep="first", inplace=True
-                    )
-                    merged = pd.merge(df, df_changes, on="uuid", how="outer")
-                    changed_rows = merged[merged["operation"].notna()]
-                    df_cols = [col for col in df.columns if col != "uuid"]
-                    df.columns
+                        merged = pd.merge(df, df_changes, on="uuid", how="outer")
+                        changed_rows = merged[merged["operation"].notna()]
+                        df_cols = [col for col in df.columns if col != "uuid"]
 
-                    for _, row in changed_rows.iterrows():
-                        if row["operation"] == "update":
-                            for col in df_cols:
-                                df.loc[df["uuid"] == row["uuid"], col] = row[col + "_y"]
-                        elif row["operation"] == "insert":
-                            if pd.isnull(row["uuid_x"]):
-                                new_uuid = str(uuid4())
-                                new_row = {col: row[col + "_y"] for col in df_cols}
-                                new_row["uuid"] = new_uuid
-                                df = df.append(new_row, ignore_index=True)
-                        elif row["operation"] == "delete":
-                            df = df[df["uuid"] != row["uuid"]]
-                        elif row["operation"] == "reset":
-                            pass
+                        for _, row in changed_rows.iterrows():
+                            if row["operation"] == "update":
+                                for col in df_cols:
+                                    df.loc[df["uuid"] == row["uuid"], col] = row[col + "_y"]
+                            elif row["operation"] == "insert":
+                                if pd.isnull(row["uuid_x"]):
+                                    new_uuid = str(uuid4())
+                                    new_row = {col: row[col + "_y"] for col in df_cols}
+                                    new_row["uuid"] = new_uuid
+                                    df = df.append(new_row, ignore_index=True)
+                            elif row["operation"] == "delete":
+                                df = df[df["uuid"] != row["uuid"]]
+                            elif row["operation"] == "reset":
+                                pass
+
+            for p in partitions:
+                df[p] = df[p].astype(str)
             return df
         elif parsed_query["operation"] == "UPDATE":
             if editable is False:
@@ -439,7 +455,7 @@ class EimerDBInstance:
             update_table = pa.Table.from_pandas(df)
 
             uuid = uuid4()
-            filename = f"commit_{uuid}_{{i}}"
+            filename = f"commit_{uuid}_{{i}}.parquet"
 
             pq.write_to_dataset(
                 update_table,
@@ -448,4 +464,156 @@ class EimerDBInstance:
                 basename_template=filename,
                 filesystem=fs,
             )
-            print("Data successfully updated!")
+    def query_changes(self, sql_query, partition_select=None, unedited=False):
+        parsed_query = parse_sql_query(sql_query)
+        table_name = parsed_query["table_name"]
+        table_config = self.tables[table_name]
+        editable = table_config["editable"]
+        instance_name = self.eimerdb_name
+        if parsed_query["operation"] == "SELECT":
+            try:
+                columns = parsed_query["columns"]
+            except Exception:
+                columns = None
+            if columns == ["*"]:
+                columns = None
+            partitions = table_config["partition_columns"]
+            bucket_name = table_config["bucket"]
+            partitions_len = len(partitions)
+            partition_levels = "**/" * partitions_len + "*"
+            fs = FileClient.get_gcs_file_system()
+            table_name_changes = table_name + "_changes"
+            table_files_changes = fs.glob(
+                f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes}/{partition_levels}"
+            )
+            try:
+                max_depth = max(obj.count("/") for obj in table_files_changes)
+                no_changes = False
+            except ValueError:
+                no_changes = True
+                df_changes = pd.DataFrame()
+            if no_changes is not True:
+                table_files_changes = [obj for obj in table_files_changes if obj.count("/") == max_depth]
+                if partition_select is not None:
+                    filtered_files = []
+                    for file in table_files_changes:
+                        parts = file.split("/")
+
+                        all_matches = True
+
+                        for key, values in partition_select.items():
+                            match_found = any(f"{key}={value}" in parts for value in values)
+
+                            if not match_found:
+                                all_matches = False
+                                break
+                        if all_matches:
+                            filtered_files.append(file)
+                        table_files_changes = filtered_files
+                dataset = pq.read_table(table_files_changes, filesystem=fs, columns=columns)
+                sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
+                if columns is not None and editable is True and unedited is False:
+                    sql_query = sql_query.replace(" FROM", ", uuid FROM")
+
+                con = duckdb.connect()
+                df_changes = con.execute(sql_query).df()
+
+            table_name_changes_all = table_name + "_changes_all"
+            table_files_changes_all = fs.glob(
+                f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes_all}/{partition_levels}"
+            )
+            try:
+                max_depth = max(obj.count("/") for obj in table_files_changes_all)
+                no_changes_all = False
+            except ValueError:
+                no_changes_all = True
+                df_changes_all = pd.DataFrame()
+            if no_changes_all is not True:
+                table_files_changes_all = [obj for obj in table_files_changes_all if obj.count("/") == max_depth]
+                if partition_select is not None:
+                    filtered_files = []
+                    for file in table_files_changes_all:
+                        parts = file.split("/")
+
+                        all_matches = True
+
+                        for key, values in partition_select.items():
+                            match_found = any(f"{key}={value}" in parts for value in values)
+
+                            if not match_found:
+                                all_matches = False
+                                break
+                        if all_matches:
+                            filtered_files.append(file)
+                        table_files_changes_all = filtered_files
+                dataset = pq.read_table(table_files_changes_all, filesystem=fs, columns=columns)
+                sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
+                if columns is not None and editable is True and unedited is False:
+                    sql_query = sql_query.replace(" FROM", ", uuid FROM")
+
+                con = duckdb.connect()
+                df_changes_all = con.execute(sql_query).df()
+
+            df = pd.concat([df_changes_all, df_changes])
+            return df
+
+    def get_changes(self, table_name):
+        fs = FileClient.get_gcs_file_system()
+        table_changes = table_name + "_changes"
+        bucket = self.bucket
+        path = self.tables[table_name]["table_path"]
+        dataset = ds.dataset(
+            f"{bucket}/{path}_changes/",
+            format="parquet",
+            partitioning="hive",
+            filesystem=fs,
+        )
+        df_changes = dataset.to_table().to_pandas()
+        return df_changes
+
+
+    def merge_changes(self, table_name):
+        fs = FileClient.get_gcs_file_system()
+        df_changes = self.get_changes(table_name)
+
+        token = AuthClient.fetch_google_credentials()
+        client = storage.Client(credentials=token)
+        bucket = client.bucket(self.bucket)
+        path = self.tables[table_name]["table_path"]
+        partitions = self.tables[table_name]["partition_columns"]
+        source_folder = self.tables[table_name]["table_path"] + "_changes"
+        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
+        filename = f"merged_commit_{uuid4()}_{{i}}.parquet"
+        table = pa.Table.from_pandas(df_changes)
+        pq.write_to_dataset(
+            table,
+            root_path=f"gs://{self.bucket}/{source_folder}",
+            partition_cols=partitions,
+            basename_template=filename,
+            filesystem=fs,
+        )
+        for blob in blobs_to_delete:
+            blob.delete()
+        print("The changes were successfully merged into one file per partition!")
+
+
+    def merge_changes_into_main(self, table_name):
+        if self.is_admin is True:
+            merged = self.query(
+                f"SELECT * FROM {table_name}", partition_select=None, unedited=False
+            )
+            self.main_table_insert(table_name, merged, raw=False)
+            partitions = self.tables[table_name]["partition_columns"]
+            partition_levels = "**/" * len(partitions) + "*"
+            fs = FileClient.get_gcs_file_system()
+            table_files = fs.glob(
+                f"gs://ssb-prod-mva-melding-data-produkt/eimerdb/mvabasen/hovedtabell_changes/{partition_levels}"
+            )
+            max_depth = max(obj.count("/") for obj in table_files)
+            files_to_move = [obj for obj in table_files if obj.count("/") == max_depth]
+
+            for file in files_to_move:
+                moved_file = file.replace("hovedtabell_changes", "hovedtabell_changes_all")
+                fs.mv(f"gs://{file}", f"gs://{moved_file}")
+            print("Changes merged into main successfully!")
+
