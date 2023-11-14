@@ -396,7 +396,10 @@ class EimerDBInstance:
                                 pass
 
             for p in partitions:
-                df[p] = df[p].astype(str)
+                try:
+                    df[p] = df[p].astype(str)
+                except KeyError:
+                    pass
             return df
         elif parsed_query["operation"] == "UPDATE":
             if editable is False:
