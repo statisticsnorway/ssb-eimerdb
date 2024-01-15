@@ -380,20 +380,28 @@ class EimerDBInstance:
                         changed_rows = merged[merged["operation"].notna()]
                         df_cols = [col for col in df.columns if col != "uuid"]
 
-                        for _, row in changed_rows.iterrows():
-                            if row["operation"] == "update":
-                                for col in df_cols:
-                                    df.loc[df["uuid"] == row["uuid"], col] = row[col + "_y"]
-                            elif row["operation"] == "insert":
+                        insert_rows = changed_rows[changed_rows["operation"] == "insert"]
+                        delete_rows = changed_rows[changed_rows["operation"] == "delete"]
+                        reset_rows = changed_rows[changed_rows["operation"] == "reset"]
+
+                        if not insert_rows.empty:
+                            for _, row in insert_rows.iterrows():
                                 if pd.isnull(row["uuid_x"]):
                                     new_uuid = str(uuid4())
                                     new_row = {col: row[col + "_y"] for col in df_cols}
                                     new_row["uuid"] = new_uuid
                                     df = df.append(new_row, ignore_index=True)
-                            elif row["operation"] == "delete":
+                        if not delete_rows.empty:
+                            for _, row in delete.iterrows():
                                 df = df[df["uuid"] != row["uuid"]]
-                            elif row["operation"] == "reset":
-                                pass
+
+                        changed_rows.set_index('uuid', inplace=True)
+                        changed_rows.columns = changed_rows.columns.str.rstrip('_y')
+                        changed_rows.reset_index(inplace=True)
+
+                        common_cols = df.columns.intersection(changed_rows.columns)
+                        update_df = changed_rows[common_cols]
+                        df.update(update_df)
 
             for p in partitions:
                 try:
@@ -418,44 +426,23 @@ class EimerDBInstance:
             bucket_name = table_config["bucket"]
             partitions_len = len(partitions)
             partition_levels = "**/" * partitions_len + "*"
-            fs = FileClient.get_gcs_file_system()
-            table_files = fs.glob(
-                f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name}/{partition_levels}"
-            )
-            max_depth = max(obj.count("/") for obj in table_files)
-            table_files = [obj for obj in table_files if obj.count("/") == max_depth]
-            if partition_select is not None:
-                filtered_files = []
-                for file in table_files:
-                    parts = file.split("/")
-
-                    all_matches = True
-
-                    for key, values in partition_select.items():
-                        match_found = any(f"{key}={value}" in parts for value in values)
-
-                        if not match_found:
-                            all_matches = False
-                            break
-                    if all_matches:
-                        filtered_files.append(file)
-                    table_files = filtered_files
-            fs = FileClient.get_gcs_file_system()
-            dataset = pq.read_table(table_files, filesystem=fs, columns=columns)
-            if len(dataset) == 0 or dataset is None:
-                print("No data")
+            
+            df = self.query(f"SELECT * FROM {table_name} WHERE {where_clause}", partition_select)
+            df["user"] = get_initials()
+            df["datetime"] = get_datetime()
+            df["operation"] = "update"
+            dataset = pa.Table.from_pandas(df)
             con = duckdb.connect()
             con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
             sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
             con.execute(sql_query)
-            df = con.table("updates").df()
-            df["user"] = get_initials()
-            df["datetime"] = get_datetime()
-            df["operation"] = "update"
+            df_updates = con.table("updates").df()
+            
+            df_updates_len = len(df_updates)
 
             table_path = self.tables[table_name]["table_path"] + "_changes"
             fs = FileClient.get_gcs_file_system()
-            update_table = pa.Table.from_pandas(df)
+            update_table = pa.Table.from_pandas(df_updates)
 
             uuid = uuid4()
             filename = f"commit_{uuid}_{{i}}.parquet"
@@ -467,6 +454,7 @@ class EimerDBInstance:
                 basename_template=filename,
                 filesystem=fs,
             )
+            return print(f"{df_updates_len} rows updated by {get_initials()}")
     def query_changes(self, sql_query, partition_select=None, unedited=False):
         parsed_query = parse_sql_query(sql_query)
         table_name = parsed_query["table_name"]
