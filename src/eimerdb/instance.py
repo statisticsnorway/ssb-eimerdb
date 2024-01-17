@@ -311,6 +311,7 @@ class EimerDBInstance:
                         filtered_files.append(file)
                     table_files = filtered_files
             dataset = pq.read_table(table_files, filesystem=fs, columns=columns)
+            sql_query_raw = sql_query
             sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
             if columns is not None and editable is True and unedited is False:
                 sql_query = sql_query.replace(" FROM", ", uuid FROM")
@@ -324,85 +325,38 @@ class EimerDBInstance:
                     f"{table_name_changes}/{partition_levels}"
                 )
             if editable is True and unedited is False and len(table_files_changes) > 0:
-                max_depth = max(obj.count("/") for obj in table_files_changes)
-                table_files_changes = [
-                    obj for obj in table_files_changes if obj.count("/") == max_depth
-                ]
-                if len(table_files_changes) != 0:
-                    if partition_select is not None:
-                        filtered_files_changes = []
-                        for file in table_files_changes:
-                            parts = file.split("/")
-
-                            all_matches = True
-
-                            for key, values in partition_select.items():
-                                match_found = any(
-                                    f"{key}={value}" in parts for value in values
-                                )
-
-                                if not match_found:
-                                    all_matches = False
-                                    break
-                            if all_matches:
-                                filtered_files_changes.append(file)
-                            table_files_changes = filtered_files_changes
-                    if columns is not None:
-                        columns_changes = columns.copy()
-                    else:
-                        columns_changes = None
-                    if columns_changes is not None:
-                        columns_changes.append("user")
-                        columns_changes.append("datetime")
-                        columns_changes.append("operation")
-                    fs = FileClient.get_gcs_file_system()
-                    dataset_changes = pq.read_table(
-                        table_files_changes, filesystem=fs, columns=columns_changes
+                df_changes = self.query_changes(sql_query_raw, partition_select)
+                if len(df_changes) == 0 or df_changes is None:
+                    pass
+                else:
+                    df_changes["datetime"] = pd.to_datetime(
+                        df_changes["datetime"]
+                    ).apply(lambda x: x.timestamp())
+                    df_changes.sort_values("datetime", ascending=False, inplace=True)
+                    df_changes.drop_duplicates(
+                        subset="uuid", keep="first", inplace=True
                     )
-                    if len(dataset_changes) == 0 or dataset_changes is None:
-                        pass
-                    else:
-                        sql_query = sql_query.replace("dataset", "dataset_changes")
-                        if columns is not None:
-                            sql_query = sql_query.replace(
-                                " FROM", ", user, datetime, operation FROM"
-                            )
-                        con = duckdb.connect()
-                        df_changes = con.execute(sql_query).df()
-                        df_changes["datetime"] = pd.to_datetime(
-                            df_changes["datetime"]
-                        ).apply(lambda x: x.timestamp())
-                        df_changes.sort_values("datetime", ascending=False, inplace=True)
-                        df_changes.drop_duplicates(
-                            subset="uuid", keep="first", inplace=True
-                        )
-                        merged = pd.merge(df, df_changes, on="uuid", how="outer")
-                        changed_rows = merged[merged["operation"].notna()]
-                        df_cols = [col for col in df.columns if col != "uuid"]
+                    df_cols = [col for col in df.columns if col != "uuid"]
 
-                        insert_rows = changed_rows[changed_rows["operation"] == "insert"]
-                        delete_rows = changed_rows[changed_rows["operation"] == "delete"]
-                        reset_rows = changed_rows[changed_rows["operation"] == "reset"]
+                    insert_rows = df_changes[df_changes["operation"] == "insert"]
+                    delete_rows = df_changes[df_changes["operation"] == "delete"]
+                    reset_rows = df_changes[df_changes["operation"] == "reset"]
+                    
+                    # Fungerer foreløpig ikke!
+                    if not insert_rows.empty:
+                        for _, row in insert_rows.iterrows():
+                            if pd.isnull(row["uuid_x"]):
+                                new_uuid = str(uuid4())
+                                new_row = {col: row[col + "_y"] for col in df_cols}
+                                new_row["uuid"] = new_uuid
+                                df = df.append(new_row, ignore_index=True)
+                    if not delete_rows.empty:
+                        for _, row in delete.iterrows():
+                            df = df[df["uuid"] != row["uuid"]]
 
-                        if not insert_rows.empty:
-                            for _, row in insert_rows.iterrows():
-                                if pd.isnull(row["uuid_x"]):
-                                    new_uuid = str(uuid4())
-                                    new_row = {col: row[col + "_y"] for col in df_cols}
-                                    new_row["uuid"] = new_uuid
-                                    df = df.append(new_row, ignore_index=True)
-                        if not delete_rows.empty:
-                            for _, row in delete.iterrows():
-                                df = df[df["uuid"] != row["uuid"]]
-
-                        changed_rows.set_index('uuid', inplace=True)
-                        changed_rows.columns = changed_rows.columns.str.rstrip('_y')
-                        changed_rows.reset_index(inplace=True)
-
-                        common_cols = df.columns.intersection(changed_rows.columns)
-                        update_df = changed_rows[common_cols]
-                        df.update(update_df)
-
+                    common_cols = df.columns.intersection(df_changes.columns)
+                    update_df = df_changes[common_cols]
+                    df.update(update_df)
             for p in partitions:
                 try:
                     df[p] = df[p].astype(str)
