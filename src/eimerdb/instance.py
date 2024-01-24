@@ -249,7 +249,9 @@ class EimerDBInstance:
         else:
             Exception("Cannot insert into main table. You are not an admin!")
 
-    def query(self, sql_query, partition_select=None, unedited=False, output_format="pandas"):
+    def query(
+        self, sql_query, partition_select=None, unedited=False, output_format="pandas"
+    ):
         """Execute an SQL query on an EimerDB table.
 
         Args:
@@ -321,33 +323,54 @@ class EimerDBInstance:
                     f"{table_name_changes}/{partition_levels}"
                 )
             if editable is True and unedited is False and len(table_files_changes) > 0:
-                df_changes = self.query_changes(f"SELECT * FROM {table_name}", partition_select, output_format="arrow", changes_output="recent")
+                df_changes = self.query_changes(
+                    f"SELECT * FROM {table_name}",
+                    partition_select,
+                    output_format="arrow",
+                    changes_output="recent"
+                )
                 if df_changes is None:
                     pass
                 else:
                     schema = df.schema
-                    timestamp_column = df_changes['datetime'].cast(pa.timestamp('ns'))
+                    timestamp_column = df_changes["datetime"].cast(pa.timestamp("ns"))
 
-                    df_changes = df_changes.drop(['datetime'])
+                    df_changes = df_changes.drop(["datetime"])
 
-                    df_changes = df_changes.add_column(len(df_changes.column_names), pa.field('datetime', pa.timestamp('ns')), timestamp_column)
+                    df_changes = df_changes.add_column(
+                        len(df_changes.column_names),
+                        pa.field('datetime', pa.timestamp('ns')),
+                        timestamp_column
+                    )
 
-                    uuid_max = df_changes.group_by("uuid").aggregate([("datetime", "max")])
+                    uuid_max = df_changes.group_by("uuid").aggregate(
+                        [("datetime", "max")]
+                    )
 
                     new_names = ["uuid", "datetime"]
 
                     uuid_max = uuid_max.rename_columns(new_names)
 
-                    df_changes= df_changes.join(uuid_max, ["uuid", "datetime"], join_type="inner").combine_chunks()
+                    df_changes= df_changes.join(
+                        uuid_max, ["uuid", "datetime"], join_type="inner"
+                    ).combine_chunks()
 
-                    df_updates = df_changes.filter(pa.compute.field("operation") == "update")
+                    df_updates = df_changes.filter(
+                        pa.compute.field("operation") == "update"
+                    )
                     df_updates = df_updates.drop(["datetime", "operation", "user"])
                     schema = df_updates.schema
                     df = df.cast(schema)
 
-                    df_deletes = df_changes.filter(pa.compute.field("operation") == "delete")
-                    df_inserts = df_changes.filter(pa.compute.field("operation") == "insert")
-                    df_resets = df_changes.filter(pa.compute.field("operation") == "reset")
+                    df_deletes = df_changes.filter(
+                        pa.compute.field("operation") == "delete"
+                    )
+                    df_inserts = df_changes.filter(
+                        pa.compute.field("operation") == "insert"
+                    )
+                    df_resets = df_changes.filter(
+                        pa.compute.field("operation") == "reset"
+                    )
 
                     uuid_updates = df_changes["uuid"]
                     filter_array = pa.compute.invert(pa.compute.is_in(df['uuid'], uuid_updates))
@@ -379,7 +402,9 @@ class EimerDBInstance:
             partitions_len = len(partitions)
             partition_levels = "**/" * partitions_len + "*"
             
-            df = self.query(f"SELECT * FROM {table_name} WHERE {where_clause}", partition_select)
+            df = self.query(
+                f"SELECT * FROM {table_name} WHERE {where_clause}", partition_select
+            )
             df["user"] = get_initials()
             df["datetime"] = get_datetime()
             df["operation"] = "update"
@@ -408,7 +433,14 @@ class EimerDBInstance:
             )
             return print(f"{df_updates_len} rows updated by {get_initials()}")
 
-    def query_changes(self, sql_query, partition_select=None, unedited=False, output_format="pandas", changes_output="all"):
+    def query_changes(
+        self, 
+        sql_query, 
+        partition_select=None, 
+        unedited=False, 
+        output_format="pandas", 
+        changes_output="all"
+    ):
         parsed_query = parse_sql_query(sql_query)
         table_name = parsed_query["table_name"]
         table_config = self.tables[table_name]
@@ -437,7 +469,9 @@ class EimerDBInstance:
                 no_changes = True
                 df_changes = pd.DataFrame()
             if no_changes is not True:
-                table_files_changes = [obj for obj in table_files_changes if obj.count("/") == max_depth]
+                table_files_changes = [
+                    obj for obj in table_files_changes if obj.count("/") == max_depth
+                ]
                 if partition_select is not None:
                     filtered_files = []
                     for file in table_files_changes:
@@ -446,7 +480,9 @@ class EimerDBInstance:
                         all_matches = True
 
                         for key, values in partition_select.items():
-                            match_found = any(f"{key}={value}" in parts for value in values)
+                            match_found = any(
+                                f"{key}={value}" in parts for value in values
+                            )
 
                             if not match_found:
                                 all_matches = False
@@ -473,7 +509,9 @@ class EimerDBInstance:
             except ValueError:
                 no_changes_all = True
             if no_changes_all is not True:
-                table_files_changes_all = [obj for obj in table_files_changes_all if obj.count("/") == max_depth]
+                table_files_changes_all = [
+                    obj for obj in table_files_changes_all if obj.count("/") == max_depth
+                ]
                 if partition_select is not None:
                     filtered_files = []
                     for file in table_files_changes_all:
@@ -482,7 +520,9 @@ class EimerDBInstance:
                         all_matches = True
 
                         for key, values in partition_select.items():
-                            match_found = any(f"{key}={value}" in parts for value in values)
+                            match_found = any(
+                                f"{key}={value}" in parts for value in values
+                            )
 
                             if not match_found:
                                 all_matches = False
@@ -490,7 +530,9 @@ class EimerDBInstance:
                         if all_matches:
                             filtered_files.append(file)
                         table_files_changes_all = filtered_files
-                dataset = pq.read_table(table_files_changes_all, filesystem=fs, columns=columns)
+                dataset = pq.read_table(
+                    table_files_changes_all, filesystem=fs, columns=columns
+                )
                 sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
                 if columns is not None and editable is True and unedited is False:
                     sql_query = sql_query.replace(" FROM", ", uuid FROM")
@@ -567,7 +609,9 @@ class EimerDBInstance:
             files_to_move = [obj for obj in table_files if obj.count("/") == max_depth]
 
             for file in files_to_move:
-                moved_file = file.replace("hovedtabell_changes", "hovedtabell_changes_all")
+                moved_file = file.replace(
+                    "hovedtabell_changes", "hovedtabell_changes_all"
+                )
                 fs.mv(f"gs://{file}", f"gs://{moved_file}")
             print("Changes merged into main successfully!")
 
