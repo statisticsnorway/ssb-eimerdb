@@ -15,8 +15,8 @@ from uuid import uuid4
 import duckdb
 import pandas as pd
 import pyarrow as pa
-import pyarrow.parquet as pq
 import pyarrow.dataset as ds
+import pyarrow.parquet as pq
 from dapla import AuthClient
 from dapla import FileClient
 from functions import arrow_schema_from_json
@@ -327,7 +327,7 @@ class EimerDBInstance:
                     f"SELECT * FROM {table_name}",
                     partition_select,
                     output_format="arrow",
-                    changes_output="recent"
+                    changes_output="recent",
                 )
                 if df_changes is None:
                     pass
@@ -339,8 +339,8 @@ class EimerDBInstance:
 
                     df_changes = df_changes.add_column(
                         len(df_changes.column_names),
-                        pa.field('datetime', pa.timestamp("ns")),
-                        timestamp_column
+                        pa.field("datetime", pa.timestamp("ns")),
+                        timestamp_column,
                     )
 
                     uuid_max = df_changes.group_by("uuid").aggregate(
@@ -351,7 +351,7 @@ class EimerDBInstance:
 
                     uuid_max = uuid_max.rename_columns(new_names)
 
-                    df_changes= df_changes.join(
+                    df_changes = df_changes.join(
                         uuid_max, ["uuid", "datetime"], join_type="inner"
                     ).combine_chunks()
 
@@ -373,7 +373,9 @@ class EimerDBInstance:
                     )
 
                     uuid_updates = df_changes["uuid"]
-                    filter_array = pa.compute.invert(pa.compute.is_in(df['uuid'], uuid_updates))
+                    filter_array = pa.compute.invert(
+                        pa.compute.is_in(df["uuid"], uuid_updates)
+                    )
                     df_filtered = pa.compute.filter(df, filter_array)
                     df = pa.concat_tables([df_filtered, df_updates])
 
@@ -439,7 +441,7 @@ class EimerDBInstance:
         partition_select=None, 
         unedited=False, 
         output_format="pandas", 
-        changes_output="all"
+        changes_output="all",query,
     ):
         parsed_query = parse_sql_query(sql_query)
         table_name = parsed_query["table_name"]
@@ -510,7 +512,9 @@ class EimerDBInstance:
                 no_changes_all = True
             if no_changes_all is not True:
                 table_files_changes_all = [
-                    obj for obj in table_files_changes_all if obj.count("/") == max_depth
+                    obj
+                    for obj in table_files_changes_all
+                    if obj.count("/") == max_depth
                 ]
                 if partition_select is not None:
                     filtered_files = []
