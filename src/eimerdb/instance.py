@@ -442,7 +442,6 @@ class EimerDBInstance:
         unedited=False, 
         output_format="pandas", 
         changes_output="all",
-        query,
     ):
         parsed_query = parse_sql_query(sql_query)
         table_name = parsed_query["table_name"]
