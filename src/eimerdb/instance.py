@@ -339,7 +339,7 @@ class EimerDBInstance:
 
                     df_changes = df_changes.add_column(
                         len(df_changes.column_names),
-                        pa.field('datetime', pa.timestamp('ns')),
+                        pa.field('datetime', pa.timestamp("ns")),
                         timestamp_column
                     )
 
