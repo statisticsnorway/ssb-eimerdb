@@ -1,4 +1,5 @@
-"""EimerDB Instance Module.
+"""
+EimerDB Instance Module.
 
 This module contains the EimerDBInstance class, which represents an instance
 of the EimerDB database. It provides methods to interact with EimerDB,
@@ -8,15 +9,14 @@ and querying data.
 Author: Stian Elisenberg
 Date: September 16, 2023
 """
-
+import logging
 import json
 from uuid import uuid4
-
 import duckdb
 import pandas as pd
 import pyarrow as pa
-import pyarrow.dataset as ds
 import pyarrow.parquet as pq
+import pyarrow.dataset as ds
 from dapla import AuthClient
 from dapla import FileClient
 from functions import arrow_schema_from_json
@@ -25,6 +25,9 @@ from functions import get_initials
 from functions import get_json
 from functions import parse_sql_query
 from google.cloud import storage
+
+logger = logging.getLogger(__name__)
+
 
 class EimerDBInstance:
     """Represents an instance of the EimerDB database.
@@ -267,6 +270,10 @@ class EimerDBInstance:
 
         """
         parsed_query = parse_sql_query(sql_query)
+        try:
+            where_clause = parsed_query["where_clause"]
+        except:
+            where_clause = ""
         table_name = parsed_query["table_name"]
         table_config = self.tables[table_name]
         editable = table_config["editable"]
@@ -318,20 +325,17 @@ class EimerDBInstance:
 
             if editable is True and unedited is False:
                 table_name_changes = table_name + "_changes"
-                table_files_changes = fs.glob(
-                    f"gs://{bucket_name}/eimerdb/{instance_name}/"
-                    f"{table_name_changes}/{partition_levels}"
-                )
-            if editable is True and unedited is False and len(table_files_changes) > 0:
+                if where_clause != "":
+                    where_clause = "WHERE " + where_clause
                 df_changes = self.query_changes(
-                    f"SELECT * FROM {table_name}",
+                    f"SELECT * FROM {table_name} {where_clause}",
                     partition_select,
                     output_format="arrow",
                     changes_output="recent",
                 )
-                if df_changes is None:
-                    pass
-                else:
+                
+            if editable is True and unedited is False and df_changes is not None:
+                if df_changes.num_rows != 0:
                     schema = df.schema
                     timestamp_column = df_changes["datetime"].cast(pa.timestamp("ns"))
 
@@ -469,7 +473,11 @@ class EimerDBInstance:
                 no_changes = False
             except ValueError:
                 no_changes = True
-                df_changes = pd.DataFrame()
+                if output_format == "pandas":
+                    df_changes = pd.DataFrame()
+                elif output_format == "arrow":
+                    df_changes = pa.table([])
+                    
             if no_changes is not True:
                 table_files_changes = [
                     obj for obj in table_files_changes if obj.count("/") == max_depth
@@ -494,12 +502,18 @@ class EimerDBInstance:
                         table_files_changes = filtered_files
                 dataset = pq.read_table(table_files_changes, filesystem=fs)
                 sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
-
-                con = duckdb.connect()
-                if output_format == "pandas":
-                    df_changes = con.execute(sql_query).df()
-                elif output_format == "arrow":
-                    df_changes = con.execute(sql_query).arrow()
+                if dataset.num_rows != 0:
+                    con = duckdb.connect()
+                    if output_format == "pandas":
+                        df_changes = con.execute(sql_query).df()
+                    elif output_format == "arrow":
+                        df_changes = con.execute(sql_query).arrow()
+                
+                elif dataset.num_rows == 0:
+                    if output_format == "pandas":
+                        df_changes = pd.DataFrame()
+                    elif output_format == "arrow":
+                        df_changes = pa.table([])
 
             table_name_changes_all = table_name + "_changes_all"
             table_files_changes_all = fs.glob(
@@ -540,14 +554,14 @@ class EimerDBInstance:
                 sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
                 if columns is not None and editable is True and unedited is False:
                     sql_query = sql_query.replace(" FROM", ", uuid FROM")
-
-                con = duckdb.connect()
-                if output_format == "pandas":
-                    df_changes_all = con.execute(sql_query).df()
-                    df = pd.concat([df_changes_all, df_changes])
-                elif output_format == "arrow":
-                    df_changes_all = con.execute(sql_query).arrow()
-                    df = pa.concat_tables([df_changes_all, df_changes])
+                if dataset.num_rows != 0:
+                    con = duckdb.connect()
+                    if output_format == "pandas":
+                        df_changes_all = con.execute(sql_query).df()
+                        df = pd.concat([df_changes_all, df_changes])
+                    elif output_format == "arrow":
+                        df_changes_all = con.execute(sql_query).arrow()
+                        df = pa.concat_tables([df_changes_all, df_changes])
    
             if changes_output == "all":
                 if no_changes_all is not True:
@@ -618,4 +632,3 @@ class EimerDBInstance:
                 )
                 fs.mv(f"gs://{file}", f"gs://{moved_file}")
             print("Changes merged into main successfully!")
-
