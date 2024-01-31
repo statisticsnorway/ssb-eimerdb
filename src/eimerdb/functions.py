@@ -1,8 +1,8 @@
-"""A collection of useful functions.
+"""
+A collection of useful functions.
 
 The template and this example uses Google style docstrings as described at:
 https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
-
 """
 
 import json
@@ -12,9 +12,12 @@ from datetime import datetime
 import pyarrow as pa
 from dapla import AuthClient
 from google.cloud import storage
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-def get_datetime():
+def get_datetime() -> str:
     """A function that returns a datetime string.
 
     Returns:
@@ -26,23 +29,30 @@ def get_datetime():
     return datetime_str
 
 
-def get_initials():
-    """A function that returns a datetime string.
+JUPYTERHUB_USER_ENV = "JUPYTERHUB_USER"
+
+
+def get_initials() -> str:
+    """A function that returns user initials.
 
     Returns:
         The users initials.
 
     """
-    user = os.environ.get("JUPYTERHUB_USER")
-    initials = user.split("@")[0][:3]
-    return initials
+    if JUPYTERHUB_USER_ENV in os.environ:
+        user = os.environ.get(JUPYTERHUB_USER_ENV)
+        return user.split("@")[0][:3]
+
+    return AuthClient.fetch_google_credentials().client_id
 
 
-def get_json(bucket_name, blob_path):
-    """A function that gets a json file from google cloud storage.
+def get_json(bucket_name: str,
+             blob_path: str) -> dict:
+    """A function that gets a json file from Google Cloud Storage.
 
     Args:
         bucket_name: Name of bucket
+        blob_path: Path to blob
 
     Returns:
         The users initials.
@@ -59,7 +69,7 @@ def get_json(bucket_name, blob_path):
     return data
 
 
-def arrow_schema_from_json(json_schema: list):
+def arrow_schema_from_json(json_schema: list) -> pa.Schema:
     """A function converts a json file to an arrow schema.
 
      Args:
@@ -78,10 +88,11 @@ def arrow_schema_from_json(json_schema: list):
         metadata = {"label": label}
         field = pa.field(name, field_type, metadata=metadata)
         fields.append(field)
+
     return pa.schema(fields)
 
 
-def parse_sql_query(sql_query: str):
+def parse_sql_query(sql_query: str) -> dict:
     """A function that parses the given sql query.
 
      Args:
@@ -131,11 +142,12 @@ def parse_sql_query(sql_query: str):
         )
 
 
-def create_eimerdb(bucket_name: str, db_name: str):
+def create_eimerdb(bucket_name: str,
+                   db_name: str) -> None:
     """Creates an EimerDB instance.
 
      Args:
-        bucket_name: A google cloud storage bucket.
+        bucket_name: A GCP bucket.
         db_name: Name of the instance.
 
     Returns:
@@ -147,7 +159,6 @@ def create_eimerdb(bucket_name: str, db_name: str):
     client = storage.Client(credentials=token)
     bucket = client.bucket(bucket_name)
     full_path = f"eimerdb/{db_name}"
-    about_blob = bucket.blob(f"{full_path}/config/about.json")
     parts = db_name.split("/")
     name = parts[-1]
     json_about = {
@@ -202,7 +213,7 @@ def create_eimerdb(bucket_name: str, db_name: str):
     tables_blob.upload_from_string(
         data=json.dumps(tables), content_type="application/json"
     )
-    print("EimerDB instance created.")
+    logger.info("EimerDB instance %s created.", db_name)
 
 
 def example_function(number1: int, number2: int) -> str:
@@ -232,3 +243,4 @@ def example_function(number1: int, number2: int) -> str:
         return f"{number1} is less than {number2}"
     else:
         return f"{number1} is greater than or equal to {number2}"
+
