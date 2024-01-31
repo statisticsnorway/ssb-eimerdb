@@ -102,11 +102,18 @@ def parse_sql_query(sql_query: str) -> dict:
         Dictionary with keys: Operation, columns, table_name and sql_filter.
 
     """
-    select_pattern = r"^SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(.*))?$"
-    update_pattern = r"^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$"
 
-    select_match = re.match(select_pattern, sql_query, re.IGNORECASE)
-    update_match = re.match(update_pattern, sql_query, re.IGNORECASE)
+    select_pattern = re.compile(r"""
+        ^SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(.*))?$
+    """, re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE)
+
+    update_pattern = re.compile(r"""
+        ^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$
+    """, re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE)
+
+
+    select_match = re.match(select_pattern, sql_query)
+    update_match = re.match(update_pattern, sql_query)
 
     if select_match:
         groups = select_match.groups()
