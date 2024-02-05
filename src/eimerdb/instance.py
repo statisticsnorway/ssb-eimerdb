@@ -187,6 +187,12 @@ class EimerDBInstance:
         if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
             client = storage.Client(credentials=token)
+            row_id_def = {
+                "name": "row_id",
+                "type": "string",
+                "label": "Unique row ID"
+            }
+            schema.insert(0, row_id_def)
             arrow_schema_from_json(schema)
             tables = self.tables
             bucket = client.bucket(self.bucket)
@@ -226,7 +232,9 @@ class EimerDBInstance:
         if self.is_admin is True:
             json_data = self.tables[table_name]
             arrow_schema = arrow_schema_from_json(json_data["schema"])
-
+            df['row_id'] = df.apply(lambda row: uuid4(), axis=1)
+            df["row_id"] = df["row_id"].astype(str)
+            #df.insert(0, "row_id", df.pop("row_id"))
             table = pa.Table.from_pandas(df, schema=arrow_schema)
             fs = FileClient.get_gcs_file_system()
 
@@ -286,8 +294,8 @@ class EimerDBInstance:
             if columns == ["*"]:
                 columns = None
             if editable is True and unedited is False and columns is not None:
-                if "uuid" not in columns:
-                    columns.append("uuid")
+                if "row_id" not in columns:
+                    columns.append("row_id")
             partitions = table_config["partition_columns"]
             bucket_name = table_config["bucket"]
             partitions_len = len(partitions)
@@ -347,16 +355,16 @@ class EimerDBInstance:
                         timestamp_column,
                     )
 
-                    uuid_max = df_changes.group_by("uuid").aggregate(
+                    row_id_max = df_changes.group_by("row_id").aggregate(
                         [("datetime", "max")]
                     )
 
-                    new_names = ["uuid", "datetime"]
+                    new_names = ["row_id", "datetime"]
 
-                    uuid_max = uuid_max.rename_columns(new_names)
+                    row_id_max = row_id_max.rename_columns(new_names)
 
                     df_changes = df_changes.join(
-                        uuid_max, ["uuid", "datetime"], join_type="inner"
+                        row_id_max, ["row_id", "datetime"], join_type="inner"
                     ).combine_chunks()
 
                     df_updates = df_changes.filter(
@@ -376,9 +384,9 @@ class EimerDBInstance:
                         pa.compute.field("operation") == "reset"
                     )
 
-                    uuid_updates = df_changes["uuid"]
+                    row_id_updates = df_changes["row_id"]
                     filter_array = pa.compute.invert(
-                        pa.compute.is_in(df["uuid"], uuid_updates)
+                        pa.compute.is_in(df["row_id"], row_id_updates)
                     )
                     df_filtered = pa.compute.filter(df, filter_array)
                     df = pa.concat_tables([df_filtered, df_updates])
@@ -427,8 +435,8 @@ class EimerDBInstance:
             fs = FileClient.get_gcs_file_system()
             update_table = pa.Table.from_pandas(df_updates)
 
-            uuid = uuid4()
-            filename = f"commit_{uuid}_{{i}}.parquet"
+            row_id = uuid4()
+            filename = f"commit_{row_id}_{{i}}.parquet"
 
             pq.write_to_dataset(
                 update_table,
@@ -553,7 +561,7 @@ class EimerDBInstance:
                 )
                 sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
                 if columns is not None and editable is True and unedited is False:
-                    sql_query = sql_query.replace(" FROM", ", uuid FROM")
+                    sql_query = sql_query.replace(" FROM", ", row_id FROM")
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
                     if output_format == "pandas":
