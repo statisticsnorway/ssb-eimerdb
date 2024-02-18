@@ -16,6 +16,7 @@ from uuid import uuid4
 
 import duckdb
 import pandas as pd
+from pandas import DataFrame
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
@@ -27,6 +28,7 @@ from functions import get_initials
 from functions import get_json
 from functions import parse_sql_query
 from google.cloud import storage
+from typing import Optional, Dict, Any, Union
 
 logger = logging.getLogger(__name__)
 
@@ -386,9 +388,10 @@ class EimerDBInstance:
                     )
 
                     new_names = ["row_id", "datetime"]
-
+                    row_id_max = row_id_max.select(['row_id', 'datetime_max'])
+                    print(row_id_max.column_names)
                     row_id_max = row_id_max.rename_columns(new_names)
-
+                    print(row_id_max.column_names)
                     df_changes = df_changes.join(
                         row_id_max, ["row_id", "datetime"], join_type="inner"
                     ).combine_chunks()
@@ -396,6 +399,7 @@ class EimerDBInstance:
                     df_updates = df_changes.filter(
                         pa.compute.field("operation") == "update"
                     )
+                    print(df_changes.schema)
                     df_updates = df_updates.drop(["datetime", "operation", "user"])
                     schema = df_updates.schema
                     df = df.cast(schema)
@@ -433,6 +437,7 @@ class EimerDBInstance:
                 columns = None
             if columns == ["*"]:
                 columns = None
+            json_data = self.tables[table_name]
             table_name = parsed_query["table_name"]
             where_clause = parsed_query["where_clause"]
             instance_name = self.eimerdb_name
@@ -459,8 +464,20 @@ class EimerDBInstance:
 
             table_path = self.tables[table_name]["table_path"] + "_changes"
             fs = FileClient.get_gcs_file_system()
-            update_table = pa.Table.from_pandas(df_updates)
-
+            arrow_schema = arrow_schema_from_json(json_data["schema"])
+            arrow_schema = arrow_schema.append(
+                pa.field("user", pa.string())
+            )
+            arrow_schema = arrow_schema.append(
+                pa.field("datetime", pa.string())
+            )
+            arrow_schema = arrow_schema.append(
+                pa.field("operation", pa.string())
+            )
+            print(arrow_schema)
+            print(df_updates)
+            update_table = pa.Table.from_pandas(df_updates, schema=arrow_schema)
+            print(update_table.schema)
             row_id = uuid4()
             filename = f"commit_{row_id}_{{i}}.parquet"
 
