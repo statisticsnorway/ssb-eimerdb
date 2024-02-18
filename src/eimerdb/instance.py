@@ -646,7 +646,7 @@ class EimerDBInstance:
             merged = self.query(
                 f"SELECT * FROM {table_name}", partition_select=None, unedited=False
             )
-            self.main_table_insert(table_name, merged, raw=False)
+            self.main_table_insert(table_name, merged)
             partitions = self.tables[table_name]["partition_columns"]
             partition_levels = "**/" * len(partitions) + "*"
             fs = FileClient.get_gcs_file_system()
