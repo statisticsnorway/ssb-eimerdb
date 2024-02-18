@@ -471,12 +471,32 @@ class EimerDBInstance:
 
     def query_changes(
         self, 
-        sql_query, 
-        partition_select=None, 
-        unedited=False, 
-        output_format="pandas", 
-        changes_output="all",
-    ):
+        sql_query: str, 
+        partition_select: Optional[Dict[str, Any]] = None, 
+        unedited: bool = False, 
+        output_format: str = "pandas", 
+        changes_output: str = "all",
+    ) -> Union[pd.DataFrame, pa.Table, str]:
+        """
+        Query changes made in the database table.
+
+        Args:
+            sql_query (str): The SQL query to execute.
+            partition_select (Optional[Dict[str, Any]], optional): 
+                Dictionary containing partition selection criteria. Defaults to None.
+            unedited (bool, optional): 
+                Flag indicating whether to retrieve unedited changes. Defaults to False.
+            output_format (str, optional): 
+                The desired output format ('pandas' or 'arrow'). Defaults to 'pandas'.
+            changes_output (str, optional): 
+                The changes that are to be retrieved ('recent' or 'all'). Defaults to 'all'.
+
+        Returns:
+            Union[pd.DataFrame, pa.Table, str]: 
+                Returns a pandas DataFrame if 'pandas' output format is specified,
+                an arrow Table if 'arrow' output format is specified,
+                otherwise returns a string representation of the result.
+        """
         parsed_query = parse_sql_query(sql_query)
         table_name = parsed_query["table_name"]
         table_config = self.tables[table_name]
@@ -601,7 +621,16 @@ class EimerDBInstance:
             elif changes_output == "recent":
                 return df_changes
 
-    def get_changes(self, table_name):
+    def get_changes(self, table_name: str) -> DataFrame:
+        """
+        Retrieve changes for a given table.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be retrieved.
+
+        Returns:
+            DataFrame: A pandas DataFrame containing the changes for the specified table.
+        """
         fs = FileClient.get_gcs_file_system()
         table_changes = table_name + "_changes"
         bucket = self.bucket
@@ -616,16 +645,25 @@ class EimerDBInstance:
         return df_changes
 
 
-    def merge_changes(self, table_name):
-        fs = FileClient.get_gcs_file_system()
+    def merge_changes(self, table_name: str) -> None:
+        """
+        Merge changes for a given table and store them as Parquet files.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be merged.
+
+        Returns:
+            None
+        """
+        fs = FileClient.get_gcs_file_system()  # type: ignore[no-untyped-call]
         df_changes = self.get_changes(table_name)
 
-        token = AuthClient.fetch_google_credentials()
+        token = AuthClient.fetch_google_credentials()  # type: ignore[no-untyped-call]
         client = storage.Client(credentials=token)
-        bucket = client.bucket(self.bucket)
-        path = self.tables[table_name]["table_path"]
-        partitions = self.tables[table_name]["partition_columns"]
-        source_folder = self.tables[table_name]["table_path"] + "_changes"
+        bucket = client.bucket(self.bucket)  # type: ignore[union-attr]
+        path = self.tables[table_name]["table_path"]  # type: ignore[index]
+        partitions = self.tables[table_name]["partition_columns"]  # type: ignore[index]
+        source_folder = self.tables[table_name]["table_path"] + "_changes"  # type: ignore[index]
         blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
         filename = f"merged_commit_{uuid4()}_{{i}}.parquet"
         table = pa.Table.from_pandas(df_changes)
@@ -638,10 +676,27 @@ class EimerDBInstance:
         )
         for blob in blobs_to_delete:
             blob.delete()
+
+        logging.info(
+            "The changes were successfully merged into one file per partition!"
+        )
+
         print("The changes were successfully merged into one file per partition!")
 
 
-    def merge_changes_into_main(self, table_name):
+    def merge_changes_into_main(self, table_name: str) -> None:
+        """
+        Merge changes for a given table into the main table.
+
+        This method merges changes for the specified table into the main table.
+        It requires admin privileges to execute.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be merged.
+
+        Returns:
+            None
+        """
         if self.is_admin is True:
             merged = self.query(
                 f"SELECT * FROM {table_name}", partition_select=None, unedited=False
@@ -661,4 +716,9 @@ class EimerDBInstance:
                     "hovedtabell_changes", "hovedtabell_changes_all"
                 )
                 fs.mv(f"gs://{file}", f"gs://{moved_file}")
+
+            logging.info(
+                "Changes merged into main successfully!"
+            )
+
             print("Changes merged into main successfully!")
