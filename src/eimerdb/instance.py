@@ -486,7 +486,7 @@ class EimerDBInstance:
 
         Args:
             sql_query (str): The SQL query to execute.
-            partition_select (Optional[Dict[str, Any]], optional): 
+            partition_select (Dict, optional): 
                 Dictionary containing partition selection criteria. Defaults to None.
             unedited (bool, optional): 
                 Flag indicating whether to retrieve unedited changes. Defaults to False.
@@ -721,8 +721,6 @@ class EimerDBInstance:
                 )
                 fs.mv(f"gs://{file}", f"gs://{moved_file}")
 
-            logging.info(
-                "Changes merged into main successfully!"
-            )
+            logging.info("Changes merged into main successfully!")
 
             print("Changes merged into main successfully!")
