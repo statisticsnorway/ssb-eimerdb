@@ -389,9 +389,9 @@ class EimerDBInstance:
 
                     new_names = ["row_id", "datetime"]
                     row_id_max = row_id_max.select(['row_id', 'datetime_max'])
-                    print(row_id_max.column_names)
+
                     row_id_max = row_id_max.rename_columns(new_names)
-                    print(row_id_max.column_names)
+
                     df_changes = df_changes.join(
                         row_id_max, ["row_id", "datetime"], join_type="inner"
                     ).combine_chunks()
@@ -399,9 +399,9 @@ class EimerDBInstance:
                     df_updates = df_changes.filter(
                         pa.compute.field("operation") == "update"
                     )
-                    print(df_changes.schema)
+
                     df_updates = df_updates.drop(["datetime", "operation", "user"])
-                    schema = df_updates.schema
+
                     df = df.cast(schema)
 
                     df_deletes = df_changes.filter(
@@ -474,10 +474,9 @@ class EimerDBInstance:
             arrow_schema = arrow_schema.append(
                 pa.field("operation", pa.string())
             )
-            print(arrow_schema)
-            print(df_updates)
+
             update_table = pa.Table.from_pandas(df_updates, schema=arrow_schema)
-            print(update_table.schema)
+
             row_id = uuid4()
             filename = f"commit_{row_id}_{{i}}.parquet"
 
