@@ -218,7 +218,7 @@ class EimerDBInstance:
         else:
             raise Exception("Cannot create table. You are not an admin!")
 
-    def main_table_insert(self, table_name, df, raw=True):
+    def insert(self, table_name, df):
         """Insert unedited data into a main table.
 
         Args:
@@ -234,13 +234,36 @@ class EimerDBInstance:
             arrow_schema = arrow_schema_from_json(json_data["schema"])
             df['row_id'] = df.apply(lambda row: uuid4(), axis=1)
             df["row_id"] = df["row_id"].astype(str)
-            #df.insert(0, "row_id", df.pop("row_id"))
             table = pa.Table.from_pandas(df, schema=arrow_schema)
-            fs = FileClient.get_gcs_file_system()
+            
+            df_raw = df.copy()
+            df_raw["user"] = get_initials()
+            df_raw["datetime"] = get_datetime()
+            df_raw["operation"] = "insert"
+            
+            arrow_schema_raw = arrow_schema
+            arrow_schema_raw = arrow_schema_raw.append(pa.field("user", pa.string()))
+            arrow_schema_raw = arrow_schema_raw.append(pa.field("datetime", pa.string()))
+            arrow_schema_raw = arrow_schema_raw.append(pa.field("operation", pa.string()))
 
+            table_raw = pa.Table.from_pandas(df_raw, schema=arrow_schema_raw)
+            timestamp_column = table_raw["datetime"].cast(pa.timestamp("ns"))
+
+            table_raw = table_raw.drop(["datetime"])
+
+            table_raw = table_raw.add_column(
+                len(table_raw.column_names),
+                pa.field("datetime", pa.timestamp("ns")),
+                timestamp_column,
+            )
+
+            insert_id = uuid4()
             table_path = json_data["table_path"]
             partitions = json_data["partition_columns"]
-            filename = f"{table_name}_data_{{i}}.parquet"
+            filename = f"insert_{insert_id}_{{i}}.parquet"
+
+            fs = FileClient.get_gcs_file_system()
+
             pq.write_to_dataset(
                 table,
                 root_path=f"gs://{self.bucket}/{table_path}",
@@ -248,17 +271,16 @@ class EimerDBInstance:
                 basename_template=filename,
                 filesystem=fs,
             )
-            if raw is True:
-                pq.write_to_dataset(
-                    table,
-                    root_path=f"gs://{self.bucket}/{table_path}_raw",
-                    partition_cols=partitions,
-                    basename_template=filename,
-                    filesystem=fs,
-                )
+            pq.write_to_dataset(
+                table_raw,
+                root_path=f"gs://{self.bucket}/{table_path}_raw",
+                partition_cols=partitions,
+                basename_template=filename,
+                filesystem=fs,
+            )
             print("Data successfully inserted!")
         else:
-            Exception("Cannot insert into main table. You are not an admin!")
+            raise Exception("Cannot insert into main table. You are not an admin!")
 
     def query(
         self, sql_query, partition_select=None, unedited=False, output_format="pandas"
@@ -624,7 +646,7 @@ class EimerDBInstance:
             merged = self.query(
                 f"SELECT * FROM {table_name}", partition_select=None, unedited=False
             )
-            self.main_table_insert(table_name, merged, raw=False)
+            self.main_table_insert(table_name, merged)
             partitions = self.tables[table_name]["partition_columns"]
             partition_levels = "**/" * len(partitions) + "*"
             fs = FileClient.get_gcs_file_system()
