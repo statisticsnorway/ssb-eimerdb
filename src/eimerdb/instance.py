@@ -9,14 +9,16 @@ and querying data.
 Author: Stian Elisenberg
 Date: September 16, 2023
 """
-import logging
+
 import json
+import logging
 from uuid import uuid4
+
 import duckdb
 import pandas as pd
 import pyarrow as pa
-import pyarrow.parquet as pq
 import pyarrow.dataset as ds
+import pyarrow.parquet as pq
 from dapla import AuthClient
 from dapla import FileClient
 from functions import arrow_schema_from_json
@@ -145,7 +147,7 @@ class EimerDBInstance:
             raise Exception("Cannot add user. You are not an admin!")
 
     def remove_user(self, username):
-        """Remove a user by their username.
+        """Remove a users access to the database.
 
         Args:
             username (str): Name of the user to remove.
@@ -187,11 +189,7 @@ class EimerDBInstance:
         if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
             client = storage.Client(credentials=token)
-            row_id_def = {
-                "name": "row_id",
-                "type": "string",
-                "label": "Unique row ID"
-            }
+            row_id_def = {"name": "row_id", "type": "string", "label": "Unique row ID"}
             schema.insert(0, row_id_def)
             arrow_schema_from_json(schema)
             tables = self.tables
@@ -232,7 +230,7 @@ class EimerDBInstance:
         if self.is_admin is True:
             json_data = self.tables[table_name]
             arrow_schema = arrow_schema_from_json(json_data["schema"])
-            df['row_id'] = df.apply(lambda row: uuid4(), axis=1)
+            df["row_id"] = df.apply(lambda row: uuid4(), axis=1)
             df["row_id"] = df["row_id"].astype(str)
             table = pa.Table.from_pandas(df, schema=arrow_schema)
             
@@ -242,9 +240,15 @@ class EimerDBInstance:
             df_raw["operation"] = "insert"
             
             arrow_schema_raw = arrow_schema
-            arrow_schema_raw = arrow_schema_raw.append(pa.field("user", pa.string()))
-            arrow_schema_raw = arrow_schema_raw.append(pa.field("datetime", pa.string()))
-            arrow_schema_raw = arrow_schema_raw.append(pa.field("operation", pa.string()))
+            arrow_schema_raw = arrow_schema_raw.append(
+                pa.field("user", pa.string())
+            )
+            arrow_schema_raw = arrow_schema_raw.append(
+                pa.field("datetime", pa.string())
+            )
+            arrow_schema_raw = arrow_schema_raw.append(
+                pa.field("operation", pa.string())
+            )
 
             table_raw = pa.Table.from_pandas(df_raw, schema=arrow_schema_raw)
             timestamp_column = table_raw["datetime"].cast(pa.timestamp("ns"))
@@ -471,12 +475,32 @@ class EimerDBInstance:
 
     def query_changes(
         self, 
-        sql_query, 
-        partition_select=None, 
-        unedited=False, 
-        output_format="pandas", 
-        changes_output="all",
-    ):
+        sql_query: str, 
+        partition_select: Optional[Dict[str, Any]] = None, 
+        unedited: bool = False, 
+        output_format: str = "pandas", 
+        changes_output: str = "all",
+    ) -> Union[pd.DataFrame, pa.Table, str]:
+        """
+        Query changes made in the database table.
+
+        Args:
+            sql_query (str): The SQL query to execute.
+            partition_select (Dict, optional): 
+                Dictionary containing partition selection criteria. Defaults to None.
+            unedited (bool, optional): 
+                Flag indicating whether to retrieve unedited changes. Defaults to False.
+            output_format (str, optional): 
+                The desired output format ('pandas' or 'arrow'). Defaults to 'pandas'.
+            changes_output (str, optional): 
+                The changes that are to be retrieved ('recent' or 'all'). Defaults to 'all'.
+
+        Returns:
+            Union[pd.DataFrame, pa.Table, str]: 
+                Returns a pandas DataFrame if 'pandas' output format is specified,
+                an arrow Table if 'arrow' output format is specified,
+                otherwise returns a string representation of the result.
+        """
         parsed_query = parse_sql_query(sql_query)
         table_name = parsed_query["table_name"]
         table_config = self.tables[table_name]
@@ -601,7 +625,16 @@ class EimerDBInstance:
             elif changes_output == "recent":
                 return df_changes
 
-    def get_changes(self, table_name):
+    def get_changes(self, table_name: str) -> DataFrame:
+        """
+        Retrieve changes for a given table.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be retrieved.
+
+        Returns:
+            DataFrame: A pandas DataFrame containing the changes for the specified table.
+        """
         fs = FileClient.get_gcs_file_system()
         table_changes = table_name + "_changes"
         bucket = self.bucket
@@ -616,16 +649,25 @@ class EimerDBInstance:
         return df_changes
 
 
-    def merge_changes(self, table_name):
-        fs = FileClient.get_gcs_file_system()
+    def merge_changes(self, table_name: str) -> None:
+        """
+        Merge changes for a given table and store them as Parquet files.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be merged.
+
+        Returns:
+            None
+        """
+        fs = FileClient.get_gcs_file_system()  # type: ignore[no-untyped-call]
         df_changes = self.get_changes(table_name)
 
-        token = AuthClient.fetch_google_credentials()
+        token = AuthClient.fetch_google_credentials()  # type: ignore[no-untyped-call]
         client = storage.Client(credentials=token)
-        bucket = client.bucket(self.bucket)
-        path = self.tables[table_name]["table_path"]
-        partitions = self.tables[table_name]["partition_columns"]
-        source_folder = self.tables[table_name]["table_path"] + "_changes"
+        bucket = client.bucket(self.bucket)  # type: ignore[union-attr]
+        path = self.tables[table_name]["table_path"]  # type: ignore[index]
+        partitions = self.tables[table_name]["partition_columns"]  # type: ignore[index]
+        source_folder = self.tables[table_name]["table_path"] + "_changes"  # type: ignore[index]
         blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
         filename = f"merged_commit_{uuid4()}_{{i}}.parquet"
         table = pa.Table.from_pandas(df_changes)
@@ -638,10 +680,27 @@ class EimerDBInstance:
         )
         for blob in blobs_to_delete:
             blob.delete()
+
+        logging.info(
+            "The changes were successfully merged into one file per partition!"
+        )
+
         print("The changes were successfully merged into one file per partition!")
 
 
-    def merge_changes_into_main(self, table_name):
+    def merge_changes_into_main(self, table_name: str) -> None:
+        """
+        Merge changes for a given table into the main table.
+
+        This method merges changes for the specified table into the main table.
+        It requires admin privileges to execute.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be merged.
+
+        Returns:
+            None
+        """
         if self.is_admin is True:
             merged = self.query(
                 f"SELECT * FROM {table_name}", partition_select=None, unedited=False
@@ -661,4 +720,7 @@ class EimerDBInstance:
                     "hovedtabell_changes", "hovedtabell_changes_all"
                 )
                 fs.mv(f"gs://{file}", f"gs://{moved_file}")
+
+            logging.info("Changes merged into main successfully!")
+
             print("Changes merged into main successfully!")

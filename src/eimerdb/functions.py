@@ -103,13 +103,19 @@ def parse_sql_query(sql_query: str) -> dict:
 
     """
 
-    select_pattern = re.compile(r"""
+    select_pattern = re.compile(
+        r"""
         ^SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(.*))?$
-    """, re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE)
+    """, 
+        re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE
+    )
 
-    update_pattern = re.compile(r"""
+    update_pattern = re.compile(
+        r"""
         ^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$
-    """, re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE)
+    """, 
+        re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE
+    )
 
 
     select_match = re.match(select_pattern, sql_query)
@@ -149,8 +155,7 @@ def parse_sql_query(sql_query: str) -> dict:
         )
 
 
-def create_eimerdb(bucket_name: str,
-                   db_name: str) -> None:
+def create_eimerdb(bucket_name: str, db_name: str) -> None:
     """Creates an EimerDB instance.
 
      Args:
