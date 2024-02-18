@@ -147,7 +147,7 @@ class EimerDBInstance:
             raise Exception("Cannot add user. You are not an admin!")
 
     def remove_user(self, username):
-        """Remove a user by their username.
+        """Remove a users access to the database.
 
         Args:
             username (str): Name of the user to remove.
