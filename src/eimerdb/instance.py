@@ -9,14 +9,16 @@ and querying data.
 Author: Stian Elisenberg
 Date: September 16, 2023
 """
-import logging
+
 import json
+import logging
 from uuid import uuid4
+
 import duckdb
 import pandas as pd
 import pyarrow as pa
-import pyarrow.parquet as pq
 import pyarrow.dataset as ds
+import pyarrow.parquet as pq
 from dapla import AuthClient
 from dapla import FileClient
 from functions import arrow_schema_from_json
@@ -187,11 +189,7 @@ class EimerDBInstance:
         if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
             client = storage.Client(credentials=token)
-            row_id_def = {
-                "name": "row_id",
-                "type": "string",
-                "label": "Unique row ID"
-            }
+            row_id_def = {"name": "row_id", "type": "string", "label": "Unique row ID"}
             schema.insert(0, row_id_def)
             arrow_schema_from_json(schema)
             tables = self.tables
@@ -232,7 +230,7 @@ class EimerDBInstance:
         if self.is_admin is True:
             json_data = self.tables[table_name]
             arrow_schema = arrow_schema_from_json(json_data["schema"])
-            df['row_id'] = df.apply(lambda row: uuid4(), axis=1)
+            df["row_id"] = df.apply(lambda row: uuid4(), axis=1)
             df["row_id"] = df["row_id"].astype(str)
             table = pa.Table.from_pandas(df, schema=arrow_schema)
             
@@ -242,9 +240,15 @@ class EimerDBInstance:
             df_raw["operation"] = "insert"
             
             arrow_schema_raw = arrow_schema
-            arrow_schema_raw = arrow_schema_raw.append(pa.field("user", pa.string()))
-            arrow_schema_raw = arrow_schema_raw.append(pa.field("datetime", pa.string()))
-            arrow_schema_raw = arrow_schema_raw.append(pa.field("operation", pa.string()))
+            arrow_schema_raw = arrow_schema_raw.append(
+                pa.field("user", pa.string())
+            )
+            arrow_schema_raw = arrow_schema_raw.append(
+                pa.field("datetime", pa.string())
+            )
+            arrow_schema_raw = arrow_schema_raw.append(
+                pa.field("operation", pa.string())
+            )
 
             table_raw = pa.Table.from_pandas(df_raw, schema=arrow_schema_raw)
             timestamp_column = table_raw["datetime"].cast(pa.timestamp("ns"))
