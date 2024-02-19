@@ -276,6 +276,7 @@ class EimerDBInstance:
                 partition_cols=partitions,
                 basename_template=filename,
                 filesystem=fs,
+                schema=arrow_schema
             )
             pq.write_to_dataset(
                 table_raw,
@@ -283,6 +284,7 @@ class EimerDBInstance:
                 partition_cols=partitions,
                 basename_template=filename,
                 filesystem=fs,
+                schema=arrow_schema
             )
             print("Data successfully inserted!")
         else:
@@ -311,6 +313,7 @@ class EimerDBInstance:
         except:
             where_clause = ""
         table_name = parsed_query["table_name"]
+        json_data = self.tables[table_name]
         table_config = self.tables[table_name]
         editable = table_config["editable"]
         instance_name = self.eimerdb_name
@@ -418,8 +421,13 @@ class EimerDBInstance:
                     filter_array = pa.compute.invert(
                         pa.compute.is_in(df["row_id"], row_id_updates)
                     )
+
                     df_filtered = pa.compute.filter(df, filter_array)
+
+                    df_filtered = df_filtered.cast(df_updates.schema)
+
                     df = pa.concat_tables([df_filtered, df_updates])
+
 
             con = duckdb.connect()
             if output_format == "pandas":
@@ -439,6 +447,7 @@ class EimerDBInstance:
                 columns = None
             json_data = self.tables[table_name]
             table_name = parsed_query["table_name"]
+            arrow_schema = arrow_schema_from_json(json_data["schema"])
             where_clause = parsed_query["where_clause"]
             instance_name = self.eimerdb_name
             table_config = self.tables[table_name]
@@ -446,10 +455,11 @@ class EimerDBInstance:
             bucket_name = table_config["bucket"]
             partitions_len = len(partitions)
             partition_levels = "**/" * partitions_len + "*"
-            
+
             df = self.query(
                 f"SELECT * FROM {table_name} WHERE {where_clause}", partition_select
             )
+
             df["user"] = get_initials()
             df["datetime"] = get_datetime()
             df["operation"] = "update"
@@ -459,12 +469,11 @@ class EimerDBInstance:
             sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
             con.execute(sql_query)
             df_updates = con.table("updates").df()
-            
+
             df_updates_len = len(df_updates)
 
             table_path = self.tables[table_name]["table_path"] + "_changes"
             fs = FileClient.get_gcs_file_system()
-            arrow_schema = arrow_schema_from_json(json_data["schema"])
             arrow_schema = arrow_schema.append(
                 pa.field("user", pa.string())
             )
@@ -475,7 +484,7 @@ class EimerDBInstance:
                 pa.field("operation", pa.string())
             )
 
-            update_table = pa.Table.from_pandas(df_updates, schema=arrow_schema)
+            update_table = pa.Table.from_pandas(df_updates)
 
             row_id = uuid4()
             filename = f"commit_{row_id}_{{i}}.parquet"
