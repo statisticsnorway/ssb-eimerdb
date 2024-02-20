@@ -284,7 +284,6 @@ class EimerDBInstance:
                 partition_cols=partitions,
                 basename_template=filename,
                 filesystem=fs,
-                schema=arrow_schema_raw
             )
             print("Data successfully inserted!")
         else:
