@@ -68,7 +68,6 @@ def get_json(bucket_name: str,
     data = json.loads(json_content)
     return data
 
-
 def arrow_schema_from_json(json_schema: list) -> pa.Schema:
     """A function converts a json file to an arrow schema.
 
@@ -91,7 +90,6 @@ def arrow_schema_from_json(json_schema: list) -> pa.Schema:
 
     return pa.schema(fields)
 
-
 def parse_sql_query(sql_query: str) -> dict:
     """A function that parses the given sql query.
 
@@ -103,42 +101,56 @@ def parse_sql_query(sql_query: str) -> dict:
 
     """
 
-    select_pattern = re.compile(
-        r"""
-        ^SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(.*))?$
-    """, 
-        re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE
+    select_pattern = re.compile(r"^SELECT\s+(.*?)\s+FROM", re.IGNORECASE)
+    from_pattern = re.compile(r"FROM\s+(\w+)", re.IGNORECASE)
+    join_pattern = re.compile(r"JOIN\s+(\w+)\s+ON", re.IGNORECASE)
+    where_pattern = re.compile(
+        r"WHERE\s+((?!(?:GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET|FETCH|UNION|"
+        r"INTERSECT|EXCEPT|INTO|TABLESAMPLE)).*?)\s*(?:GROUP\s+BY|HAVING|ORDER\s+BY|"
+        r"LIMIT|OFFSET|FETCH|UNION|INTERSECT|EXCEPT|INTO|TABLESAMPLE|$)",
+        re.IGNORECASE,
     )
 
     update_pattern = re.compile(
         r"""
         ^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$
-    """, 
-        re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE
+    """,
+        re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE,
     )
 
-
-    select_match = re.match(select_pattern, sql_query)
     update_match = re.match(update_pattern, sql_query)
 
-    if select_match:
-        groups = select_match.groups()
-        columns_str, table_name, rest_of_query = groups
-        columns = [
-            re.sub(
-                r"^COUNT\((.*?)\)$",
-                r"\1",
-                col.strip().split(" AS ")[0],
-            )
-            for col in columns_str.split(",")
-        ]
+    select_clause = ""
+    from_table = ""
+    join_tables = []
+    where_clause = ""
 
-        return {
+    select_match = select_pattern.search(sql_query)
+    if select_match:
+        select_clause = select_match.group(1).strip()
+
+    from_match = from_pattern.search(sql_query)
+    if from_match:
+        from_table = from_match.group(1).strip()
+
+    join_tables = join_pattern.findall(sql_query)
+
+    where_match = where_pattern.search(sql_query)
+    if where_match:
+        where_clause = where_match.group(1).strip()
+
+    if select_match:
+        result = {
             "operation": "SELECT",
-            "columns": columns,
-            "table_name": table_name,
-            "sql_filter": rest_of_query.strip() if rest_of_query else None,
+            "columns": ["*"],
+            "select_clause": select_clause,
+            "table_name": from_table,
+            "join_tables": join_tables,
+            "where_clause": where_clause,
         }
+
+        return result
+
     elif update_match:
         groups = update_match.groups()
         table_name, set_clause, where_clause = groups
@@ -150,9 +162,8 @@ def parse_sql_query(sql_query: str) -> dict:
             "where_clause": where_clause.strip() if where_clause else None,
         }
     else:
-        raise ValueError(
-            "Unsupported SQL operation. Only SELECT and UPDATE statements are allowed."
-        )
+        raise ValueError("Error parsing sql-query. Syntax error or query not supported.")
+
 
 
 def create_eimerdb(bucket_name: str, db_name: str) -> None:
