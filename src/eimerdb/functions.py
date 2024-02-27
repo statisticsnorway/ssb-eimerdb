@@ -39,11 +39,8 @@ def get_initials() -> str:
         The users initials.
 
     """
-    if JUPYTERHUB_USER_ENV in os.environ:
-        user = os.environ.get(JUPYTERHUB_USER_ENV)
-        return user.split("@")[0][:3]
-
-    return AuthClient.fetch_google_credentials().client_id
+    user = AuthClient.fetch_local_user_from_jupyter()["username"]
+    return user.split("@")[0]
 
 
 def get_json(bucket_name: str,
@@ -83,7 +80,15 @@ def arrow_schema_from_json(json_schema: list) -> pa.Schema:
         name = field_dict["name"]
         data_type = field_dict["type"]
         label = field_dict["label"]
-        field_type = getattr(pa, data_type)()
+        
+        if 'timestamp' in data_type:
+            unit_start = data_type.find("(") + 1
+            unit_end = data_type.find(")")
+            unit = data_type[unit_start:unit_end]
+            field_type = getattr(pa, 'timestamp')(unit)
+        else:
+            field_type = getattr(pa, data_type)()
+        
         metadata = {"label": label}
         field = pa.field(name, field_type, metadata=metadata)
         fields.append(field)

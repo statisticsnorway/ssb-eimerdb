@@ -374,7 +374,6 @@ class EimerDBInstance:
                 
             if editable is True and unedited is False and df_changes is not None:
                 if df_changes.num_rows != 0:
-                    schema = df.schema
                     timestamp_column = df_changes["datetime"].cast(pa.timestamp("ns"))
 
                     df_changes = df_changes.drop(["datetime"])
@@ -403,8 +402,6 @@ class EimerDBInstance:
                     )
 
                     df_updates = df_updates.drop(["datetime", "operation", "user"])
-
-                    df = df.cast(schema)
 
                     df_deletes = df_changes.filter(
                         pa.compute.field("operation") == "delete"
@@ -454,25 +451,7 @@ class EimerDBInstance:
             bucket_name = table_config["bucket"]
             partitions_len = len(partitions)
             partition_levels = "**/" * partitions_len + "*"
-
-            df = self.query(
-                f"SELECT * FROM {table_name} WHERE {where_clause}", partition_select
-            )
-
-            df["user"] = get_initials()
-            df["datetime"] = get_datetime()
-            df["operation"] = "update"
-            dataset = pa.Table.from_pandas(df)
-            con = duckdb.connect()
-            con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
-            sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
-            con.execute(sql_query)
-            df_updates = con.table("updates").df()
-
-            df_updates_len = len(df_updates)
-
-            table_path = self.tables[table_name]["table_path"] + "_changes"
-            fs = FileClient.get_gcs_file_system()
+            
             arrow_schema = arrow_schema.append(
                 pa.field("user", pa.string())
             )
@@ -483,7 +462,26 @@ class EimerDBInstance:
                 pa.field("operation", pa.string())
             )
 
-            update_table = pa.Table.from_pandas(df_updates)
+            df = self.query(
+                f"SELECT * FROM {table_name} WHERE {where_clause}", partition_select
+            )
+
+            df["user"] = get_initials()
+            df["datetime"] = get_datetime()
+            df["operation"] = "update"
+            dataset = pa.Table.from_pandas(df, schema=arrow_schema)
+            con = duckdb.connect()
+            con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
+            sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
+            con.execute(sql_query)
+            df_updates = con.table("updates").df()
+
+            df_updates_len = len(df_updates)
+
+            table_path = self.tables[table_name]["table_path"] + "_changes"
+            fs = FileClient.get_gcs_file_system()
+
+            update_table = pa.Table.from_pandas(df_updates, schema=arrow_schema)
 
             row_id = uuid4()
             filename = f"commit_{row_id}_{{i}}.parquet"
@@ -530,6 +528,7 @@ class EimerDBInstance:
         table_config = self.tables[table_name]
         editable = table_config["editable"]
         instance_name = self.eimerdb_name
+        table_schema = arrow_schema_from_json(self.tables[table_name]["schema"])
         if parsed_query["operation"] == "SELECT":
             try:
                 columns = parsed_query["columns"]
@@ -640,6 +639,7 @@ class EimerDBInstance:
                     elif output_format == "arrow":
                         df_changes_all = con.execute(sql_query).arrow()
                         df = pa.concat_tables([df_changes_all, df_changes])
+                        df = df.cast(table_schema)
    
             if changes_output == "all":
                 if no_changes_all is not True:
