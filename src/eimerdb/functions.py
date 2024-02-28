@@ -39,7 +39,11 @@ def get_initials() -> str:
         The users initials.
 
     """
-    user = AuthClient.fetch_local_user_from_jupyter()["username"]
+    try:
+        user = AuthClient.fetch_local_user_from_jupyter()["username"]
+        return user.split("@")[0]
+    except KeyError:
+        return "user@ssb.no"
     return user.split("@")[0]
 
 
