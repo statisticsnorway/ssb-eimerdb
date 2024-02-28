@@ -24,7 +24,7 @@ import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 from dapla import AuthClient
 from dapla import FileClient
-from google.cloud import storage
+from google.cloud import storage  # type: ignore
 from pandas import DataFrame
 
 from functions import arrow_schema_from_json
@@ -72,7 +72,7 @@ class EimerDBInstance:
 
     """
 
-    def __init__(self, bucket_name, eimer_name):
+    def __init__(self, bucket_name: str, eimer_name: str) -> None:
         """Initialize EimerDBInstance.
 
         Args:
@@ -124,7 +124,7 @@ class EimerDBInstance:
             self.role_groups = None
             self.is_admin = False
 
-    def add_user(self, username, role):
+    def add_user(self, username: str, role: Any) -> None:
         """Add a user with a specified role.
 
         Args:
@@ -152,8 +152,9 @@ class EimerDBInstance:
                 raise Exception(f"User {username} already exists!")
         else:
             raise Exception("Cannot add user. You are not an admin!")
+        return None
 
-    def remove_user(self, username):
+    def remove_user(self, username: str) -> None:
         """Remove a users access to the database.
 
         Args:
@@ -180,7 +181,12 @@ class EimerDBInstance:
         else:
             raise Exception("Cannot remove user. You are not an admin!")
 
-    def create_table(self, table_name, schema, partition_columns=None, editable=True):
+    def create_table(
+        self,
+        table_name: str,
+        schema: List[Dict[str, Any]],
+        partition_columns: Optional[List[str]] = None,
+    ) -> None:
         """Create a new table in EimerDB.
 
         Args:
@@ -223,7 +229,7 @@ class EimerDBInstance:
         else:
             raise Exception("Cannot create table. You are not an admin!")
 
-    def insert(self, table_name, df):
+    def insert(self, table_name: str, df: pd.DataFrame) -> None:
         """Insert unedited data into a main table.
 
         Args:
