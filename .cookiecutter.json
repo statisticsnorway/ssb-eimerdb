@@ -2,8 +2,13 @@
   "_copy_without_render": [
     "*.rst_t"
   ],
+  "_jinja2_env_vars": {
+    "lstrip_blocks": true,
+    "trim_blocks": true
+  },
   "_template": "https://github.com/statisticsnorway/ssb-pypitemplate.git",
   "author": "Stian Elisenberg",
+  "code_quality_level": "Medium",
   "copyright_owner": "Statistics Norway",
   "copyright_year": "2023",
   "development_status": "Development Status :: 3 - Alpha",
