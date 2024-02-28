@@ -29,9 +29,6 @@ def get_datetime() -> str:
     return datetime_str
 
 
-JUPYTERHUB_USER_ENV = "JUPYTERHUB_USER"
-
-
 def get_initials() -> str:
     """A function that returns user initials.
 
