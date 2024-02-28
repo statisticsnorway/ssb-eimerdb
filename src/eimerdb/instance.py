@@ -27,11 +27,11 @@ from dapla import FileClient
 from google.cloud import storage
 from pandas import DataFrame
 
-from .functions import arrow_schema_from_json
-from .functions import get_datetime
-from .functions import get_initials
-from .functions import get_json
-from .functions import parse_sql_query
+from functions import arrow_schema_from_json
+from functions import get_datetime
+from functions import get_initials
+from functions import get_json
+from functions import parse_sql_query
 
 
 logger = logging.getLogger(__name__)
