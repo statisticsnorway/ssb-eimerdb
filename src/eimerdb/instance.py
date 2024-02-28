@@ -15,6 +15,7 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Union
+from typing import List
 from uuid import uuid4
 
 import duckdb
@@ -186,6 +187,7 @@ class EimerDBInstance:
         table_name: str,
         schema: List[Dict[str, Any]],
         partition_columns: Optional[List[str]] = None,
+        editable: Optional[bool] = True,
     ) -> None:
         """Create a new table in EimerDB.
 
