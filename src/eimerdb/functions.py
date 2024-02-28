@@ -1,18 +1,18 @@
-"""
-A collection of useful functions.
+"""A collection of useful functions.
 
 The template and this example uses Google style docstrings as described at:
 https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
 """
 
 import json
-import os
+import logging
 import re
 from datetime import datetime
+
 import pyarrow as pa
 from dapla import AuthClient
 from google.cloud import storage
-import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +29,6 @@ def get_datetime() -> str:
     return datetime_str
 
 
-JUPYTERHUB_USER_ENV = "JUPYTERHUB_USER"
-
-
 def get_initials() -> str:
     """A function that returns user initials.
 
@@ -39,21 +36,23 @@ def get_initials() -> str:
         The users initials.
 
     """
-    user = AuthClient.fetch_local_user_from_jupyter()["username"]
+    try:
+        user = AuthClient.fetch_local_user_from_jupyter()["username"]
+        return user.split("@")[0]
+    except KeyError:
+        return "user@ssb.no"
     return user.split("@")[0]
 
 
-def get_json(bucket_name: str,
-             blob_path: str) -> dict:
-    """A function that gets a json file from Google Cloud Storage.
+def get_json(bucket_name: str, blob_path: str) -> str:
+    """A function that retrieves a JSON file from Google Cloud Storage.
 
     Args:
-        bucket_name: Name of bucket
-        blob_path: Path to blob
+        bucket_name (str): Name of the bucket.
+        blob_path (str): Path to the blob.
 
     Returns:
-        The users initials.
-
+        str: The JSON content.
     """
     token = AuthClient.fetch_google_credentials()
     client = storage.Client(credentials=token)
@@ -65,55 +64,56 @@ def get_json(bucket_name: str,
     data = json.loads(json_content)
     return data
 
-def arrow_schema_from_json(json_schema: list) -> pa.Schema:
-    """A function converts a json file to an arrow schema.
 
-     Args:
-        json_schema: A json schema with name, type and label
+def arrow_schema_from_json(json_schema: dict) -> pa.Schema:
+    """A function that converts a JSON file to an Arrow schema.
+
+    Args:
+        json_schema (dict): A JSON schema with name, type, and label.
 
     Returns:
-        Pyarrow schema.
-
+        pa.Schema: The PyArrow schema.
     """
     fields = []
     for field_dict in json_schema:
         name = field_dict["name"]
         data_type = field_dict["type"]
         label = field_dict["label"]
-        
-        if 'timestamp' in data_type:
+
+        if "timestamp" in data_type:
             unit_start = data_type.find("(") + 1
             unit_end = data_type.find(")")
             unit = data_type[unit_start:unit_end]
-            field_type = getattr(pa, 'timestamp')(unit)
+            field_type = pa.timestamp(unit)
         else:
             field_type = getattr(pa, data_type)()
-        
+
         metadata = {"label": label}
         field = pa.field(name, field_type, metadata=metadata)
         fields.append(field)
 
     return pa.schema(fields)
 
-def parse_sql_query(sql_query: str) -> dict:
-    """A function that parses the given sql query.
 
-     Args:
-        sql_query: An sql query.
+def parse_sql_query(sql_query: str) -> dict:
+    """A function that parses the provided SQL query.
+
+    Args:
+        sql_query (str): An SQL query.
 
     Returns:
-        Dictionary with keys: Operation, columns, table_name and sql_filter.
+        dict: A dictionary with keys: Operation, columns, table_name, and sql_filter.
 
+    Raises:
+        ValueError: If there is a syntax error or if the query is not supported.
     """
-
-    select_pattern = re.compile(r"^SELECT\s+(.*?)\s+FROM", re.IGNORECASE)
-    from_pattern = re.compile(r"FROM\s+(\w+)", re.IGNORECASE)
-    join_pattern = re.compile(r"JOIN\s+(\w+)\s+ON", re.IGNORECASE)
+    select_pattern = re.compile(r"\bSELECT\b")
+    from_pattern = re.compile(r"\bFROM\s+(\w+)")
+    join_pattern = re.compile(r"JOIN\s+(\w+)\s+ON")
     where_pattern = re.compile(
         r"WHERE\s+((?!(?:GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET|FETCH|UNION|"
         r"INTERSECT|EXCEPT|INTO|TABLESAMPLE)).*?)\s*(?:GROUP\s+BY|HAVING|ORDER\s+BY|"
         r"LIMIT|OFFSET|FETCH|UNION|INTERSECT|EXCEPT|INTO|TABLESAMPLE|$)",
-        re.IGNORECASE,
     )
 
     update_pattern = re.compile(
@@ -126,37 +126,22 @@ def parse_sql_query(sql_query: str) -> dict:
     update_match = re.match(update_pattern, sql_query)
 
     select_clause = ""
-    from_table = ""
-    join_tables = []
+    tables = ""
     where_clause = ""
 
     select_match = select_pattern.search(sql_query)
-    if select_match:
-        select_clause = select_match.group(1).strip()
 
-    from_match = from_pattern.search(sql_query)
-    if from_match:
-        from_table = from_match.group(1).strip()
+    from_match = from_pattern.findall(sql_query)
 
     join_tables = join_pattern.findall(sql_query)
+
+    tables = from_match + join_tables
 
     where_match = where_pattern.search(sql_query)
     if where_match:
         where_clause = where_match.group(1).strip()
 
-    if select_match:
-        result = {
-            "operation": "SELECT",
-            "columns": ["*"],
-            "select_clause": select_clause,
-            "table_name": from_table,
-            "join_tables": join_tables,
-            "where_clause": where_clause,
-        }
-
-        return result
-
-    elif update_match:
+    if update_match:
         groups = update_match.groups()
         table_name, set_clause, where_clause = groups
 
@@ -166,9 +151,22 @@ def parse_sql_query(sql_query: str) -> dict:
             "set_clause": set_clause,
             "where_clause": where_clause.strip() if where_clause else None,
         }
-    else:
-        raise ValueError("Error parsing sql-query. Syntax error or query not supported.")
 
+    elif select_match:
+        result = {
+            "operation": "SELECT",
+            "columns": ["*"],
+            "select_clause": select_clause,
+            "table_name": tables,
+            "where_clause": where_clause,
+        }
+
+        return result
+
+    else:
+        raise ValueError(
+            "Error parsing sql-query. Syntax error or query not supported."
+        )
 
 
 def create_eimerdb(bucket_name: str, db_name: str) -> None:
@@ -242,33 +240,4 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
         data=json.dumps(tables), content_type="application/json"
     )
     logger.info("EimerDB instance %s created.", db_name)
-
-
-def example_function(number1: int, number2: int) -> str:
-    """Example function comparing two integers.
-
-    This function can be deleted. It is used to show and test generating
-    documentation from code, type hinting, testing, and testing examples
-    in the code.
-
-
-    Args:
-        number1: The first number.
-        number2: The second number, which will be compared to number1.
-
-    Returns:
-        A string describing which number is the greatest.
-
-    Examples:
-        Examples should be written in doctest format, and should illustrate how
-        to use the function.
-
-        >>> example_function(1, 2)
-        1 is less than 2
-
-    """
-    if number1 < number2:
-        return f"{number1} is less than {number2}"
-    else:
-        return f"{number1} is greater than or equal to {number2}"
-
+    return None
