@@ -24,11 +24,11 @@ import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 from dapla import AuthClient
 from dapla import FileClient
-from functions import arrow_schema_from_json
-from functions import get_datetime
-from functions import get_initials
-from functions import get_json
-from functions import parse_sql_query
+from .functions import arrow_schema_from_json
+from .functions import get_datetime
+from .functions import get_initials
+from .functions import get_json
+from .functions import parse_sql_query
 from google.cloud import storage
 from pandas import DataFrame
 
