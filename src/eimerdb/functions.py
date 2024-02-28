@@ -83,7 +83,7 @@ def arrow_schema_from_json(json_schema: list) -> pa.Schema:
             unit_start = data_type.find("(") + 1
             unit_end = data_type.find(")")
             unit = data_type[unit_start:unit_end]
-            field_type = getattr(pa, "timestamp")(unit)
+            field_type = pa.timestamp(unit)
         else:
             field_type = getattr(pa, data_type)()
 

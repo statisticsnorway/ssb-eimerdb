@@ -291,7 +291,7 @@ class EimerDBInstance:
         else:
             raise Exception("Cannot insert into main table. You are not an admin!")
 
-    def query(
+    def query(  # noqa: C901
         self, sql_query, partition_select=None, unedited=False, output_format="pandas"
     ):
         """Execute an SQL query on an EimerDB table.
@@ -501,9 +501,7 @@ class EimerDBInstance:
             )
             return print(f"{df_updates_len} rows updated by {get_initials()}")
 
-    # noqa
-
-    def query_changes(
+    def query_changes(  # noqa: C901
         self,
         sql_query: str,
         partition_select: Optional[Dict[str, Any]] = None,
@@ -655,8 +653,6 @@ class EimerDBInstance:
                     return df_changes
             elif changes_output == "recent":
                 return df_changes
-
-    # noqa
 
     def get_changes(self, table_name: str) -> DataFrame:
         """Retrieve changes for a given table.
