@@ -27,13 +27,13 @@
 
 ### Google Cloud Storage Integration
 
-Create your custom instance for data storage
+Create your own database for data storage by specifying bucket name and a database name.
 ```python
-create_eimerdb(bucket="bucket-name", db_name="mvabasen")
+create_eimerdb(bucket="bucket-name", db_name="prodcombasen")
 ```
-Seamlessly connect to instances hosted on Google Cloud Storage.
+Connect to your EimerDB database hosted on Google Cloud Storage.
 ```python
-mvabasen = EimerDBInstance("bucket-name", "mvabasen")
+prodcombasen = EimerDBInstance("bucket-name", "prodcombasen")
 ```
 
 ### Table Management
@@ -41,27 +41,40 @@ mvabasen = EimerDBInstance("bucket-name", "mvabasen")
 Easily create tables with defined schemas.
 Example:
 ```python
-mvabasen.create_table(
-    table_name="Hovedtabell", schema, partition_columns=["aar", "termin"], editable=True
+prodcombasen.create_table(
+    table_name="prefill_prod",
+    schema, 
+    partition_columns=["aar"],
+    editable=True
 )
 ```
 Partition tables for efficient data organization.
 
 ### SQL Query Support
 
-Execute SQL queries directly on your data.
+Query your tables with SQL syntax. Specify partition selection for row skipping, making queries faster.
 ```python
-mvabasen.query("SELECT * FROM hovedtabell WHERE substr(nace,1,3) = '479'")
+prodcombasen.query(
+    """SELECT * 
+    FROM prodcom_prefill
+    WHERE produktkode = '10.13.11.20'""",
+    partition_select = {
+        "aar": [2022, 2021]
+        }
 ```
     
 
 ### Data Updates
 
-Perform data updates using SQL statements, including inserts, updates, and deletes.
-Changes are recorded as commits for versioning.
+Perform updates using SQL statements
+Each update is saved as a separate file for versioning. The update files will also include info about who made the update and when.
 ```python
-mvabasen.query(
-    "UPDATE hovedtabell SET omsetning = 999 WHERE aar = '2022' AND termin = '2' AND orgb = '987654321'"
+prodcombasen.query(
+    """UPDATE prodcom_prefill
+    SET mengde = 123
+    WHERE ident = '123456'
+    AND produktkode = '10.13.11.20'""",
+    partition_select = partitions
 )
 ```
 
@@ -69,20 +82,51 @@ mvabasen.query(
 
 Retrieve the unedited version of your data.
 ```python
-mvabasen.query("SELECT * FROM hovedtabell WHERE orgb = '987654321'", unedited=True)
+prodcombasen.query(
+    """SELECT *
+    FROM prodcom_prefill""",
+    unedited=True
+)
 ```
 
-### Partition Filtering
+### Query multiple tables
 
-Filter data based on partition keys, allowing for precise data selection.
-Optimize query performance by narrowing down search criteria.
+Query multiple tables using JOIN and subquery.
 ```python
-partitions = {
-    "aar": ["2022", "2023"],
-    "termin": ["2", "3"]
-}
-
-mvabasen.query("SELECT * FROM hovedtabell WHERE orgb = '987654321'", partition_select=partitions)
+prodcombasen.query(
+    f"""SELECT 
+            t1.aar, 
+            t1.produktkode, 
+            t1.beskrivelse, 
+            SUM(t1.mengde) AS mengde
+        FROM 
+            prefill_prod AS t1
+        JOIN (
+            SELECT 
+                t2.aar, 
+                t2.ident, 
+                t2.skjemaversjon, 
+                MAX(t2.dato_mottatt) AS newest_dato_mottatt
+            FROM 
+                skjemainfo AS t2
+            GROUP BY 
+                t2.aar, 
+                t2.ident, 
+                t2.skjemaversjon
+        ) AS subquery ON 
+            t1.aar = subquery.aar
+            AND t1.ident = subquery.ident
+            AND t1.skjemaversjon = subquery.skjemaversjon
+        WHERE 
+            t1.mengde IS NOT NULL
+        GROUP BY 
+            t1.aar, 
+            t1.produktkode, 
+            t1.beskrivelse;""",
+        partition_select={
+            "aar": [2022, 2021, 2020]
+        },
+    )
 ```
 
 ### User Management

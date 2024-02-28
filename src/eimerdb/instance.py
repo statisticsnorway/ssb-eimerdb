@@ -32,6 +32,7 @@ from functions import parse_sql_query
 from google.cloud import storage
 from pandas import DataFrame
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -69,6 +70,7 @@ class EimerDBInstance:
             query on a table in EimerDB.
 
     """
+
     def __init__(self, bucket_name, eimer_name):
         """Initialize EimerDBInstance.
 
@@ -237,12 +239,12 @@ class EimerDBInstance:
             df["row_id"] = df.apply(lambda row: uuid4(), axis=1)
             df["row_id"] = df["row_id"].astype(str)
             table = pa.Table.from_pandas(df, schema=arrow_schema)
-            
+
             df_raw = df.copy()
             df_raw["user"] = get_initials()
             df_raw["datetime"] = get_datetime()
             df_raw["operation"] = "insert"
-            
+
             arrow_schema_raw = arrow_schema
             arrow_schema_raw = arrow_schema_raw.append(pa.field("user", pa.string()))
             arrow_schema_raw = arrow_schema_raw.append(
@@ -422,13 +424,13 @@ class EimerDBInstance:
                         df_filtered = df_filtered.cast(df_updates.schema)
 
                         df_updated = pa.concat_tables([df_filtered, df_updates])
-                    
+
                         row_id_deletes = df_deletes["row_id"]
                         filter_array_deletes = pa.compute.invert(
-                            pa.compute.is_in(df_updates["row_id"], row_id_deletes)
+                            pa.compute.is_in(df_updated["row_id"], row_id_deletes)
                         )
-                        df_final = pa.compute.filter(df_updates, filter_array_deletes)
-                            
+                        df = pa.compute.filter(df_updated, filter_array_deletes)
+
                 con.register(table_name, df)
                 del df
 
@@ -440,6 +442,9 @@ class EimerDBInstance:
             return output
 
         elif parsed_query["operation"] == "UPDATE":
+            table_name = parsed_query["table_name"]
+            table_config = self.tables[table_name]
+            editable = table_config["editable"]
             if editable is False:
                 raise Exception(f"The table {table_name} is not editable!")
             try:
@@ -458,7 +463,7 @@ class EimerDBInstance:
             bucket_name = table_config["bucket"]
             partitions_len = len(partitions)
             partition_levels = "**/" * partitions_len + "*"
-            
+
             arrow_schema = arrow_schema.append(pa.field("user", pa.string()))
             arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
             arrow_schema = arrow_schema.append(pa.field("operation", pa.string()))
@@ -470,7 +475,7 @@ class EimerDBInstance:
             df["user"] = get_initials()
             df["datetime"] = get_datetime()
             df["operation"] = "update"
-            dataset = pa.Table.from_pandas(df, schema=arrow_schema)
+            dataset = pa.Table.from_pandas(df, schema=arrow_schema) # noqa
             con = duckdb.connect()
             con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
             sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
@@ -554,7 +559,7 @@ class EimerDBInstance:
                     df_changes = pd.DataFrame()
                 elif output_format == "arrow":
                     df_changes = pa.table([])
-                    
+
             if no_changes is not True:
                 table_files_changes = [
                     obj for obj in table_files_changes if obj.count("/") == max_depth
@@ -585,7 +590,7 @@ class EimerDBInstance:
                         df_changes = con.execute(sql_query).df()
                     elif output_format == "arrow":
                         df_changes = con.execute(sql_query).arrow()
-                
+
                 elif dataset.num_rows == 0:
                     if output_format == "pandas":
                         df_changes = pd.DataFrame()
@@ -640,7 +645,7 @@ class EimerDBInstance:
                         df_changes_all = con.execute(sql_query).arrow()
                         df = pa.concat_tables([df_changes_all, df_changes])
                         df = df.cast(table_schema)
-   
+
             if changes_output == "all":
                 if no_changes_all is not True:
                     return df
@@ -669,7 +674,6 @@ class EimerDBInstance:
         )
         df_changes = dataset.to_table().to_pandas()
         return df_changes
-
 
     def merge_changes(self, table_name: str) -> None:
         """Merge changes for a given table and store them as Parquet files.
@@ -707,7 +711,6 @@ class EimerDBInstance:
         )
 
         print("The changes were successfully merged into one file per partition!")
-
 
     def merge_changes_into_main(self, table_name: str) -> None:
         """Merge changes for a given table into the main table.

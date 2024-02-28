@@ -41,7 +41,7 @@ def get_initials() -> str:
     return user.split("@")[0]
 
 
-def get_json(bucket_name: str,blob_path: str) -> dict:
+def get_json(bucket_name: str, blob_path: str) -> dict:
     """A function that retrieves a JSON file from Google Cloud Storage.
 
     Args:
@@ -83,12 +83,13 @@ def arrow_schema_from_json(json_schema: list) -> pa.Schema:
             field_type = getattr(pa, "timestamp")(unit)
         else:
             field_type = getattr(pa, data_type)()
-        
+
         metadata = {"label": label}
         field = pa.field(name, field_type, metadata=metadata)
         fields.append(field)
 
     return pa.schema(fields)
+
 
 def parse_sql_query(sql_query: str) -> dict:
     """A function that parses the given SQL query.
@@ -127,7 +128,7 @@ def parse_sql_query(sql_query: str) -> dict:
     from_match = from_pattern.findall(sql_query)
 
     join_tables = join_pattern.findall(sql_query)
-    
+
     tables = from_match + join_tables
 
     where_match = where_pattern.search(sql_query)
@@ -160,7 +161,6 @@ def parse_sql_query(sql_query: str) -> dict:
         raise ValueError(
             "Error parsing sql-query. Syntax error or query not supported."
         )
-
 
 
 def create_eimerdb(bucket_name: str, db_name: str) -> None:
@@ -234,33 +234,3 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
         data=json.dumps(tables), content_type="application/json"
     )
     logger.info("EimerDB instance %s created.", db_name)
-
-
-def example_function(number1: int, number2: int) -> str:
-    """Example function comparing two integers.
-
-    This function can be deleted. It is used to show and test generating
-    documentation from code, type hinting, testing, and testing examples
-    in the code.
-
-
-    Args:
-        number1: The first number.
-        number2: The second number, which will be compared to number1.
-
-    Returns:
-        A string describing which number is the greatest.
-
-    Examples:
-        Examples should be written in doctest format, and should illustrate how
-        to use the function.
-
-        >>> example_function(1, 2)
-        1 is less than 2
-
-    """
-    if number1 < number2:
-        return f"{number1} is less than {number2}"
-    else:
-        return f"{number1} is greater than or equal to {number2}"
-
