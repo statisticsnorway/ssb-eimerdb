@@ -311,127 +311,126 @@ class EimerDBInstance:
             where_clause = parsed_query["where_clause"]
         except:
             where_clause = ""
-        table_name = parsed_query["table_name"]
-        json_data = self.tables[table_name]
-        table_config = self.tables[table_name]
-        editable = table_config["editable"]
-        instance_name = self.eimerdb_name
         if parsed_query["operation"] == "SELECT":
-            try:
-                columns = parsed_query["columns"]
-            except Exception:
-                columns = None
-            if columns == ["*"]:
-                columns = None
-            if editable is True and unedited is False and columns is not None:
-                if "row_id" not in columns:
-                    columns.append("row_id")
-            partitions = table_config["partition_columns"]
-            bucket_name = table_config["bucket"]
-            partitions_len = len(partitions)
-            partition_levels = "**/" * partitions_len + "*"
-            fs = FileClient.get_gcs_file_system()
-            if unedited is True:
-                table_name_parts = table_name + "_raw"
-            else:
-                table_name_parts = table_name
-            table_files = fs.glob(
-                f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_parts}/{partition_levels}"
-            )
-            max_depth = max(obj.count("/") for obj in table_files)
-            table_files = [obj for obj in table_files if obj.count("/") == max_depth]
-
-            if partition_select is not None:
-                filtered_files = []
-                for file in table_files:
-                    parts = file.split("/")
-
-                    all_matches = True
-
-                    for key, values in partition_select.items():
-                        match_found = any(f"{key}={value}" in parts for value in values)
-
-                        if not match_found:
-                            all_matches = False
-                            break
-                    if all_matches:
-                        filtered_files.append(file)
-                    table_files = filtered_files
-            df = pq.read_table(table_files, filesystem=fs)
-            sql_query_raw = sql_query
-            sql_query = sql_query.replace(f"FROM {table_name}", "FROM df")
-
-            if editable is True and unedited is False:
-                table_name_changes = table_name + "_changes"
-                if where_clause != "":
-                    where_clause = "WHERE " + where_clause
-                df_changes = self.query_changes(
-                    f"SELECT * FROM {table_name} {where_clause}",
-                    partition_select,
-                    output_format="arrow",
-                    changes_output="recent",
-                )
-                
-            if editable is True and unedited is False and df_changes is not None:
-                if df_changes.num_rows != 0:
-                    timestamp_column = df_changes["datetime"].cast(pa.timestamp("ns"))
-
-                    df_changes = df_changes.drop(["datetime"])
-
-                    df_changes = df_changes.add_column(
-                        len(df_changes.column_names),
-                        pa.field("datetime", pa.timestamp("ns")),
-                        timestamp_column,
-                    )
-
-                    row_id_max = df_changes.group_by("row_id").aggregate(
-                        [("datetime", "max")]
-                    )
-
-                    new_names = ["row_id", "datetime"]
-                    row_id_max = row_id_max.select(['row_id', 'datetime_max'])
-
-                    row_id_max = row_id_max.rename_columns(new_names)
-
-                    df_changes = df_changes.join(
-                        row_id_max, ["row_id", "datetime"], join_type="inner"
-                    ).combine_chunks()
-
-                    df_updates = df_changes.filter(
-                        pa.compute.field("operation") == "update"
-                    )
-
-                    df_updates = df_updates.drop(["datetime", "operation", "user"])
-
-                    df_deletes = df_changes.filter(
-                        pa.compute.field("operation") == "delete"
-                    )
-                    df_inserts = df_changes.filter(
-                        pa.compute.field("operation") == "insert"
-                    )
-                    df_resets = df_changes.filter(
-                        pa.compute.field("operation") == "reset"
-                    )
-
-                    row_id_updates = df_changes["row_id"]
-                    filter_array = pa.compute.invert(
-                        pa.compute.is_in(df["row_id"], row_id_updates)
-                    )
-
-                    df_filtered = pa.compute.filter(df, filter_array)
-
-                    df_filtered = df_filtered.cast(df_updates.schema)
-
-                    df = pa.concat_tables([df_filtered, df_updates])
-
-
             con = duckdb.connect()
+            tables = parsed_query["table_name"]
+            for index, table_name in enumerate(tables):
+                json_data = self.tables[table_name]
+                table_config = self.tables[table_name]
+                editable = table_config["editable"]
+                instance_name = self.eimerdb_name
+                try:
+                    columns = parsed_query["columns"]
+                except Exception:
+                    columns = None
+                if columns == ["*"]:
+                    columns = None
+                if editable is True and unedited is False and columns is not None:
+                    if "row_id" not in columns:
+                        columns.append("row_id")
+                partitions = table_config["partition_columns"]
+                bucket_name = table_config["bucket"]
+                partitions_len = len(partitions)
+                partition_levels = "**/" * partitions_len + "*"
+                fs = FileClient.get_gcs_file_system()
+                if unedited is True:
+                    table_name_parts = table_name + "_raw"
+                else:
+                    table_name_parts = table_name
+                table_files = fs.glob(
+                    f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_parts}/{partition_levels}"
+                )
+                max_depth = max(obj.count("/") for obj in table_files)
+                table_files = [obj for obj in table_files if obj.count("/") == max_depth]
+
+                if partition_select is not None:
+                    filtered_files = []
+                    for file in table_files:
+                        parts = file.split("/")
+
+                        all_matches = True
+
+                        for key, values in partition_select.items():
+                            match_found = any(f"{key}={value}" in parts for value in values)
+
+                            if not match_found:
+                                all_matches = False
+                                break
+                        if all_matches:
+                            filtered_files.append(file)
+                        table_files = filtered_files
+                df = pq.read_table(table_files, filesystem=fs)
+
+                if editable is True and unedited is False:
+                    df_changes = self.query_changes(
+                        f"SELECT * FROM {table_name}",
+                        partition_select,
+                        output_format="arrow",
+                        changes_output="recent",
+                    )
+
+                if editable is True and unedited is False and df_changes is not None:
+                    if df_changes.num_rows != 0:
+                        timestamp_column = df_changes["datetime"].cast(pa.timestamp("ns"))
+
+                        df_changes = df_changes.drop(["datetime"])
+
+                        df_changes = df_changes.add_column(
+                            len(df_changes.column_names),
+                            pa.field("datetime", pa.timestamp("ns")),
+                            timestamp_column,
+                        )
+
+                        row_id_max = df_changes.group_by("row_id").aggregate(
+                            [("datetime", "max")]
+                        )
+
+                        new_names = ["row_id", "datetime"]
+                        row_id_max = row_id_max.select(['row_id', 'datetime_max'])
+
+                        row_id_max = row_id_max.rename_columns(new_names)
+
+                        df_changes = df_changes.join(
+                            row_id_max, ["row_id", "datetime"], join_type="inner"
+                        ).combine_chunks()
+
+                        df_updates = df_changes.filter(
+                            pa.compute.field("operation") == "update"
+                        )
+
+                        df_updates = df_updates.drop(["datetime", "operation", "user"])
+
+                        df_deletes = df_changes.filter(
+                            pa.compute.field("operation") == "delete"
+                        )
+                        df_inserts = df_changes.filter(
+                            pa.compute.field("operation") == "insert"
+                        )
+                        df_resets = df_changes.filter(
+                            pa.compute.field("operation") == "reset"
+                        )
+
+                        row_id_updates = df_changes["row_id"]
+                        filter_array = pa.compute.invert(
+                            pa.compute.is_in(df["row_id"], row_id_updates)
+                        )
+
+                        df_filtered = pa.compute.filter(df, filter_array)
+
+                        df_filtered = df_filtered.cast(df_updates.schema)
+
+                        df = pa.concat_tables([df_filtered, df_updates])
+                            
+                con.register(table_name, df)
+                del df
+
             if output_format == "pandas":
                 output = con.execute(sql_query).df()
             elif output_format == "arrow":
                 output = con.execute(sql_query).arrow()
 
             return output
+
         elif parsed_query["operation"] == "UPDATE":
             if editable is False:
                 raise Exception(f"The table {table_name} is not editable!")
@@ -524,7 +523,7 @@ class EimerDBInstance:
                 otherwise returns a string representation of the result.
         """
         parsed_query = parse_sql_query(sql_query)
-        table_name = parsed_query["table_name"]
+        table_name = parsed_query["table_name"][0]
         table_config = self.tables[table_name]
         editable = table_config["editable"]
         instance_name = self.eimerdb_name

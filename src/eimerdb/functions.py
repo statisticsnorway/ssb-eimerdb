@@ -106,14 +106,13 @@ def parse_sql_query(sql_query: str) -> dict:
 
     """
 
-    select_pattern = re.compile(r"^SELECT\s+(.*?)\s+FROM", re.IGNORECASE)
-    from_pattern = re.compile(r"FROM\s+(\w+)", re.IGNORECASE)
-    join_pattern = re.compile(r"JOIN\s+(\w+)\s+ON", re.IGNORECASE)
+    select_pattern = re.compile(r"\bSELECT\b")
+    from_pattern = re.compile(r"\bFROM\s+(\w+)")
+    join_pattern = re.compile(r"JOIN\s+(\w+)\s+ON")
     where_pattern = re.compile(
         r"WHERE\s+((?!(?:GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET|FETCH|UNION|"
         r"INTERSECT|EXCEPT|INTO|TABLESAMPLE)).*?)\s*(?:GROUP\s+BY|HAVING|ORDER\s+BY|"
         r"LIMIT|OFFSET|FETCH|UNION|INTERSECT|EXCEPT|INTO|TABLESAMPLE|$)",
-        re.IGNORECASE,
     )
 
     update_pattern = re.compile(
@@ -131,32 +130,18 @@ def parse_sql_query(sql_query: str) -> dict:
     where_clause = ""
 
     select_match = select_pattern.search(sql_query)
-    if select_match:
-        select_clause = select_match.group(1).strip()
 
-    from_match = from_pattern.search(sql_query)
-    if from_match:
-        from_table = from_match.group(1).strip()
+    from_match = from_pattern.findall(sql_query)
 
     join_tables = join_pattern.findall(sql_query)
+    
+    tables = from_match + join_tables
 
     where_match = where_pattern.search(sql_query)
     if where_match:
         where_clause = where_match.group(1).strip()
 
-    if select_match:
-        result = {
-            "operation": "SELECT",
-            "columns": ["*"],
-            "select_clause": select_clause,
-            "table_name": from_table,
-            "join_tables": join_tables,
-            "where_clause": where_clause,
-        }
-
-        return result
-
-    elif update_match:
+    if update_match:
         groups = update_match.groups()
         table_name, set_clause, where_clause = groups
 
@@ -166,6 +151,18 @@ def parse_sql_query(sql_query: str) -> dict:
             "set_clause": set_clause,
             "where_clause": where_clause.strip() if where_clause else None,
         }
+
+    elif select_match:
+        result = {
+            "operation": "SELECT",
+            "columns": ["*"],
+            "select_clause": select_clause,
+            "table_name": tables,
+            "where_clause": where_clause,
+        }
+
+        return result
+
     else:
         raise ValueError("Error parsing sql-query. Syntax error or query not supported.")
 
