@@ -6,17 +6,19 @@
 [![License](https://img.shields.io/pypi/l/ssb-eimerdb)][license]
 
 [![Documentation](https://github.com/statisticsnorway/ssb-eimerdb/actions/workflows/docs.yml/badge.svg)][documentation]
-[![Tests](https://github.com/statisticsnorway/ssb-eimerdb/workflows/Tests/badge.svg)][tests]
+[![Tests](https://github.com/statisticsnorway/ssb-eimerdb/actions/workflows/tests.yml/badge.svg)][tests]
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=statisticsnorway_ssb-eimerdb&metric=coverage)][sonarcov]
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=statisticsnorway_ssb-eimerdb&metric=alert_status)][sonarquality]
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)][pre-commit]
 [![Black](https://img.shields.io/badge/code%20style-black-000000.svg)][black]
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)][poetry]
 
 [pypi status]: https://pypi.org/project/ssb-eimerdb/
 [documentation]: https://statisticsnorway.github.io/ssb-eimerdb
 [tests]: https://github.com/statisticsnorway/ssb-eimerdb/actions?workflow=Tests
+
 [sonarcov]: https://sonarcloud.io/summary/overall?id=statisticsnorway_ssb-eimerdb
 [sonarquality]: https://sonarcloud.io/summary/overall?id=statisticsnorway_ssb-eimerdb
 [pre-commit]: https://github.com/pre-commit/pre-commit
@@ -155,7 +157,7 @@ mvabasen.remove_user(username="olduser")
 You can install _EimerDB_ via [pip] from [PyPI]:
 
 ```console
-$ pip install ssb-eimerdb
+pip install ssb-eimerdb
 ```
 
 ## Usage
