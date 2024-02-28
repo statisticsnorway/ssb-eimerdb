@@ -308,7 +308,7 @@ class EimerDBInstance:
             Exception: If the table is not editable (for UPDATE queries).
 
         """
-        if output_format == None:
+        if output_format is None:
             output_format = "pandas"
 
         parsed_query = parse_sql_query(sql_query)
@@ -372,8 +372,9 @@ class EimerDBInstance:
                 df = pq.read_table(table_files, filesystem=fs)
 
                 if editable is True and unedited is False:
+                    slct_qry = "SELECT * FROM"
                     df_changes = self.query_changes(
-                        f"SELECT * FROM {table_name}",
+                        f"{slct_qry} {table_name}",
                         partition_select,
                         output_format="arrow",
                         changes_output="recent",
@@ -471,8 +472,10 @@ class EimerDBInstance:
             arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
             arrow_schema = arrow_schema.append(pa.field("operation", pa.string()))
 
+            slct_qry = "SELECT * FROM"
+
             df = self.query(
-                f"SELECT * FROM {table_name} WHERE {where_clause}", partition_select
+                f"{slct_qry} {table_name} WHERE {where_clause}", partition_select
             )
 
             df["user"] = get_initials()

@@ -96,8 +96,7 @@ def arrow_schema_from_json(json_schema: dict) -> pa.Schema:
 
 
 def parse_sql_query(sql_query: str) -> dict:
-    """
-    A function that parses the provided SQL query.
+    """A function that parses the provided SQL query.
 
     Args:
         sql_query (str): An SQL query.
@@ -106,7 +105,7 @@ def parse_sql_query(sql_query: str) -> dict:
         dict: A dictionary with keys: Operation, columns, table_name, and sql_filter.
 
     Raises:
-        ValueError: If there is a syntax error in the SQL query or if the query is not supported.
+        ValueError: If there is a syntax error or if the query is not supported.
     """
     select_pattern = re.compile(r"\bSELECT\b")
     from_pattern = re.compile(r"\bFROM\s+(\w+)")
