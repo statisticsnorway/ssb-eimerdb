@@ -44,7 +44,7 @@ class EimerDBInstance:
 
     Args:
         bucket_name (str): The name of the Google Cloud Storage bucket
-            where EimerDB is hosted.
+            where the EimerDB database is hosted.
         eimer_name (str): The name of the EimerDB instance.
 
     Attributes:
