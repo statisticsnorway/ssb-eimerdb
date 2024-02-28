@@ -291,15 +291,20 @@ class EimerDBInstance:
         else:
             raise Exception("Cannot insert into main table. You are not an admin!")
 
-    def query(  # noqa: C901
-        self, sql_query, partition_select=None, unedited=False, output_format=None
-    ):
+    def query(
+        self,
+        sql_query: str,
+        partition_select: Optional[Dict[str, Any]] = None,
+        unedited: Optional[bool] = False,
+        output_format: Optional[str] = None,
+    ) -> Union[pd.DataFrame, pa.Table]:
         """Execute an SQL query on an EimerDB table.
 
         Args:
             sql_query (str): SQL query to execute.
             partition_select (dict): Dictionary specifying partition filters.
             unedited (bool): Indicates whether to include unedited data.
+            output_format (str, optional): Desired output format ('pandas' or 'arrow').
 
         Returns:
             pandas.DataFrame: Resulting DataFrame from the query.
@@ -512,9 +517,9 @@ class EimerDBInstance:
         sql_query: str,
         partition_select: Optional[Dict[str, Any]] = None,
         unedited: Optional[bool] = False,
-        output_format: Optional[str] = "pandas",
+        output_format: Optional[str] = None,
         changes_output: Optional[str] = "all",
-    ) -> Union[pd.DataFrame, pa.Table, str]:
+    ) -> Union[pd.DataFrame, pa.Table]:
         """Query changes made in the database table.
 
         Args:
@@ -533,6 +538,9 @@ class EimerDBInstance:
                 Returns a pandas DataFrame if 'pandas' output format is specified,
                 an arrow Table if 'arrow' output format is specified,
         """
+        if output_format is None:
+            output_format = "pandas"
+
         parsed_query = parse_sql_query(sql_query)
         table_name = parsed_query["table_name"][0]
         table_config = self.tables[table_name]
