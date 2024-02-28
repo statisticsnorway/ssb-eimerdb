@@ -292,7 +292,7 @@ class EimerDBInstance:
             raise Exception("Cannot insert into main table. You are not an admin!")
 
     def query(  # noqa: C901
-        self, sql_query, partition_select=None, unedited=False, output_format="pandas"
+        self, sql_query, partition_select=None, unedited=False, output_format=None
     ):
         """Execute an SQL query on an EimerDB table.
 
@@ -308,6 +308,9 @@ class EimerDBInstance:
             Exception: If the table is not editable (for UPDATE queries).
 
         """
+        if output_format == None:
+            output_format = "pandas"
+
         parsed_query = parse_sql_query(sql_query)
         try:
             where_clause = parsed_query["where_clause"]
@@ -505,9 +508,9 @@ class EimerDBInstance:
         self,
         sql_query: str,
         partition_select: Optional[Dict[str, Any]] = None,
-        unedited: bool = False,
-        output_format: str = "pandas",
-        changes_output: str = "all",
+        unedited: Optional[bool] = False,
+        output_format: Optional[str] = "pandas",
+        changes_output: Optional[str] = "all",
     ) -> Union[pd.DataFrame, pa.Table, str]:
         """Query changes made in the database table.
 
@@ -526,7 +529,6 @@ class EimerDBInstance:
             Union[pd.DataFrame, pa.Table, str]:
                 Returns a pandas DataFrame if 'pandas' output format is specified,
                 an arrow Table if 'arrow' output format is specified,
-                otherwise returns a string representation of the result.
         """
         parsed_query = parse_sql_query(sql_query)
         table_name = parsed_query["table_name"][0]
@@ -711,39 +713,4 @@ class EimerDBInstance:
         )
 
         print("The changes were successfully merged into one file per partition!")
-
-    def merge_changes_into_main(self, table_name: str) -> None:
-        """Merge changes for a given table into the main table.
-
-        This method merges changes for the specified table into the main table.
-        It requires admin privileges to execute.
-
-        Args:
-            table_name (str): The name of the table for which changes are to be merged.
-
-        Returns:
-            None
-        """
-        if self.is_admin is True:
-            merged = self.query(
-                f"SELECT * FROM {table_name}", partition_select=None, unedited=False
-            )
-            self.main_table_insert(table_name, merged)
-            partitions = self.tables[table_name]["partition_columns"]
-            partition_levels = "**/" * len(partitions) + "*"
-            fs = FileClient.get_gcs_file_system()
-            table_files = fs.glob(
-                f"gs://ssb-prod-mva-melding-data-produkt/eimerdb/mvabasen/hovedtabell_changes/{partition_levels}"
-            )
-            max_depth = max(obj.count("/") for obj in table_files)
-            files_to_move = [obj for obj in table_files if obj.count("/") == max_depth]
-
-            for file in files_to_move:
-                moved_file = file.replace(
-                    "hovedtabell_changes", "hovedtabell_changes_all"
-                )
-                fs.mv(f"gs://{file}", f"gs://{moved_file}")
-
-            logging.info("Changes merged into main successfully!")
-
-            print("Changes merged into main successfully!")
+        return None

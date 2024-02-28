@@ -43,7 +43,7 @@ def get_initials() -> str:
     return user.split("@")[0]
 
 
-def get_json(bucket_name: str, blob_path: str) -> dict:
+def get_json(bucket_name: str, blob_path: str) -> str:
     """A function that retrieves a JSON file from Google Cloud Storage.
 
     Args:
@@ -64,7 +64,7 @@ def get_json(bucket_name: str, blob_path: str) -> dict:
     return data
 
 
-def arrow_schema_from_json(json_schema: list) -> pa.Schema:
+def arrow_schema_from_json(json_schema: dict) -> pa.Schema:
     """A function that converts a JSON file to an Arrow schema.
 
     Args:
@@ -95,13 +95,17 @@ def arrow_schema_from_json(json_schema: list) -> pa.Schema:
 
 
 def parse_sql_query(sql_query: str) -> dict:
-    """A function that parses the given SQL query.
+    """
+    A function that parses the provided SQL query.
 
     Args:
         sql_query (str): An SQL query.
 
     Returns:
         dict: A dictionary with keys: Operation, columns, table_name, and sql_filter.
+
+    Raises:
+        ValueError: If there is a syntax error in the SQL query or if the query is not supported.
     """
     select_pattern = re.compile(r"\bSELECT\b")
     from_pattern = re.compile(r"\bFROM\s+(\w+)")
@@ -236,3 +240,4 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
         data=json.dumps(tables), content_type="application/json"
     )
     logger.info("EimerDB instance %s created.", db_name)
+    return None
