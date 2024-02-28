@@ -578,9 +578,9 @@ class EimerDBInstance:
             except ValueError:
                 no_changes = True
                 if output_format == "pandas":
-                    df_changes = pd.DataFrame()
+                    df_changes: pd.DataFrame = pd.DataFrame()
                 elif output_format == "arrow":
-                    df_changes = pa.table([])
+                    df_changes: pa.Table = pa.table([])
 
             if no_changes is not True:
                 table_files_changes = [
@@ -609,15 +609,15 @@ class EimerDBInstance:
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
                     if output_format == "pandas":
-                        df_changes = con.execute(sql_query).df()
+                        df_changes: pd.DataFrame = con.execute(sql_query).df()
                     elif output_format == "arrow":
-                        df_changes = con.execute(sql_query).arrow()
+                        df_changes: pa.Table = con.execute(sql_query).arrow()
 
                 elif dataset.num_rows == 0:
                     if output_format == "pandas":
-                        df_changes = pd.DataFrame()
+                        df_changes: pd.DataFrame = pd.DataFrame()
                     elif output_format == "arrow":
-                        df_changes = pa.table([])
+                        df_changes: pa.Table = pa.table([])
 
             table_name_changes_all = table_name + "_changes_all"
             table_files_changes_all = fs.glob(
@@ -661,11 +661,11 @@ class EimerDBInstance:
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
                     if output_format == "pandas":
-                        df_changes_all = con.execute(sql_query).df()
-                        df = pd.concat([df_changes_all, df_changes])
+                        df_changes_all: pd.DataFrame = con.execute(sql_query).df()
+                        df: pd.DataFrame = pd.concat([df_changes_all, df_changes])
                     elif output_format == "arrow":
-                        df_changes_all = con.execute(sql_query).arrow()
-                        df = pa.concat_tables([df_changes_all, df_changes])
+                        df_changes_all: pa.Table = con.execute(sql_query).arrow()
+                        df: pa.Table = pa.concat_tables([df_changes_all, df_changes])
                         df = df.cast(table_schema)
 
             if changes_output == "all":
