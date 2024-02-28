@@ -1,13 +1,8 @@
-"""Command-line interface."""
+"""Main entry point for the my_package package."""
 
-import click
-
-
-@click.command()
-@click.version_option()
-def main() -> None:
-    """EimerDB."""
-
+from eimerdb.functions import main as functions_main
+from eimerdb.instance import main as instance_main
 
 if __name__ == "__main__":
-    main(prog_name="ssb-eimerdb")  # pragma: no cover
+    functions_main()
+    instance_main()

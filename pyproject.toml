@@ -19,7 +19,7 @@ classifiers = [
 Changelog = "https://github.com/statisticsnorway/ssb-eimerdb/releases"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<4.0"
+python = ">=3.9,<4.0"
 click = ">=8.0.1"
 duckdb = "^0.8.1"
 google-cloud-storage = "^2.10.0"
