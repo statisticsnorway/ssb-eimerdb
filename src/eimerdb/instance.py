@@ -291,7 +291,7 @@ class EimerDBInstance:
         else:
             raise Exception("Cannot insert into main table. You are not an admin!")
 
-    def query(
+    def query(  # noqa: C901
         self,
         sql_query: str,
         partition_select: Optional[Dict[str, Any]] = None,
