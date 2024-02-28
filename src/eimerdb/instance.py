@@ -475,7 +475,7 @@ class EimerDBInstance:
             df["user"] = get_initials()
             df["datetime"] = get_datetime()
             df["operation"] = "update"
-            dataset = pa.Table.from_pandas(df, schema=arrow_schema) # noqa
+            dataset = pa.Table.from_pandas(df, schema=arrow_schema)  # noqa
             con = duckdb.connect()
             con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
             sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
@@ -500,6 +500,7 @@ class EimerDBInstance:
                 filesystem=fs,
             )
             return print(f"{df_updates_len} rows updated by {get_initials()}")
+    # noqa
 
     def query_changes(
         self,
@@ -653,6 +654,7 @@ class EimerDBInstance:
                     return df_changes
             elif changes_output == "recent":
                 return df_changes
+    # noqa
 
     def get_changes(self, table_name: str) -> DataFrame:
         """Retrieve changes for a given table.

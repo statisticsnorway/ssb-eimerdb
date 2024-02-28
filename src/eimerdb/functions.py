@@ -8,9 +8,11 @@ import json
 import logging
 import re
 from datetime import datetime
+
 import pyarrow as pa
 from dapla import AuthClient
 from google.cloud import storage
+
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +63,7 @@ def get_json(bucket_name: str, blob_path: str) -> dict:
     data = json.loads(json_content)
     return data
 
+
 def arrow_schema_from_json(json_schema: list) -> pa.Schema:
     """A function that converts a JSON file to an Arrow schema.
 
@@ -75,7 +78,7 @@ def arrow_schema_from_json(json_schema: list) -> pa.Schema:
         name = field_dict["name"]
         data_type = field_dict["type"]
         label = field_dict["label"]
-        
+
         if "timestamp" in data_type:
             unit_start = data_type.find("(") + 1
             unit_end = data_type.find(")")
@@ -100,7 +103,6 @@ def parse_sql_query(sql_query: str) -> dict:
     Returns:
         dict: A dictionary with keys: Operation, columns, table_name, and sql_filter.
     """
-
     select_pattern = re.compile(r"\bSELECT\b")
     from_pattern = re.compile(r"\bFROM\s+(\w+)")
     join_pattern = re.compile(r"JOIN\s+(\w+)\s+ON")

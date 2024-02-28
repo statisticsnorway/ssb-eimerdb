@@ -28,10 +28,13 @@
 ### Google Cloud Storage Integration
 
 Create your own database for data storage by specifying bucket name and a database name.
+
 ```python
 create_eimerdb(bucket="bucket-name", db_name="prodcombasen")
 ```
+
 Connect to your EimerDB database hosted on Google Cloud Storage.
+
 ```python
 prodcombasen = EimerDBInstance("bucket-name", "prodcombasen")
 ```
@@ -39,35 +42,37 @@ prodcombasen = EimerDBInstance("bucket-name", "prodcombasen")
 ### Table Management
 
 Easily create tables with defined schemas.
-Example:
+
 ```python
 prodcombasen.create_table(
     table_name="prefill_prod",
-    schema, 
+    schema,
     partition_columns=["aar"],
     editable=True
 )
 ```
+
 Partition tables for efficient data organization.
 
 ### SQL Query Support
 
-Query your tables with SQL syntax. Specify partition selection for row skipping, making queries faster.
+Query your tables with SQL syntax. Specify partition selection for row skipping, making queries faster
+
 ```python
 prodcombasen.query(
-    """SELECT * 
+    """SELECT *
     FROM prodcom_prefill
     WHERE produktkode = '10.13.11.20'""",
     partition_select = {
         "aar": [2022, 2021]
         }
 ```
-    
 
 ### Data Updates
 
 Perform updates using SQL statements
-Each update is saved as a separate file for versioning. The update files will also include info about who made the update and when.
+Each update is saved as a separate file for versioning. The update files includes a username column with the user who made the update and a datetime column for when the update happened.
+
 ```python
 prodcombasen.query(
     """UPDATE prodcom_prefill
@@ -81,6 +86,7 @@ prodcombasen.query(
 ### Unedited Data Access
 
 Retrieve the unedited version of your data.
+
 ```python
 prodcombasen.query(
     """SELECT *
@@ -92,36 +98,37 @@ prodcombasen.query(
 ### Query multiple tables
 
 Query multiple tables using JOIN and subquery.
+
 ```python
 prodcombasen.query(
-    f"""SELECT 
-            t1.aar, 
-            t1.produktkode, 
-            t1.beskrivelse, 
+    f"""SELECT
+            t1.aar,
+            t1.produktkode,
+            t1.beskrivelse,
             SUM(t1.mengde) AS mengde
-        FROM 
+        FROM
             prefill_prod AS t1
         JOIN (
-            SELECT 
-                t2.aar, 
-                t2.ident, 
-                t2.skjemaversjon, 
+            SELECT
+                t2.aar,
+                t2.ident,
+                t2.skjemaversjon,
                 MAX(t2.dato_mottatt) AS newest_dato_mottatt
-            FROM 
+            FROM
                 skjemainfo AS t2
-            GROUP BY 
-                t2.aar, 
-                t2.ident, 
+            GROUP BY
+                t2.aar,
+                t2.ident,
                 t2.skjemaversjon
-        ) AS subquery ON 
+        ) AS subquery ON
             t1.aar = subquery.aar
             AND t1.ident = subquery.ident
             AND t1.skjemaversjon = subquery.skjemaversjon
-        WHERE 
+        WHERE
             t1.mengde IS NOT NULL
-        GROUP BY 
-            t1.aar, 
-            t1.produktkode, 
+        GROUP BY
+            t1.aar,
+            t1.produktkode,
             t1.beskrivelse;""",
         partition_select={
             "aar": [2022, 2021, 2020]
@@ -133,6 +140,7 @@ prodcombasen.query(
 
 Add and remove users from your instance.
 Assign specific roles to users for access control.
+
 ```python
 mvabasen.add_user(username="newuser", role="admin")
 mvabasen.remove_user(username="olduser")
