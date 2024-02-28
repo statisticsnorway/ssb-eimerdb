@@ -500,6 +500,7 @@ class EimerDBInstance:
                 filesystem=fs,
             )
             return print(f"{df_updates_len} rows updated by {get_initials()}")
+
     # noqa
 
     def query_changes(
@@ -654,6 +655,7 @@ class EimerDBInstance:
                     return df_changes
             elif changes_output == "recent":
                 return df_changes
+
     # noqa
 
     def get_changes(self, table_name: str) -> DataFrame:
