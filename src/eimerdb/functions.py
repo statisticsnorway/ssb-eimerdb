@@ -1,18 +1,16 @@
-"""
-A collection of useful functions.
+"""A collection of useful functions.
 
 The template and this example uses Google style docstrings as described at:
 https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
 """
 
 import json
-import os
+import logging
 import re
 from datetime import datetime
 import pyarrow as pa
 from dapla import AuthClient
 from google.cloud import storage
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -43,17 +41,15 @@ def get_initials() -> str:
     return user.split("@")[0]
 
 
-def get_json(bucket_name: str,
-             blob_path: str) -> dict:
-    """A function that gets a json file from Google Cloud Storage.
+def get_json(bucket_name: str,blob_path: str) -> dict:
+    """A function that retrieves a JSON file from Google Cloud Storage.
 
     Args:
-        bucket_name: Name of bucket
-        blob_path: Path to blob
+        bucket_name (str): Name of the bucket.
+        blob_path (str): Path to the blob.
 
     Returns:
-        The users initials.
-
+        str: The JSON content.
     """
     token = AuthClient.fetch_google_credentials()
     client = storage.Client(credentials=token)
@@ -66,14 +62,13 @@ def get_json(bucket_name: str,
     return data
 
 def arrow_schema_from_json(json_schema: list) -> pa.Schema:
-    """A function converts a json file to an arrow schema.
+    """A function that converts a JSON file to an Arrow schema.
 
-     Args:
-        json_schema: A json schema with name, type and label
+    Args:
+        json_schema (dict): A JSON schema with name, type, and label.
 
     Returns:
-        Pyarrow schema.
-
+        pa.Schema: The PyArrow schema.
     """
     fields = []
     for field_dict in json_schema:
@@ -81,11 +76,11 @@ def arrow_schema_from_json(json_schema: list) -> pa.Schema:
         data_type = field_dict["type"]
         label = field_dict["label"]
         
-        if 'timestamp' in data_type:
+        if "timestamp" in data_type:
             unit_start = data_type.find("(") + 1
             unit_end = data_type.find(")")
             unit = data_type[unit_start:unit_end]
-            field_type = getattr(pa, 'timestamp')(unit)
+            field_type = getattr(pa, "timestamp")(unit)
         else:
             field_type = getattr(pa, data_type)()
         
@@ -96,14 +91,13 @@ def arrow_schema_from_json(json_schema: list) -> pa.Schema:
     return pa.schema(fields)
 
 def parse_sql_query(sql_query: str) -> dict:
-    """A function that parses the given sql query.
+    """A function that parses the given SQL query.
 
-     Args:
-        sql_query: An sql query.
+    Args:
+        sql_query (str): An SQL query.
 
     Returns:
-        Dictionary with keys: Operation, columns, table_name and sql_filter.
-
+        dict: A dictionary with keys: Operation, columns, table_name, and sql_filter.
     """
 
     select_pattern = re.compile(r"\bSELECT\b")
@@ -125,8 +119,7 @@ def parse_sql_query(sql_query: str) -> dict:
     update_match = re.match(update_pattern, sql_query)
 
     select_clause = ""
-    from_table = ""
-    join_tables = []
+    tables = ""
     where_clause = ""
 
     select_match = select_pattern.search(sql_query)
@@ -164,7 +157,9 @@ def parse_sql_query(sql_query: str) -> dict:
         return result
 
     else:
-        raise ValueError("Error parsing sql-query. Syntax error or query not supported.")
+        raise ValueError(
+            "Error parsing sql-query. Syntax error or query not supported."
+        )
 
 
 
