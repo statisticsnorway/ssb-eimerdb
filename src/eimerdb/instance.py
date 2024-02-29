@@ -509,8 +509,8 @@ class EimerDBInstance:
 
             update_table = pa.Table.from_pandas(df_updates, schema=arrow_schema)
 
-            row_id = uuid4()
-            filename = f"commit_{row_id}_{{i}}.parquet"
+            unique_file_id = uuid4()
+            filename = f"commit_{unique_file_id}_{{i}}.parquet"
 
             pq.write_to_dataset(
                 update_table,
@@ -520,6 +520,67 @@ class EimerDBInstance:
                 filesystem=fs,
             )
             return print(f"{df_updates_len} rows updated by {get_initials()}")
+
+        elif parsed_query["operation"] == "DELETE":
+            table_name = parsed_query["table_name"]
+            table_config = self.tables[table_name]
+            editable = table_config["editable"]
+            if editable is False:
+                raise Exception(f"The table {table_name} is not editable!")
+            try:
+                columns = parsed_query["columns"]
+            except Exception:
+                columns = None
+            if columns == ["*"]:
+                columns = None
+            json_data = self.tables[table_name]
+            table_name = parsed_query["table_name"]
+            arrow_schema = arrow_schema_from_json(json_data["schema"])
+            where_clause = parsed_query["where_clause"]
+            instance_name = self.eimerdb_name
+            table_config = self.tables[table_name]
+            partitions = table_config["partition_columns"]
+            bucket_name = table_config["bucket"]
+            partitions_len = len(partitions)
+            partition_levels = "**/" * partitions_len + "*"
+
+            arrow_schema = arrow_schema.append(pa.field("user", pa.string()))
+            arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
+            arrow_schema = arrow_schema.append(pa.field("operation", pa.string()))
+
+            slct_qry = "SELECT * FROM"
+
+            df = self.query(
+                f"{slct_qry} {table_name} WHERE {where_clause}", partition_select
+            )
+
+            df["user"] = get_initials()
+            df["datetime"] = get_datetime()
+            df["operation"] = "delete"
+            dataset = pa.Table.from_pandas(df, schema=arrow_schema)  # noqa
+            con = duckdb.connect()
+            con.execute(f"CREATE TABLE deletes AS FROM dataset WHERE {where_clause}")
+
+            df_deletions = con.table("deletes").df()
+
+            df_deletions_len = len(df_deletions)
+
+            table_path = self.tables[table_name]["table_path"] + "_changes"
+            fs = FileClient.get_gcs_file_system()
+
+            deletion_Table = pa.Table.from_pandas(df_deletions, schema=arrow_schema)
+
+            unique_file_id = uuid4()
+            filename = f"commit_{unique_file_id}_{{i}}.parquet"
+
+            pq.write_to_dataset(
+                deletion_Table,
+                root_path=f"gs://{self.bucket}/{table_path}",
+                partition_cols=partitions,
+                basename_template=filename,
+                filesystem=fs,
+            )
+            return print(f"{df_deletions_len} rows deleted by {get_initials()}")
 
     def query_changes(  # noqa: C901
         self,

@@ -125,6 +125,12 @@ def parse_sql_query(sql_query: str) -> dict:
 
     update_match = re.match(update_pattern, sql_query)
 
+    delete_pattern = re.compile(
+        r"^DELETE\s+FROM\s+(\w+)\s+(?:WHERE\s+(.*))?$", re.IGNORECASE | re.DOTALL
+    )
+
+    delete_match = re.match(delete_pattern, sql_query)
+
     select_clause = ""
     tables = ""
     where_clause = ""
@@ -138,8 +144,18 @@ def parse_sql_query(sql_query: str) -> dict:
     tables = from_match + join_tables
 
     where_match = where_pattern.search(sql_query)
+
     if where_match:
         where_clause = where_match.group(1).strip()
+
+    if delete_match:
+        table_name, where_clause = delete_match.groups()
+
+        return {
+            "operation": "DELETE",
+            "table_name": table_name,
+            "where_clause": where_clause.strip() if where_clause else None,
+        }
 
     if update_match:
         groups = update_match.groups()
