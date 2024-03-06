@@ -566,20 +566,20 @@ class EimerDBInstance:
                         partition_select,
                     )
 
-                dataset = pq.read_table(table_files_changes, filesystem=fs)
+                dataset: pa.Table = pq.read_table(table_files_changes, filesystem=fs)
                 sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
                     if output_format == "pandas":
-                        df_changes = con.execute(sql_query).df()
+                        df_changes: pd.DataFrame = con.execute(sql_query).df()
                     elif output_format == "arrow":
-                        df_changes = con.execute(sql_query).arrow()
+                        df_changes: pa.Table = con.execute(sql_query).arrow()
 
                 elif dataset.num_rows == 0:
                     if output_format == "pandas":
                         df_changes = pd.DataFrame()
                     elif output_format == "arrow":
-                        df_changes = pa.table([])
+                        df_changes: pa.Table = pa.table([])
 
             table_name_changes_all = table_name + "_changes_all"
             table_files_changes_all = fs.glob(
@@ -612,11 +612,11 @@ class EimerDBInstance:
                     con = duckdb.connect()
                     if output_format == "pandas":
                         df_changes_all: pd.DataFrame = con.execute(sql_query).df()
-                        df = pd.concat([df_changes_all, df_changes])
+                        df: pd.DataFrame = pd.concat([df_changes_all, df_changes])
                     elif output_format == "arrow":
                         df_changes_all: pa.Table = con.execute(sql_query).arrow()
-                        df = pa.concat_tables([df_changes_all, df_changes])
-                        df = df.cast(table_schema)
+                        df: pa.Table = pa.concat_tables([df_changes_all, df_changes])
+                        df: pa.Table = df.cast(table_schema)
 
             if changes_output == "all":
                 if no_changes_all is not True:
@@ -644,7 +644,7 @@ class EimerDBInstance:
             partitioning="hive",
             filesystem=fs,
         )
-        df_changes = dataset.to_table().to_pandas()
+        df_changes: DataFrame = dataset.to_table().to_pandas()
         return df_changes
 
     def combine_changes(self, table_name: str) -> None:

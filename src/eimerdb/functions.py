@@ -11,7 +11,7 @@ from datetime import datetime
 
 import pyarrow as pa
 from dapla import AuthClient
-from google.cloud import storage
+from google.cloud import storage  # type: ignore
 
 
 logger = logging.getLogger(__name__)
@@ -40,11 +40,10 @@ def get_initials() -> str:
         user = AuthClient.fetch_local_user_from_jupyter()["username"]
         return user.split("@")[0]
     except KeyError:
-        return "user@ssb.no"
-    return user.split("@")[0]
+        return "user"
 
 
-def get_json(bucket_name: str, blob_path: str) -> str:
+def get_json(bucket_name: str, blob_path: str) -> dict[str, Any]:
     """A function that retrieves a JSON file from Google Cloud Storage.
 
     Args:
@@ -61,11 +60,11 @@ def get_json(bucket_name: str, blob_path: str) -> str:
 
     json_content = blob.download_as_text()
 
-    data = json.loads(json_content)
+    data: str = json.loads(json_content)
     return data
 
 
-def arrow_schema_from_json(json_schema: dict) -> pa.Schema:
+def arrow_schema_from_json(json_schema: dict[str, Any]) -> pa.Schema:
     """A function that converts a JSON file to an Arrow schema.
 
     Args:
@@ -95,7 +94,7 @@ def arrow_schema_from_json(json_schema: dict) -> pa.Schema:
     return pa.schema(fields)
 
 
-def parse_sql_query(sql_query: str) -> dict:
+def parse_sql_query(sql_query: str) -> dict[str, Any]:
     """A function that parses the provided SQL query.
 
     Args:
