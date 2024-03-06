@@ -1,7 +1,9 @@
 from typing import Any
 from typing import Optional
+
 import pyarrow as pa
 from dapla import FileClient
+
 
 def get_partitioned_files(
     table_name: str,

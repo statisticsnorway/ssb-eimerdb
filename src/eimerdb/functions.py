@@ -9,10 +9,10 @@ import logging
 import re
 from datetime import datetime
 from typing import Any
+
 import pyarrow as pa
 from dapla import AuthClient
 from google.cloud import storage  # type: ignore
-
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,8 @@ def get_initials() -> str:
     """
     try:
         user = AuthClient.fetch_local_user_from_jupyter()["username"]
-        return user.split("@")[0]
+        user_split: str = user.split("@")[0]
+        return user_split
     except KeyError:
         return "user"
 
@@ -60,7 +61,7 @@ def get_json(bucket_name: str, blob_path: str) -> dict[str, Any]:
 
     json_content = blob.download_as_text()
 
-    data: str = json.loads(json_content)
+    data: dict[str, Any] = json.loads(json_content)
     return data
 
 
@@ -75,8 +76,8 @@ def arrow_schema_from_json(json_schema: dict[str, Any]) -> pa.Schema:
     """
     fields = []
     for field_dict in json_schema:
-        name = field_dict["name"]
-        data_type = field_dict["type"]
+        name = field_dict["name"]  # type: ignore
+        data_type = field_dict["type"]  # type: ignore
         label = field_dict["label"]
 
         if "timestamp" in data_type:

@@ -123,7 +123,7 @@ class EimerDBInstance:
         else:
             self.users = None  # type: ignore
             self.role_groups = None  # type: ignore
-            self.is_admin = False  # type: ignore
+            self.is_admin = False
 
     def add_user(self, username: str, role: Any) -> None:
         """Add a user with a specified role.
@@ -206,7 +206,7 @@ class EimerDBInstance:
             client = storage.Client(credentials=token)
             row_id_def = {"name": "row_id", "type": "string", "label": "Unique row ID"}
             schema.insert(0, row_id_def)
-            arrow_schema = arrow_schema_from_json(schema)
+            arrow_schema = arrow_schema_from_json(schema)  # type: ignore
             tables = self.tables
             bucket = client.bucket(self.bucket)
             initials = get_initials()
@@ -353,7 +353,7 @@ class EimerDBInstance:
                 if partition_select is not None:
                     table_files = filter_partitions(table_files, partition_select)
 
-                df = pq.read_table(table_files, filesystem=fs)
+                df = pq.read_table(table_files, filesystem=fs)  # type: ignore
 
                 if editable is True and unedited is False:
                     slct_qry = "SELECT * FROM"
@@ -494,6 +494,8 @@ class EimerDBInstance:
                 filesystem=fs,
             )
             return print(f"{df_deletions_len} rows deleted by {get_initials()}")  # type: ignore
+        else:
+            return None
 
     def query_changes(
         self,
@@ -552,7 +554,7 @@ class EimerDBInstance:
             except ValueError:
                 no_changes = True
                 if output_format == "pandas":
-                    df_changes: pd.DataFrame = pd.DataFrame()  # type: ignore
+                    df_changes: pd.DataFrame = pd.DataFrame()
                 elif output_format == "arrow":
                     df_changes: pa.Table = pa.table([])  # type: ignore
 
@@ -610,8 +612,8 @@ class EimerDBInstance:
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
                     if output_format == "pandas":
-                        df_changes_all: pd.DataFrame = con.execute(sql_query).df()  # type: ignore
-                        df: pd.DataFrame = pd.concat([df_changes_all, df_changes])  # type: ignore
+                        df_changes_all: pd.DataFrame = con.execute(sql_query).df()
+                        df: pd.DataFrame = pd.concat([df_changes_all, df_changes])
                     elif output_format == "arrow":
                         df_changes_all: pa.Table = con.execute(sql_query).arrow()  # type: ignore
                         df: pa.Table = pa.concat_tables([df_changes_all, df_changes])  # type: ignore
@@ -624,6 +626,8 @@ class EimerDBInstance:
                     return df_changes
             elif changes_output == "recent":
                 return df_changes
+            else:
+                return None
 
     def get_changes(self, table_name: str) -> DataFrame:
         """Retrieve changes for a given table.
