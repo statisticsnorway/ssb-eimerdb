@@ -575,7 +575,7 @@ class EimerDBInstance:
 
                 elif dataset.num_rows == 0:
                     if output_format == "pandas":
-                        df_changes pd.DataFrame()
+                        df_changes = pd.DataFrame()
                     elif output_format == "arrow":
                         df_changes = pa.table([])
 
