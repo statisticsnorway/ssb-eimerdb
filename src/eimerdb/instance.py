@@ -300,7 +300,7 @@ class EimerDBInstance:
         else:
             raise Exception("Cannot insert into main table. You are not an admin!")
 
-    def query(  # noqa: C901
+    def query(
         self,
         sql_query: str,
         partition_select: Optional[dict[str, Any]] = None,
@@ -559,7 +559,10 @@ class EimerDBInstance:
                     obj for obj in table_files_changes if obj.count("/") == max_depth
                 ]
                 if partition_select is not None:
-                    table_files_changes = filter_partitions(table_files_changes, partition_select)
+                    table_files_changes = filter_partitions(
+                        table_files_changes,
+                        partition_select,
+                    )
 
                 dataset = pq.read_table(table_files_changes, filesystem=fs)
                 sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
@@ -592,7 +595,10 @@ class EimerDBInstance:
                     if obj.count("/") == max_depth
                 ]
                 if partition_select is not None:
-                    table_files_changes_all = filter_partitions(table_files_changes_all, partition_select)
+                    table_files_changes_all = filter_partitions(
+                        table_files_changes_all,
+                        partition_select
+                    )
 
                 dataset = pq.read_table(
                     table_files_changes_all, filesystem=fs, columns=columns
