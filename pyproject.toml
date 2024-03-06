@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ssb-eimerdb"
-version = "0.1.0"
+version = "0.1.1"
 description = "EimerDB"
 authors = ["Stian Elisenberg <seg@ssb.no>"]
 license = "MIT"
