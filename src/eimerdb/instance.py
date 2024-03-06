@@ -130,10 +130,13 @@ class EimerDBInstance:
 
         Args:
             username (str): Name of the user to add.
-            role (str): Role to assign (admin or user).
+            role (Any): Role to assign (admin or user).
 
         Raises:
             Exception: If the user is not an admin or the user already exists.
+
+        Returns:
+            None
 
         """
         if self.is_admin is True:
@@ -141,7 +144,7 @@ class EimerDBInstance:
             client = storage.Client(credentials=token)
             bucket = client.bucket(self.bucket)
             users = self.users
-            new_user: dict[str, str] = {username: role}
+            new_user = {username: role}
             if username not in users:
                 users.update(new_user)
                 user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")

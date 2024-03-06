@@ -30,8 +30,6 @@ def get_partitioned_files(
     Returns:
         list[str]: A list of file paths corresponding to the partitioned files of the table.
 
-    Raises:
-        NoPartitionColumnsError: If the table configuration does not contain partition columns.
     """
     partitions = table_config["partition_columns"]
     bucket_name = table_config["bucket"]
