@@ -26,14 +26,14 @@ from dapla import FileClient
 from google.cloud import storage  # type: ignore
 from pandas import DataFrame
 
-from functions import arrow_schema_from_json
-from functions import get_datetime
-from functions import get_initials
-from functions import get_json
-from functions import parse_sql_query
-from query import get_partitioned_files
-from query import update_pyarrow_table
-from query import filter_partitions
+from .functions import arrow_schema_from_json
+from .functions import get_datetime
+from .functions import get_initials
+from .functions import get_json
+from .functions import parse_sql_query
+from .query import get_partitioned_files
+from .query import update_pyarrow_table
+from .query import filter_partitions
 
 logger = logging.getLogger(__name__)
 
@@ -371,9 +371,9 @@ class EimerDBInstance:
                 del df
 
             if output_format == "pandas":
-                output: pd.DataFrame = con.execute(sql_query).df()
+                output: pd.DataFrame = con.execute(sql_query).df()  # type: ignore
             elif output_format == "arrow":
-                output: pa.Table = con.execute(sql_query).arrow()
+                output: pa.Table = con.execute(sql_query).arrow()  # type: ignore
 
             return output
 
@@ -402,7 +402,7 @@ class EimerDBInstance:
 
             slct_qry = "SELECT * FROM"
 
-            df_update_results = self.query(
+            df_update_results: pd.DataFrame = self.query(  # type: ignore
                 f"{slct_qry} {table_name} WHERE {where_clause}", partition_select
             )
 
@@ -434,7 +434,7 @@ class EimerDBInstance:
                 basename_template=filename,
                 filesystem=fs,
             )
-            return print(f"{df_updates_len} rows updated by {get_initials()}")
+            return print(f"{df_updates_len} rows updated by {get_initials()}")  # type: ignore
 
         elif parsed_query["operation"] == "DELETE":
             table_name = parsed_query["table_name"]
@@ -462,7 +462,7 @@ class EimerDBInstance:
 
             slct_qry = "SELECT * FROM"
 
-            df_delete_results: pd.DataFrame = self.query(
+            df_delete_results: pd.DataFrame = self.query(  # type: ignore
                 f"{slct_qry} {table_name} WHERE {where_clause}", partition_select
             )
 
@@ -552,9 +552,9 @@ class EimerDBInstance:
             except ValueError:
                 no_changes = True
                 if output_format == "pandas":
-                    df_changes: pd.DataFrame = pd.DataFrame()
+                    df_changes: pd.DataFrame = pd.DataFrame()  # type: ignore
                 elif output_format == "arrow":
-                    df_changes: pa.Table = pa.table([])
+                    df_changes: pa.Table = pa.table([])  # type: ignore
 
             if no_changes is not True:
                 table_files_changes = [
@@ -577,7 +577,7 @@ class EimerDBInstance:
 
                 elif dataset.num_rows == 0:
                     if output_format == "pandas":
-                        df_changes: pd.DataFrame = pd.DataFrame()
+                        df_changes: pd.DataFrame = pd.DataFrame()  # type: ignore
                     elif output_format == "arrow":
                         df_changes: pa.Table = pa.table([])  # type: ignore
 
@@ -598,8 +598,7 @@ class EimerDBInstance:
                 ]
                 if partition_select is not None:
                     table_files_changes_all = filter_partitions(
-                        table_files_changes_all,
-                        partition_select
+                        table_files_changes_all, partition_select
                     )
 
                 dataset = pq.read_table(

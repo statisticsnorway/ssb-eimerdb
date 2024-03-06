@@ -115,6 +115,6 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
     row_id_deletes = df_deletes["row_id"]
     filter_array_deletes = pa.compute.invert(  # type: ignore
         pa.compute.is_in(df_updated["row_id"], row_id_deletes)  # type: ignore
-    )  # type: ignore
-    df_output = pa.compute.filter(df_updated, filter_array_deletes)  # type: ignore
+    )
+    df_output: pa.Table = pa.compute.filter(df_updated, filter_array_deletes)  # type: ignore
     return df_output
