@@ -125,7 +125,7 @@ class EimerDBInstance:
             self.role_groups = None  # type: ignore
             self.is_admin = False
 
-    def add_user(self, username: str, role: Any) -> None:
+    def add_user(self, username: str, role: Any):
         """Add a user with a specified role.
 
         Args:
@@ -141,7 +141,7 @@ class EimerDBInstance:
             client = storage.Client(credentials=token)
             bucket = client.bucket(self.bucket)
             users = self.users
-            new_user = {username: role}
+            new_user: dict[str, str] = {username: role}
             if username not in users:
                 users.update(new_user)
                 user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
@@ -153,7 +153,6 @@ class EimerDBInstance:
                 raise Exception(f"User {username} already exists!")
         else:
             raise Exception("Cannot add user. You are not an admin!")
-        return None
 
     def remove_user(self, username: str) -> None:
         """Remove a users access to the database.
@@ -434,7 +433,7 @@ class EimerDBInstance:
                 basename_template=filename,
                 filesystem=fs,
             )
-            return print(f"{df_updates_len} rows updated by {get_initials()}")  # type: ignore
+            return print(f"{df_updates_len} rows updated by {get_initials()}")
 
         elif parsed_query["operation"] == "DELETE":
             table_name = parsed_query["table_name"]
@@ -493,7 +492,7 @@ class EimerDBInstance:
                 basename_template=filename,
                 filesystem=fs,
             )
-            return print(f"{df_deletions_len} rows deleted by {get_initials()}")  # type: ignore
+            return print(f"{df_deletions_len} rows deleted by {get_initials()}")
         else:
             return None
 

@@ -14,11 +14,25 @@ def get_partitioned_files(
     partition_select: Optional[dict[str, Any]] = None,
     unedited: Optional[bool] = False,
 ) -> list[str]:
-    """ABC.
+    """
+    Retrieve the paths of partitioned files for a given table.
+
+    Args:
+        table_name (str): The name of the table.
+        instance_name (str): The name of the instance.
+        table_config (dict[str, Any]): Configuration details for the table.
+        suffix (str): The suffix to be appended to the table name.
+        fs (Any): The filesystem object.
+        partition_select (Optional[dict[str, Any]]): Optional dictionary specifying partition
+            selection criteria. Defaults to None.
+        unedited (Optional[bool]): Optional flag indicating whether the file paths should include
+            the suffix or not. Defaults to False.
 
     Returns:
-        ABC.
+        list[str]: A list of file paths corresponding to the partitioned files of the table.
 
+    Raises:
+        NoPartitionColumnsError: If the table configuration does not contain partition columns.
     """
     partitions = table_config["partition_columns"]
     bucket_name = table_config["bucket"]
@@ -41,10 +55,16 @@ def filter_partitions(
     table_files: list[str],
     partition_select: dict[str, Any],
 ) -> list[str]:
-    """ABC.
+    """
+    Filter the list of partitioned files based on specified partition selection criteria.
+
+    Args:
+        table_files (list[str]): List of file paths corresponding to partitioned files.
+        partition_select (dict[str, Any]): Dictionary specifying partition selection criteria,
+            where keys are partition column names and values are lists of values to match.
 
     Returns:
-        ABC.
+        list[str]: A filtered list of file paths that match the specified partition selection criteria.
 
     """
     filtered_files = []
@@ -66,10 +86,15 @@ def filter_partitions(
 
 
 def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
-    """ABC.
+    """
+    Apply changes from a PyArrow table of updates and deletions to another PyArrow table.
+
+    Args:
+        df (pa.Table): The original PyArrow table to be updated.
+        df_changes (pa.Table): The PyArrow table containing updates and deletions.
 
     Returns:
-        ABC.
+        pa.Table: A new PyArrow table with the changes applied.
 
     """
     timestamp_column = df_changes["datetime"].cast(pa.timestamp("ns"))
