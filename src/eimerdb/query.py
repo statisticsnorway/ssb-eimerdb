@@ -14,8 +14,7 @@ def get_partitioned_files(
     partition_select: Optional[dict[str, Any]] = None,
     unedited: Optional[bool] = False,
 ) -> list[str]:
-    """
-    Retrieve the paths of partitioned files for a given table.
+    """Retrieve the paths of partitioned files for a given table.
 
     Args:
         table_name (str): The name of the table.
@@ -55,8 +54,7 @@ def filter_partitions(
     table_files: list[str],
     partition_select: dict[str, Any],
 ) -> list[str]:
-    """
-    Filter the list of partitioned files based on specified partition selection criteria.
+    """Filter the list of partitioned files based on specified partition selection criteria.
 
     Args:
         table_files (list[str]): List of file paths corresponding to partitioned files.
@@ -86,8 +84,7 @@ def filter_partitions(
 
 
 def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
-    """
-    Apply changes from a PyArrow table of updates and deletions to another PyArrow table.
+    """Apply changes from a PyArrow table of updates and deletions to another PyArrow table.
 
     Args:
         df (pa.Table): The original PyArrow table to be updated.

@@ -125,7 +125,7 @@ class EimerDBInstance:
             self.role_groups = None  # type: ignore
             self.is_admin = False
 
-    def add_user(self, username: str, role: Any):
+    def add_user(self, username: str, role: Any) -> None:
         """Add a user with a specified role.
 
         Args:
@@ -153,6 +153,7 @@ class EimerDBInstance:
                 raise Exception(f"User {username} already exists!")
         else:
             raise Exception("Cannot add user. You are not an admin!")
+        return None
 
     def remove_user(self, username: str) -> None:
         """Remove a users access to the database.
