@@ -758,8 +758,8 @@ class EimerDBInstance:
         df_changes = dataset.to_table().to_pandas()
         return df_changes
 
-    def merge_changes(self, table_name: str) -> None:
-        """Merge changes for a given table and store them as Parquet files.
+    def combine_changes(self, table_name: str) -> None:
+        """Combines the files containing the changes of the table into one file
 
         Args:
             table_name (str): The name of the table for which changes are to be merged.
@@ -793,5 +793,5 @@ class EimerDBInstance:
             "The changes were successfully merged into one file per partition!"
         )
 
-        print("The changes were successfully merged into one file per partition!")
+        print("The changes were successfully co into one file per partition!")
         return None
