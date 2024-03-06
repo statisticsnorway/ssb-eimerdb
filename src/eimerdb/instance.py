@@ -33,6 +33,7 @@ from functions import get_json
 from functions import parse_sql_query
 from query import get_partitioned_files
 from query import update_pyarrow_table
+from query import filter_partitions
 
 logger = logging.getLogger(__name__)
 
