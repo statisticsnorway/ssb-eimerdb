@@ -402,26 +402,26 @@ class EimerDBInstance:
 
             slct_qry = "SELECT * FROM"
 
-            df = self.query(
+            df_update_results = self.query(
                 f"{slct_qry} {table_name} WHERE {where_clause}", partition_select
             )
 
-            df["user"] = get_initials()
-            df["datetime"] = get_datetime()
-            df["operation"] = "update"
-            dataset = pa.Table.from_pandas(df, schema=arrow_schema)
+            df_update_results["user"] = get_initials()
+            df_update_results["datetime"] = get_datetime()
+            df_update_results["operation"] = "update"
+            dataset = pa.Table.from_pandas(df_update_results, schema=arrow_schema)
             con = duckdb.connect()
             con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
             sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
             con.execute(sql_query)
-            df_updates = con.table("updates").df()
+            df_updates_commits = con.table("updates").df()
 
-            df_updates_len = len(df_updates)
+            df_updates_len = len(df_updates_commits)
 
             table_path = self.tables[table_name]["table_path"] + "_changes"
             fs = FileClient.get_gcs_file_system()
 
-            update_table = pa.Table.from_pandas(df_updates, schema=arrow_schema)
+            update_table = pa.Table.from_pandas(df_updates_commits, schema=arrow_schema)
 
             unique_file_id = uuid4()
             filename = f"commit_{unique_file_id}_{{i}}.parquet"
@@ -461,14 +461,14 @@ class EimerDBInstance:
 
             slct_qry = "SELECT * FROM"
 
-            df = self.query(
+            df_delete_results = self.query(
                 f"{slct_qry} {table_name} WHERE {where_clause}", partition_select
             )
 
-            df["user"] = get_initials()
-            df["datetime"] = get_datetime()
-            df["operation"] = "delete"
-            dataset = pa.Table.from_pandas(df, schema=arrow_schema)
+            df_delete_results["user"] = get_initials()
+            df_delete_results["datetime"] = get_datetime()
+            df_delete_results["operation"] = "delete"
+            dataset = pa.Table.from_pandas(df_delete_results, schema=arrow_schema)
             con = duckdb.connect()
             con.execute(f"CREATE TABLE deletes AS FROM dataset WHERE {where_clause}")
 
@@ -569,15 +569,15 @@ class EimerDBInstance:
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
                     if output_format == "pandas":
-                        df_changes: pd.DataFrame = con.execute(sql_query).df()
+                        df_changes = con.execute(sql_query).df()
                     elif output_format == "arrow":
-                        df_changes: pa.Table = con.execute(sql_query).arrow()
+                        df_changes = con.execute(sql_query).arrow()
 
                 elif dataset.num_rows == 0:
                     if output_format == "pandas":
-                        df_changes: pd.DataFrame = pd.DataFrame()
+                        df_changes pd.DataFrame()
                     elif output_format == "arrow":
-                        df_changes: pa.Table = pa.table([])
+                        df_changes = pa.table([])
 
             table_name_changes_all = table_name + "_changes_all"
             table_files_changes_all = fs.glob(
@@ -610,10 +610,10 @@ class EimerDBInstance:
                     con = duckdb.connect()
                     if output_format == "pandas":
                         df_changes_all: pd.DataFrame = con.execute(sql_query).df()
-                        df: pd.DataFrame = pd.concat([df_changes_all, df_changes])
+                        df = pd.concat([df_changes_all, df_changes])
                     elif output_format == "arrow":
                         df_changes_all: pa.Table = con.execute(sql_query).arrow()
-                        df: pa.Table = pa.concat_tables([df_changes_all, df_changes])
+                        df = pa.concat_tables([df_changes_all, df_changes])
                         df = df.cast(table_schema)
 
             if changes_output == "all":
