@@ -8,7 +8,7 @@ import json
 import logging
 import re
 from datetime import datetime
-
+from typing import Any
 import pyarrow as pa
 from dapla import AuthClient
 from google.cloud import storage  # type: ignore

@@ -31,9 +31,9 @@ from .functions import get_datetime
 from .functions import get_initials
 from .functions import get_json
 from .functions import parse_sql_query
+from .query import filter_partitions
 from .query import get_partitioned_files
 from .query import update_pyarrow_table
-from .query import filter_partitions
 
 logger = logging.getLogger(__name__)
 
@@ -121,9 +121,9 @@ class EimerDBInstance:
             self.role_groups = role_groups
             self.is_admin = True
         else:
-            self.users = None
-            self.role_groups = None
-            self.is_admin = False
+            self.users = None  # type: ignore
+            self.role_groups = None  # type: ignore
+            self.is_admin = False  # type: ignore
 
     def add_user(self, username: str, role: Any) -> None:
         """Add a user with a specified role.
@@ -206,7 +206,7 @@ class EimerDBInstance:
             client = storage.Client(credentials=token)
             row_id_def = {"name": "row_id", "type": "string", "label": "Unique row ID"}
             schema.insert(0, row_id_def)
-            arrow_schema_from_json(schema)
+            arrow_schema = arrow_schema_from_json(schema)
             tables = self.tables
             bucket = client.bucket(self.bucket)
             initials = get_initials()
@@ -216,7 +216,7 @@ class EimerDBInstance:
                     "table_path": f"{self.eimer_path}/{table_name}",
                     "bucket": self.bucket,
                     "editable": editable,
-                    "schema": schema,
+                    "schema": arrow_schema,
                 }
             }
             if partition_columns:
@@ -366,7 +366,7 @@ class EimerDBInstance:
 
                 if editable is True and unedited is False and df_changes is not None:
                     if df_changes.num_rows != 0:
-                        df = update_pyarrow_table(df, df_changes)
+                        df = update_pyarrow_table(df, df_changes)  # type: ignore
                 con.register(table_name, df)
                 del df
 
@@ -493,7 +493,7 @@ class EimerDBInstance:
                 basename_template=filename,
                 filesystem=fs,
             )
-            return print(f"{df_deletions_len} rows deleted by {get_initials()}")
+            return print(f"{df_deletions_len} rows deleted by {get_initials()}")  # type: ignore
 
     def query_changes(
         self,
@@ -571,9 +571,9 @@ class EimerDBInstance:
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
                     if output_format == "pandas":
-                        df_changes: pd.DataFrame = con.execute(sql_query).df()
+                        df_changes: pd.DataFrame = con.execute(sql_query).df()  # type: ignore
                     elif output_format == "arrow":
-                        df_changes: pa.Table = con.execute(sql_query).arrow()
+                        df_changes: pa.Table = con.execute(sql_query).arrow()  # type: ignore
 
                 elif dataset.num_rows == 0:
                     if output_format == "pandas":
@@ -610,10 +610,10 @@ class EimerDBInstance:
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
                     if output_format == "pandas":
-                        df_changes_all: pd.DataFrame = con.execute(sql_query).df()
-                        df: pd.DataFrame = pd.concat([df_changes_all, df_changes])
+                        df_changes_all: pd.DataFrame = con.execute(sql_query).df()  # type: ignore
+                        df: pd.DataFrame = pd.concat([df_changes_all, df_changes])  # type: ignore
                     elif output_format == "arrow":
-                        df_changes_all: pa.Table = con.execute(sql_query).arrow()
+                        df_changes_all: pa.Table = con.execute(sql_query).arrow()  # type: ignore
                         df: pa.Table = pa.concat_tables([df_changes_all, df_changes])  # type: ignore
                         df: pa.Table = df.cast(table_schema)  # type: ignore
 

@@ -1,12 +1,7 @@
 from typing import Any
 from typing import Optional
-from typing import Union
-from dapla import FileClient
-from typing import Any
-import pandas as pd
 import pyarrow as pa
-import pyarrow.dataset as ds
-import pyarrow.parquet as pq
+from dapla import FileClient
 
 def get_partitioned_files(
     table_name: str,
