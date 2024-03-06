@@ -220,7 +220,7 @@ class EimerDBInstance:
                 }
             }
             if partition_columns:
-                new_table[table_name]["partition_columns"] = partition_columns
+                new_table[table_name]["partition_columns"] = partition_columns  # type: ignore
             else:
                 new_table[table_name]["partition_columns"] = None
             tables.update(new_table)
@@ -306,7 +306,7 @@ class EimerDBInstance:
         partition_select: Optional[dict[str, Any]] = None,
         unedited: Optional[bool] = False,
         output_format: Optional[str] = None,
-    ) -> Union[pd.DataFrame, pa.Table, str]:
+    ) -> Union[pd.DataFrame, pa.Table, str, None]:
         """Execute an SQL query on an EimerDB table.
 
         Args:
@@ -371,7 +371,7 @@ class EimerDBInstance:
                 del df
 
             if output_format == "pandas":
-                output: pd.DataFrame = con.execute(sql_query).df()  # type: ignore
+                output: pd.DataFrame = con.execute(sql_query).df()
             elif output_format == "arrow":
                 output: pa.Table = con.execute(sql_query).arrow()  # type: ignore
 
@@ -504,7 +504,7 @@ class EimerDBInstance:
         unedited: Optional[bool] = False,
         output_format: Optional[str] = None,
         changes_output: Optional[str] = "all",
-    ) -> Union[pd.DataFrame, pa.Table]:
+    ) -> Union[pd.DataFrame, pa.Table, None]:
         """Query changes made in the database table.
 
         Args:
@@ -628,6 +628,8 @@ class EimerDBInstance:
                 return df_changes
             else:
                 return None
+        else:
+            return None
 
     def get_changes(self, table_name: str) -> DataFrame:
         """Retrieve changes for a given table.

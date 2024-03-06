@@ -78,7 +78,7 @@ def arrow_schema_from_json(json_schema: dict[str, Any]) -> pa.Schema:
     for field_dict in json_schema:
         name = field_dict["name"]  # type: ignore
         data_type = field_dict["type"]  # type: ignore
-        label = field_dict["label"]
+        label = field_dict["label"]  # type: ignore
 
         if "timestamp" in data_type:
             unit_start = data_type.find("(") + 1
