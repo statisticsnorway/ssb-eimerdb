@@ -141,7 +141,7 @@ def parse_sql_query(sql_query: str) -> dict:
 
     join_tables = join_pattern.findall(sql_query)
 
-    tables = from_match + join_tables
+    tables = from_match + join_tables  # type: ignore
 
     where_match = where_pattern.search(sql_query)
 
@@ -250,8 +250,6 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
     )
 
     tables_blob = bucket.blob(f"{full_path}/config/tables.json")
-    tables_blob.upload_from_string(
-        data=json.dumps({}), content_type="application/json"
-    )
+    tables_blob.upload_from_string(data=json.dumps({}), content_type="application/json")
     logger.info("EimerDB instance %s created.", db_name)
     return None

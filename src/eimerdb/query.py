@@ -68,7 +68,6 @@ def filter_partitions(
     return table_files
 
 
-# type: ignore
 def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
     """ABC.
 
