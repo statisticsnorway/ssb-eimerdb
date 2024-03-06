@@ -8,11 +8,11 @@ import json
 import logging
 import re
 from datetime import datetime
+from typing import Any
 
 import pyarrow as pa
 from dapla import AuthClient
-from google.cloud import storage
-
+from google.cloud import storage  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +38,13 @@ def get_initials() -> str:
     """
     try:
         user = AuthClient.fetch_local_user_from_jupyter()["username"]
-        return user.split("@")[0]
+        user_split: str = user.split("@")[0]
+        return user_split
     except KeyError:
-        return "user@ssb.no"
-    return user.split("@")[0]
+        return "user"
 
 
-def get_json(bucket_name: str, blob_path: str) -> str:
+def get_json(bucket_name: str, blob_path: str) -> dict[str, Any]:
     """A function that retrieves a JSON file from Google Cloud Storage.
 
     Args:
@@ -61,11 +61,11 @@ def get_json(bucket_name: str, blob_path: str) -> str:
 
     json_content = blob.download_as_text()
 
-    data = json.loads(json_content)
+    data: dict[str, Any] = json.loads(json_content)
     return data
 
 
-def arrow_schema_from_json(json_schema: dict) -> pa.Schema:
+def arrow_schema_from_json(json_schema: dict[str, Any]) -> pa.Schema:
     """A function that converts a JSON file to an Arrow schema.
 
     Args:
@@ -76,9 +76,9 @@ def arrow_schema_from_json(json_schema: dict) -> pa.Schema:
     """
     fields = []
     for field_dict in json_schema:
-        name = field_dict["name"]
-        data_type = field_dict["type"]
-        label = field_dict["label"]
+        name = field_dict["name"]  # type: ignore
+        data_type = field_dict["type"]  # type: ignore
+        label = field_dict["label"]  # type: ignore
 
         if "timestamp" in data_type:
             unit_start = data_type.find("(") + 1
@@ -95,7 +95,7 @@ def arrow_schema_from_json(json_schema: dict) -> pa.Schema:
     return pa.schema(fields)
 
 
-def parse_sql_query(sql_query: str) -> dict:
+def parse_sql_query(sql_query: str) -> dict[str, Any]:
     """A function that parses the provided SQL query.
 
     Args:
@@ -141,7 +141,7 @@ def parse_sql_query(sql_query: str) -> dict:
 
     join_tables = join_pattern.findall(sql_query)
 
-    tables = from_match + join_tables
+    tables = from_match + join_tables  # type: ignore
 
     where_match = where_pattern.search(sql_query)
 
@@ -188,7 +188,7 @@ def parse_sql_query(sql_query: str) -> dict:
 def create_eimerdb(bucket_name: str, db_name: str) -> None:
     """Creates an EimerDB instance.
 
-     Args:
+    Args:
         bucket_name: A GCP bucket.
         db_name: Name of the instance.
 
@@ -249,11 +249,7 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
         content_type="application/json",
     )
 
-    tables = {}
-
     tables_blob = bucket.blob(f"{full_path}/config/tables.json")
-    tables_blob.upload_from_string(
-        data=json.dumps(tables), content_type="application/json"
-    )
+    tables_blob.upload_from_string(data=json.dumps({}), content_type="application/json")
     logger.info("EimerDB instance %s created.", db_name)
     return None
