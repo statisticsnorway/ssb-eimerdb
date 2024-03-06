@@ -249,11 +249,9 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
         content_type="application/json",
     )
 
-    tables = {}
-
     tables_blob = bucket.blob(f"{full_path}/config/tables.json")
     tables_blob.upload_from_string(
-        data=json.dumps(tables), content_type="application/json"
+        data=json.dumps({}), content_type="application/json"
     )
     logger.info("EimerDB instance %s created.", db_name)
     return None

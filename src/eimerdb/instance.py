@@ -411,6 +411,7 @@ class EimerDBInstance:
             df_update_results["operation"] = "update"
             dataset = pa.Table.from_pandas(df_update_results, schema=arrow_schema)
             con = duckdb.connect()
+            con.register("dataset", dataset)
             con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
             sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
             con.execute(sql_query)
@@ -470,6 +471,7 @@ class EimerDBInstance:
             df_delete_results["operation"] = "delete"
             dataset = pa.Table.from_pandas(df_delete_results, schema=arrow_schema)
             con = duckdb.connect()
+            con.register("dataset", dataset)
             con.execute(f"CREATE TABLE deletes AS FROM dataset WHERE {where_clause}")
 
             df_deletions = con.table("deletes").df()
