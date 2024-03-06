@@ -266,7 +266,7 @@ class EimerDBInstance:
             table_raw = pa.Table.from_pandas(df_raw, schema=arrow_schema_raw)
             timestamp_column = table_raw["datetime"].cast(pa.timestamp("ns"))
 
-            table_raw = table_raw.drop(["datetime"])
+            table_raw = table_raw.drop(["datetime"])  # type: ignore
 
             table_raw = table_raw.add_column(
                 len(table_raw.column_names),
@@ -306,7 +306,7 @@ class EimerDBInstance:
         partition_select: Optional[dict[str, Any]] = None,
         unedited: Optional[bool] = False,
         output_format: Optional[str] = None,
-    ) -> Union[pd.DataFrame, pa.Table]:
+    ) -> Union[pd.DataFrame, pa.Table, str]:
         """Execute an SQL query on an EimerDB table.
 
         Args:
@@ -371,9 +371,9 @@ class EimerDBInstance:
                 del df
 
             if output_format == "pandas":
-                output = con.execute(sql_query).df()
+                output: pd.DataFrame = con.execute(sql_query).df()
             elif output_format == "arrow":
-                output = con.execute(sql_query).arrow()
+                output: pa.Table = con.execute(sql_query).arrow()
 
             return output
 
@@ -462,7 +462,7 @@ class EimerDBInstance:
 
             slct_qry = "SELECT * FROM"
 
-            df_delete_results = self.query(
+            df_delete_results: pd.DataFrame = self.query(
                 f"{slct_qry} {table_name} WHERE {where_clause}", partition_select
             )
 
@@ -577,9 +577,9 @@ class EimerDBInstance:
 
                 elif dataset.num_rows == 0:
                     if output_format == "pandas":
-                        df_changes = pd.DataFrame()
+                        df_changes: pd.DataFrame = pd.DataFrame()
                     elif output_format == "arrow":
-                        df_changes: pa.Table = pa.table([])
+                        df_changes: pa.Table = pa.table([])  # type: ignore
 
             table_name_changes_all = table_name + "_changes_all"
             table_files_changes_all = fs.glob(
@@ -615,8 +615,8 @@ class EimerDBInstance:
                         df: pd.DataFrame = pd.concat([df_changes_all, df_changes])
                     elif output_format == "arrow":
                         df_changes_all: pa.Table = con.execute(sql_query).arrow()
-                        df: pa.Table = pa.concat_tables([df_changes_all, df_changes])
-                        df: pa.Table = df.cast(table_schema)
+                        df: pa.Table = pa.concat_tables([df_changes_all, df_changes])  # type: ignore
+                        df: pa.Table = df.cast(table_schema)  # type: ignore
 
             if changes_output == "all":
                 if no_changes_all is not True:
