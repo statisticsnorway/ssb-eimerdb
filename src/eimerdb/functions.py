@@ -188,7 +188,7 @@ def parse_sql_query(sql_query: str) -> dict:
 def create_eimerdb(bucket_name: str, db_name: str) -> None:
     """Creates an EimerDB instance.
 
-     Args:
+    Args:
         bucket_name: A GCP bucket.
         db_name: Name of the instance.
 
