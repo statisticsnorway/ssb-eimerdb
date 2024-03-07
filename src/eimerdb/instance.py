@@ -207,14 +207,9 @@ class EimerDBInstance:
         if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
             client = storage.Client(credentials=token)
-            updated_schema = {
-                **schema,
-                "name": "row_id",
-                "type": "string",
-                "label": "Unique row ID",
-            }
-
-            arrow_schema = arrow_schema_from_json(updated_schema)
+            row_id_def = {"name": "row_id", "type": "string", "label": "Unique row ID"}
+            schema.insert(0, row_id_def)
+            arrow_schema = arrow_schema_from_json(schema)
             tables = self.tables
             bucket = client.bucket(self.bucket)
             initials = get_initials()
