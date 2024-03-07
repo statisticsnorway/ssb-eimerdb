@@ -132,7 +132,6 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
     delete_match = re.match(delete_pattern, sql_query)
 
     select_clause = ""
-    tables = ""
     where_clause = ""
 
     select_match = select_pattern.search(sql_query)
