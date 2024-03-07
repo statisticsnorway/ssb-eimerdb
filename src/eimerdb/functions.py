@@ -12,7 +12,7 @@ from typing import Any
 
 import pyarrow as pa
 from dapla import AuthClient
-from google.cloud import storage  # type: ignore
+from google.cloud import storage
 
 logger = logging.getLogger(__name__)
 
@@ -76,9 +76,9 @@ def arrow_schema_from_json(json_schema: dict[str, Any]) -> pa.Schema:
     """
     fields = []
     for field_dict in json_schema:
-        name = field_dict["name"]  # type: ignore
-        data_type = field_dict["type"]  # type: ignore
-        label = field_dict["label"]  # type: ignore
+        name = field_dict["name"]
+        data_type = field_dict["type"]
+        label = field_dict["label"]
 
         if "timestamp" in data_type:
             unit_start = data_type.find("(") + 1
@@ -141,7 +141,7 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
 
     join_tables = join_pattern.findall(sql_query)
 
-    tables = from_match + join_tables  # type: ignore
+    tables = from_match + join_tables
 
     where_match = where_pattern.search(sql_query)
 
