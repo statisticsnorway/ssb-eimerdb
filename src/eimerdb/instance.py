@@ -543,6 +543,10 @@ class EimerDBInstance:
         editable = table_config["editable"]
         instance_name = self.eimerdb_name
         table_schema = arrow_schema_from_json(self.tables[table_name]["schema"])
+
+        df: Optional[Any] = None
+        df_changes: Optional[Any] = None
+
         if parsed_query["operation"] == "SELECT":
             try:
                 columns = parsed_query["columns"]
@@ -594,7 +598,7 @@ class EimerDBInstance:
                     if output_format == "pandas":
                         df_changes = pd.DataFrame()
                     elif output_format == "arrow":
-                        df_changes = pa.table([])
+                        df_changes = pa.table(pd.DataFrame())
 
             table_name_changes_all = table_name + "_changes_all"
             table_files_changes_all = fs.glob(
@@ -605,8 +609,6 @@ class EimerDBInstance:
                 no_changes_all = False
             except ValueError:
                 no_changes_all = True
-
-            df: Optional[Any] = None
 
             if no_changes_all is not True:
                 table_files_changes_all = [
@@ -629,10 +631,10 @@ class EimerDBInstance:
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
                     if output_format == "pandas":
-                        df_changes_all: pd.DataFrame = con.execute(sql_query).df()
+                        df_changes_all = con.execute(sql_query).df()
                         df = pd.concat([df_changes_all, df_changes])
                     elif output_format == "arrow":
-                        df_changes_all: pa.Table = con.execute(sql_query).arrow()
+                        df_changes_all = con.execute(sql_query).arrow()
                         df = pa.concat_tables([df_changes_all, df_changes])
                         df = df.cast(table_schema)
 
