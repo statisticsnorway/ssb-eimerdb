@@ -46,7 +46,9 @@ def get_partitioned_files(
     )
 
     max_depth = max(obj.count("/") for obj in table_files)
-    filtered_files: list[str] = [obj for obj in table_files if obj.count("/") == max_depth]
+    filtered_files: list[str] = [
+        obj for obj in table_files if obj.count("/") == max_depth
+    ]
     return filtered_files
 
 
