@@ -211,7 +211,7 @@ class EimerDBInstance:
                 **schema,
                 "name": "row_id",
                 "type": "string",
-                "label": "Unique row ID"
+                "label": "Unique row ID",
             }
 
             arrow_schema = arrow_schema_from_json(updated_schema)
