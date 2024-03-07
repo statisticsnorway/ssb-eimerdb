@@ -329,7 +329,7 @@ class EimerDBInstance:
 
         Raises:
             Exception: If the table is not editable (for UPDATE queries).
-
+            ValueError: If the output format is invalid.
         """
         instance_name = self.eimerdb_name
         if output_format is None:
