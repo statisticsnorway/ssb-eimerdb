@@ -17,13 +17,13 @@ Changelog = "https://github.com/statisticsnorway/ssb-eimerdb/releases"
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
 click = ">=8.0.1"
-duckdb = "^0.8.1"
-google-cloud-storage = "^2.10.0"
+duckdb = "^0.10.0"
+google-cloud-storage = "^2.15.0"
 pyarrow = "14.0.2"
-dapla-toolbelt = "2.0.6"
+dapla-toolbelt = "^2.0.8"
 uuid = "^1.30"
-ipykernel = "^6.25.2"
-pandas = "2.0.3"
+ipykernel = "^6.29.3"
+pandas = "^2.2.1"
 
 [tool.poetry.group.dev.dependencies]
 Pygments = ">=2.10.0"
@@ -77,6 +77,15 @@ warn_unreachable = true
 pretty = true
 show_column_numbers = true
 show_error_context = true
+
+[[tool.mypy.overrides]]
+# Allow missing type hints in third-party libraries without type information.
+module = [
+    "pandas.*",
+    "duckdb.*",
+    "pyarrow.*"
+]
+ignore_missing_imports = true
 
 [tool.ruff]
 force-exclude = true  # Apply excludes to pre-commit
