@@ -24,9 +24,7 @@ def get_datetime() -> str:
         datetime string.
 
     """
-    datetime_now = datetime.now()
-    datetime_str = datetime_now.strftime("%Y-%m-%d %H:%M:%S.%f")
-    return datetime_str
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
 def get_initials() -> str:
