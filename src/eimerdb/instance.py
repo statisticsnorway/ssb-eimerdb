@@ -116,7 +116,7 @@ class EimerDBInstance:
 
         self.tables = tables
 
-        self.users: Optional[dict[str, Any]] = None
+        self.users: dict[str, Any] = {initials: ""}
         self.role_groups: Optional[dict[str, Any]] = None
         self.is_admin: bool = False
 
