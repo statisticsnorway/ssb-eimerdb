@@ -137,8 +137,8 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
 
     select_match = select_pattern.search(sql_query)
 
-    from_match: list = from_pattern.findall(sql_query)
-    join_tables: list = join_pattern.findall(sql_query)
+    from_match: list[str] = from_pattern.findall(sql_query)
+    join_tables: list[str] = join_pattern.findall(sql_query)
 
     tables = from_match + join_tables
 
