@@ -65,11 +65,11 @@ def get_json(bucket_name: str, blob_path: str) -> dict[str, Any]:
     return data
 
 
-def arrow_schema_from_json(json_schema: dict[str, Any]) -> pa.Schema:
-    """A function that converts a JSON file to an Arrow schema.
+def arrow_schema_from_json(json_schema: list[dict[str, Any]]) -> pa.Schema:
+    """A function that converts a JSON schema to an Arrow schema.
 
     Args:
-        json_schema (dict): A JSON schema with name, type, and label.
+        json_schema (list[dict]): A JSON schema with name, type, and label.
 
     Returns:
         pa.Schema: The PyArrow schema.
@@ -137,9 +137,8 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
 
     select_match = select_pattern.search(sql_query)
 
-    from_match = from_pattern.findall(sql_query)
-
-    join_tables = join_pattern.findall(sql_query)
+    from_match: list = from_pattern.findall(sql_query)
+    join_tables: list = join_pattern.findall(sql_query)
 
     tables = from_match + join_tables
 
