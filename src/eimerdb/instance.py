@@ -207,9 +207,14 @@ class EimerDBInstance:
         if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
             client = storage.Client(credentials=token)
-            row_id_def = {"name": "row_id", "type": "string", "label": "Unique row ID"}
-            schema.insert(0, row_id_def)
-            arrow_schema = arrow_schema_from_json(schema)
+            updated_schema = {
+                **schema,
+                "name": "row_id",
+                "type": "string",
+                "label": "Unique row ID"
+            }
+
+            arrow_schema = arrow_schema_from_json(updated_schema)
             tables = self.tables
             bucket = client.bucket(self.bucket)
             initials = get_initials()
@@ -284,6 +289,7 @@ class EimerDBInstance:
 
             fs = FileClient.get_gcs_file_system()
 
+            # noinspection PyTypeChecker
             pq.write_to_dataset(
                 table,
                 root_path=f"gs://{self.bucket}/{table_path}",
@@ -358,6 +364,8 @@ class EimerDBInstance:
 
                 df = pq.read_table(table_files, filesystem=fs)
 
+                df_changes = None
+
                 if editable is True and unedited is False:
                     slct_qry = "SELECT * FROM"
                     df_changes = self.query_changes(
@@ -368,7 +376,7 @@ class EimerDBInstance:
                     )
 
                 if editable is True and unedited is False and df_changes is not None:
-                    if df_changes.num_rows != 0:
+                    if df_changes is not None and df_changes.num_rows != 0:
                         df = update_pyarrow_table(df, df_changes)
                 con.register(table_name, df)
                 del df
@@ -551,15 +559,17 @@ class EimerDBInstance:
             table_files_changes = fs.glob(
                 f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes}/{partition_levels}"
             )
+
+            max_depth = 0
             try:
                 max_depth = max(obj.count("/") for obj in table_files_changes)
                 no_changes = False
             except ValueError:
                 no_changes = True
                 if output_format == "pandas":
-                    df_changes: pd.DataFrame = pd.DataFrame()
+                    df_changes = pd.DataFrame()
                 elif output_format == "arrow":
-                    df_changes: pa.Table = pa.table([])
+                    df_changes = pa.table(pd.DataFrame())
 
             if no_changes is not True:
                 table_files_changes = [
@@ -576,15 +586,15 @@ class EimerDBInstance:
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
                     if output_format == "pandas":
-                        df_changes: pd.DataFrame = con.execute(sql_query).df()
+                        df_changes = con.execute(sql_query).df()
                     elif output_format == "arrow":
-                        df_changes: pa.Table = con.execute(sql_query).arrow()
+                        df_changes = con.execute(sql_query).arrow()
 
                 elif dataset.num_rows == 0:
                     if output_format == "pandas":
-                        df_changes: pd.DataFrame = pd.DataFrame()
+                        df_changes = pd.DataFrame()
                     elif output_format == "arrow":
-                        df_changes: pa.Table = pa.table([])
+                        df_changes = pa.table([])
 
             table_name_changes_all = table_name + "_changes_all"
             table_files_changes_all = fs.glob(
@@ -595,6 +605,9 @@ class EimerDBInstance:
                 no_changes_all = False
             except ValueError:
                 no_changes_all = True
+
+            df: Optional[Any] = None
+
             if no_changes_all is not True:
                 table_files_changes_all = [
                     obj
@@ -609,6 +622,7 @@ class EimerDBInstance:
                 dataset = pq.read_table(
                     table_files_changes_all, filesystem=fs, columns=columns
                 )
+
                 sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
                 if columns is not None and editable is True and unedited is False:
                     sql_query = sql_query.replace(" FROM", ", row_id FROM")
@@ -616,11 +630,11 @@ class EimerDBInstance:
                     con = duckdb.connect()
                     if output_format == "pandas":
                         df_changes_all: pd.DataFrame = con.execute(sql_query).df()
-                        df: pd.DataFrame = pd.concat([df_changes_all, df_changes])
+                        df = pd.concat([df_changes_all, df_changes])
                     elif output_format == "arrow":
                         df_changes_all: pa.Table = con.execute(sql_query).arrow()
-                        df: pa.Table = pa.concat_tables([df_changes_all, df_changes])
-                        df: pa.Table = df.cast(table_schema)
+                        df = pa.concat_tables([df_changes_all, df_changes])
+                        df = df.cast(table_schema)
 
             if changes_output == "all":
                 if no_changes_all is not True:
