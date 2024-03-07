@@ -44,7 +44,7 @@ def get_partitioned_files(
         f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_parts}/{partition_levels}"
     )
     max_depth = max(obj.count("/") for obj in table_files)
-    table_files = [obj for obj in table_files if obj.count("/") == max_depth]
+    table_files = [str(obj) for obj in table_files if obj.count("/") == max_depth]
     return table_files
 
 
