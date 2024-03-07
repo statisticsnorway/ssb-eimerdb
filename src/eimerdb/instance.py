@@ -382,9 +382,11 @@ class EimerDBInstance:
                 del df
 
             if output_format == "pandas":
-                output: pd.DataFrame = con.execute(sql_query).df()
+                output = con.execute(sql_query).df()
             elif output_format == "arrow":
-                output: pa.Table = con.execute(sql_query).arrow()
+                output = con.execute(sql_query).arrow()
+            else:
+                raise ValueError(f"Invalid output format: {output_format}")
 
             return output
 
