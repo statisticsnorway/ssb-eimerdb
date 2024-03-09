@@ -124,7 +124,8 @@ class EimerDBInstance:
             role (Any): Role to assign (admin or user).
 
         Raises:
-            Exception: If the user is not an admin or the user already exists.
+            PermissionError: If the user is not an admin.
+            ValueError: If the user already exists.
         """
         if self.is_admin is not True:
             raise PermissionError("Cannot add user. You are not an admin!")
@@ -150,7 +151,8 @@ class EimerDBInstance:
             username (str): Name of the user to remove.
 
         Raises:
-            Exception: If the user is not an admin or the user does not exist.
+            PermissionError: If the user is not an admin.
+            ValueError: If the user does not exist.
         """
         if self.is_admin is not True:
             raise PermissionError("Cannot remove user. You are not an admin!")
@@ -184,7 +186,7 @@ class EimerDBInstance:
             editable (bool, optional): Indicates if the table is editable.
 
         Raises:
-            Exception: If the current user is not an admin.
+            PermissionError: If the current user is not an admin.
         """
         if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
@@ -224,7 +226,7 @@ class EimerDBInstance:
             df (pandas.DataFrame): DataFrame containing the data to insert.
 
         Raises:
-            Exception: If the current user is not an admin.
+            PermissionError: If the current user is not an admin.
         """
         if self.is_admin is True:
             json_data = self.tables[table_name]
@@ -307,7 +309,6 @@ class EimerDBInstance:
             pandas.DataFrame: Resulting DataFrame from the query.
 
         Raises:
-            Exception: If the table is not editable (for UPDATE queries).
             ValueError: If the output format is invalid.
         """
         instance_name = self.eimerdb_name
