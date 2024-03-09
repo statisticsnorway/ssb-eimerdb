@@ -81,16 +81,8 @@ class EimerDBInstance:
             eimer_name (str): Name of EimerDB instance.
 
         Attributes:
-            bucket (str): GCS bucket name.
-            eimerdb_name (str): EimerDB instance name.
-            path (str): Configuration path.
-            eimer_path (str): Instance path.
-            created_by (str): Creator's name.
-            time_created (str): Creation timestamp.
-            users (dict): EimerDB users and roles.
-            role_groups (dict): Role groups.
-            is_admin (bool): Admin status.
-
+            bucket_name (str): GCS bucket name.
+            eimer_name (str): EimerDB instance name.
         """
         self.bucket = bucket_name
 
@@ -137,7 +129,6 @@ class EimerDBInstance:
 
         Returns:
             None
-
         """
         if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
@@ -156,7 +147,6 @@ class EimerDBInstance:
                 raise Exception(f"User {username} already exists!")
         else:
             raise Exception("Cannot add user. You are not an admin!")
-        return None
 
     def remove_user(self, username: str) -> None:
         """Remove a users access to the database.
@@ -166,7 +156,6 @@ class EimerDBInstance:
 
         Raises:
             Exception: If the user is not an admin or the user does not exist.
-
         """
         if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
@@ -202,7 +191,6 @@ class EimerDBInstance:
 
         Raises:
             Exception: If the current user is not an admin.
-
         """
         if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
@@ -243,7 +231,6 @@ class EimerDBInstance:
 
         Raises:
             Exception: If the current user is not an admin.
-
         """
         if self.is_admin is True:
             json_data = self.tables[table_name]
@@ -293,6 +280,7 @@ class EimerDBInstance:
                 filesystem=fs,
                 schema=arrow_schema,
             )
+            # noinspection PyTypeChecker
             pq.write_to_dataset(
                 table_raw,
                 root_path=f"gs://{self.bucket}/{table_path}_raw",
@@ -357,6 +345,7 @@ class EimerDBInstance:
                 if partition_select is not None:
                     table_files = filter_partitions(table_files, partition_select)
 
+                # noinspection PyTypeChecker
                 df = pq.read_table(table_files, filesystem=fs)
 
                 df_changes = None
@@ -393,7 +382,7 @@ class EimerDBInstance:
                 raise Exception(f"The table {table_name} is not editable!")
             try:
                 columns = parsed_query["columns"]
-            except Exception:
+            except ValueError:
                 columns = None
             if columns == ["*"]:
                 columns = None
@@ -435,6 +424,7 @@ class EimerDBInstance:
             unique_file_id = uuid4()
             filename = f"commit_{unique_file_id}_{{i}}.parquet"
 
+            # noinspection PyTypeChecker
             pq.write_to_dataset(
                 update_table,
                 root_path=f"gs://{self.bucket}/{table_path}",
@@ -452,7 +442,7 @@ class EimerDBInstance:
                 raise Exception(f"The table {table_name} is not editable!")
             try:
                 columns = parsed_query["columns"]
-            except Exception:
+            except ValueError:
                 columns = None
             if columns == ["*"]:
                 columns = None
@@ -494,6 +484,7 @@ class EimerDBInstance:
             unique_file_id = uuid4()
             filename = f"commit_{unique_file_id}_{{i}}.parquet"
 
+            # noinspection PyTypeChecker
             pq.write_to_dataset(
                 deletion_Table,
                 root_path=f"gs://{self.bucket}/{table_path}",
@@ -547,7 +538,7 @@ class EimerDBInstance:
         if parsed_query["operation"] == "SELECT":
             try:
                 columns = parsed_query["columns"]
-            except Exception:
+            except ValueError:
                 columns = None
             if columns == ["*"]:
                 columns = None
@@ -582,6 +573,7 @@ class EimerDBInstance:
                         partition_select,
                     )
 
+                # noinspection PyTypeChecker
                 dataset: pa.Table = pq.read_table(table_files_changes, filesystem=fs)
                 sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
                 if dataset.num_rows != 0:
@@ -618,6 +610,7 @@ class EimerDBInstance:
                         table_files_changes_all, partition_select
                     )
 
+                # noinspection PyTypeChecker
                 dataset = pq.read_table(
                     table_files_changes_all, filesystem=fs, columns=columns
                 )
@@ -659,12 +652,15 @@ class EimerDBInstance:
         fs = FileClient.get_gcs_file_system()
         bucket = self.bucket
         path = self.tables[table_name]["table_path"]
+
+        # noinspection PyTypeChecker
         dataset = ds.dataset(
             f"{bucket}/{path}_changes/",
             format="parquet",
             partitioning="hive",
             filesystem=fs,
         )
+
         df_changes: DataFrame = dataset.to_table().to_pandas()
         return df_changes
 
@@ -689,6 +685,8 @@ class EimerDBInstance:
         blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
         filename = f"merged_commit_{uuid4()}_{{i}}.parquet"
         table = pa.Table.from_pandas(df_changes)
+
+        # noinspection PyTypeChecker
         pq.write_to_dataset(
             table,
             root_path=f"gs://{self.bucket}/{source_folder}",
@@ -704,4 +702,3 @@ class EimerDBInstance:
         )
 
         print("The changes were successfully combined into one file per partition!")
-        return None

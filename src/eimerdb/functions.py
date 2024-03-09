@@ -190,7 +190,6 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
 
     Returns:
         success or failure
-
     """
     creator = get_initials()
     token = AuthClient.fetch_google_credentials()
@@ -248,4 +247,3 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
     tables_blob = bucket.blob(f"{full_path}/config/tables.json")
     tables_blob.upload_from_string(data=json.dumps({}), content_type="application/json")
     logger.info("EimerDB instance %s created.", db_name)
-    return None
