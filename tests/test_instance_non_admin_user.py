@@ -33,15 +33,10 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
         self.assertEqual(self.instance.is_admin, False)
 
     @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
-    @patch("eimerdb.instance.storage.Client")
-    def test_add_user_not_admin(
-        self, mock_storage_client: Mock, mock_fetch_credentials: Mock
-    ) -> None:
+    def test_add_user_not_admin(self, mock_fetch_credentials: Mock) -> None:
         # Setup
         mock_credentials = Mock()
         mock_fetch_credentials.return_value = mock_credentials
-        mock_bucket = mock_storage_client.return_value.bucket.return_value
-        mock_blob = mock_bucket.blob.return_value
 
         # Test & Assertion
         with self.assertRaises(Exception) as context:
