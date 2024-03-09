@@ -67,7 +67,3 @@ class TestQuery(unittest.TestCase):
                 "file2/partition_col1=value1/partition_col2=value2",
             ],
         )
-
-
-if __name__ == "__main__":
-    unittest.main()

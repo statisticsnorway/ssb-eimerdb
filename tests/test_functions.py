@@ -85,7 +85,3 @@ class TestFunctions(unittest.TestCase):
         mock_client.return_value.bucket.return_value = mock_bucket
 
         create_eimerdb("bucket_name", "db_name")
-
-
-if __name__ == "__main__":
-    unittest.main()
