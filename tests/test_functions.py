@@ -31,11 +31,11 @@ class TestFunctions(unittest.TestCase):
         result = get_initials()
         self.assertEqual(result, "user")
 
-    @patch("eimerdb.functions.AuthClient.fetch_google_credentials")
+    @patch(
+        "eimerdb.functions.AuthClient.fetch_google_credentials", return_value="token"
+    )
     @patch("google.cloud.storage.Client")
-    def test_get_json(self, mock_client: Mock, mock_fetch: Mock) -> None:
-        mock_fetch.return_value = "token"
-
+    def test_get_json(self, mock_client: Mock, _: Mock) -> None:
         mock_blob = MagicMock()
         mock_blob.download_as_text.return_value = '{"key": "value"}'
 

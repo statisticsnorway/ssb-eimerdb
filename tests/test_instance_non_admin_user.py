@@ -31,3 +31,21 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
         self.assertEqual(self.instance.users, {"non_admin_user": ""})
         self.assertIsNone(self.instance.role_groups)
         self.assertEqual(self.instance.is_admin, False)
+
+    @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
+    @patch("eimerdb.instance.storage.Client")
+    def test_add_user_not_admin(
+        self, mock_storage_client: Mock, mock_fetch_credentials: Mock
+    ) -> None:
+        # Setup
+        mock_credentials = Mock()
+        mock_fetch_credentials.return_value = mock_credentials
+        mock_bucket = mock_storage_client.return_value.bucket.return_value
+        mock_blob = mock_bucket.blob.return_value
+
+        # Test & Assertion
+        with self.assertRaises(Exception) as context:
+            self.instance.add_user("new_user", "user")
+        self.assertEqual(
+            str(context.exception), "Cannot add user. You are not an admin!"
+        )
