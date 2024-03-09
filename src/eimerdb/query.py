@@ -107,7 +107,6 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
     )
 
     row_id_max = df_changes.group_by("row_id").aggregate([("datetime", "max")])
-
     new_names = ["row_id", "datetime"]
     row_id_max = row_id_max.select(["row_id", "datetime_max"])
 
