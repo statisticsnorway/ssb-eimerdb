@@ -34,7 +34,7 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
 
     def test_add_user_not_admin(self) -> None:
         # Test & Assertion
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(PermissionError) as context:
             self.instance.add_user("new_user", "user")
         self.assertEqual(
             str(context.exception), "Cannot add user. You are not an admin!"
@@ -42,7 +42,7 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
 
     def test_remove_user_not_admin(self) -> None:
         # Test & Assertion
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(PermissionError) as context:
             self.instance.remove_user("non_admin_user")
         self.assertEqual(
             str(context.exception), "Cannot remove user. You are not an admin!"

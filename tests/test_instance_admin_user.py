@@ -61,7 +61,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
 
     def test_add_user_user_exists(self) -> None:
         # Test & Assertion
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(ValueError) as context:
             self.instance.add_user("admin_user", "admin")
         self.assertEqual(str(context.exception), "User admin_user already exists!")
 
@@ -87,6 +87,6 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
 
     def test_remove_user_user_not_exists(self) -> None:
         # Test & Assertion
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(ValueError) as context:
             self.instance.remove_user("new_user")
         self.assertEqual(str(context.exception), "User new_user does not exist.")

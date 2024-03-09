@@ -127,10 +127,10 @@ class EimerDBInstance:
             Exception: If the user is not an admin or the user already exists.
         """
         if self.is_admin is not True:
-            raise Exception("Cannot add user. You are not an admin!")
+            raise PermissionError("Cannot add user. You are not an admin!")
 
         if username in self.users:
-            raise Exception(f"User {username} already exists!")
+            raise ValueError(f"User {username} already exists!")
 
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
         bucket = client.bucket(self.bucket)
@@ -153,10 +153,10 @@ class EimerDBInstance:
             Exception: If the user is not an admin or the user does not exist.
         """
         if self.is_admin is not True:
-            raise Exception("Cannot remove user. You are not an admin!")
+            raise PermissionError("Cannot remove user. You are not an admin!")
 
         if username not in self.users:
-            raise Exception(f"User {username} does not exist.")
+            raise ValueError(f"User {username} does not exist.")
 
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
         bucket = client.bucket(self.bucket)
@@ -214,7 +214,7 @@ class EimerDBInstance:
                 data=json.dumps(tables), content_type="application/json"
             )
         else:
-            raise Exception("Cannot create table. You are not an admin!")
+            raise PermissionError("Cannot create table. You are not an admin!")
 
     def insert(self, table_name: str, df: pd.DataFrame) -> None:
         """Insert unedited data into a main table.
@@ -284,7 +284,9 @@ class EimerDBInstance:
             )
             print("Data successfully inserted!")
         else:
-            raise Exception("Cannot insert into main table. You are not an admin!")
+            raise PermissionError(
+                "Cannot insert into main table. You are not an admin!"
+            )
 
     def query(
         self,
@@ -373,7 +375,7 @@ class EimerDBInstance:
             table_config = self.tables[table_name]
             editable = table_config["editable"]
             if editable is False:
-                raise Exception(f"The table {table_name} is not editable!")
+                raise ValueError(f"The table {table_name} is not editable!")
             try:
                 columns = parsed_query["columns"]
             except ValueError:
@@ -433,7 +435,7 @@ class EimerDBInstance:
             table_config = self.tables[table_name]
             editable = table_config["editable"]
             if editable is False:
-                raise Exception(f"The table {table_name} is not editable!")
+                raise ValueError(f"The table {table_name} is not editable!")
             try:
                 columns = parsed_query["columns"]
             except ValueError:
