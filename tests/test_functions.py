@@ -1,15 +1,14 @@
 import unittest
 from unittest.mock import patch, MagicMock, Mock
+
 import pyarrow as pa
 
-from eimerdb.functions import (
-    get_datetime,
-    get_initials,
-    get_json,
-    arrow_schema_from_json,
-    parse_sql_query,
-    create_eimerdb,
-)
+from eimerdb.functions import arrow_schema_from_json
+from eimerdb.functions import create_eimerdb
+from eimerdb.functions import get_datetime
+from eimerdb.functions import get_initials
+from eimerdb.functions import get_json
+from eimerdb.functions import parse_sql_query
 
 
 class TestFunctions(unittest.TestCase):
