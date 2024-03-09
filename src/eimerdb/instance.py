@@ -152,22 +152,21 @@ class EimerDBInstance:
         Raises:
             Exception: If the user is not an admin or the user does not exist.
         """
-        if self.is_admin is True:
-            token = AuthClient.fetch_google_credentials()
-            client = storage.Client(credentials=token)
-            bucket = client.bucket(self.bucket)
-            users = self.users
-            if username in users:
-                del users[username]
-                user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
-                user_roles_blob.upload_from_string(
-                    data=json.dumps(users), content_type="application/json"
-                )
-                print(f"User {username} successfully removed!")
-            else:
-                print(f"The user {username} does not exist.")
-        else:
+        if self.is_admin is not True:
             raise Exception("Cannot remove user. You are not an admin!")
+
+        if username not in self.users:
+            raise Exception(f"User {username} does not exist.")
+
+        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        bucket = client.bucket(self.bucket)
+
+        del self.users[username]
+        user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
+        user_roles_blob.upload_from_string(
+            data=json.dumps(self.users), content_type="application/json"
+        )
+        print(f"User {username} successfully removed!")
 
     def create_table(
         self,

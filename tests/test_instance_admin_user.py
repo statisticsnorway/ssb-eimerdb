@@ -64,3 +64,29 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             self.instance.add_user("admin_user", "admin")
         self.assertEqual(str(context.exception), "User admin_user already exists!")
+
+    @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
+    @patch("eimerdb.instance.storage.Client")
+    def test_remove_user_success(
+        self, mock_storage_client: Mock, mock_fetch_credentials: Mock
+    ) -> None:
+        # Setup
+        mock_credentials = Mock()
+        mock_fetch_credentials.return_value = mock_credentials
+        mock_bucket = mock_storage_client.return_value.bucket.return_value
+        mock_blob = mock_bucket.blob.return_value
+
+        # Test
+        self.instance.remove_user("admin_user")
+
+        # Assertions
+        mock_fetch_credentials.assert_called_once()
+        mock_storage_client.assert_called_once_with(credentials=mock_credentials)
+        mock_bucket.blob.assert_called_once_with("/path/to/eimer/config/users.json")
+        mock_blob.upload_from_string.assert_called_once()
+
+    def test_remove_user_user_not_exists(self) -> None:
+        # Test & Assertion
+        with self.assertRaises(Exception) as context:
+            self.instance.remove_user("new_user")
+        self.assertEqual(str(context.exception), "User new_user does not exist.")
