@@ -126,23 +126,22 @@ class EimerDBInstance:
         Raises:
             Exception: If the user is not an admin or the user already exists.
         """
-        if self.is_admin is True:
-            token = AuthClient.fetch_google_credentials()
-            client = storage.Client(credentials=token)
-            bucket = client.bucket(self.bucket)
-            users = self.users
-            new_user = {username: role}
-            if username not in users:
-                users.update(new_user)
-                user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
-                user_roles_blob.upload_from_string(
-                    data=json.dumps(users), content_type="application/json"
-                )
-                print(f"User {username} added with the role {role}!")
-            else:
-                raise Exception(f"User {username} already exists!")
-        else:
+        if self.is_admin is not True:
             raise Exception("Cannot add user. You are not an admin!")
+
+        if username in self.users:
+            raise Exception(f"User {username} already exists!")
+
+        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        bucket = client.bucket(self.bucket)
+
+        self.users.update({username: role})
+        user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
+
+        user_roles_blob.upload_from_string(
+            data=json.dumps(self.users), content_type="application/json"
+        )
+        print(f"User {username} added with the role {role}!")
 
     def remove_user(self, username: str) -> None:
         """Remove a users access to the database.

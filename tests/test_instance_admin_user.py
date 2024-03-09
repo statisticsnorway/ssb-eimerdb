@@ -58,3 +58,9 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         mock_storage_client.assert_called_once_with(credentials=mock_credentials)
         mock_bucket.blob.assert_called_once_with("/path/to/eimer/config/users.json")
         mock_blob.upload_from_string.assert_called_once()
+
+    def test_add_user_user_exists(self) -> None:
+        # Test & Assertion
+        with self.assertRaises(Exception) as context:
+            self.instance.add_user("admin_user", "admin")
+        self.assertEqual(str(context.exception), "User admin_user already exists!")
