@@ -1,5 +1,7 @@
 import unittest
-from unittest.mock import patch, MagicMock, Mock
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pyarrow as pa
 
