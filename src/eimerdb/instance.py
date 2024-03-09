@@ -70,7 +70,6 @@ class EimerDBInstance:
             of a specified schema.
         query(sql_query, partition_select=None, unedited=False): Execute an SQL
             query on a table in EimerDB.
-
     """
 
     def __init__(self, bucket_name: str, eimer_name: str) -> None:
@@ -126,9 +125,6 @@ class EimerDBInstance:
 
         Raises:
             Exception: If the user is not an admin or the user already exists.
-
-        Returns:
-            None
         """
         if self.is_admin is True:
             token = AuthClient.fetch_google_credentials()
@@ -669,9 +665,6 @@ class EimerDBInstance:
 
         Args:
             table_name (str): The name of the table for which changes are to be merged.
-
-        Returns:
-            None
         """
         fs = FileClient.get_gcs_file_system()
         df_changes = self.get_changes(table_name)

@@ -187,9 +187,6 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
     Args:
         bucket_name: A GCP bucket.
         db_name: Name of the instance.
-
-    Returns:
-        success or failure
     """
     creator = get_initials()
     token = AuthClient.fetch_google_credentials()
