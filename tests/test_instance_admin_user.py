@@ -240,6 +240,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         # Assert that the returned DataFrame is the same as the mock DataFrame
         self.assertIs(expected_df, changes_df)
 
+    @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
     @patch("eimerdb.instance.storage.Client")
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.uuid4")
@@ -252,6 +253,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         mock_uuid4: Mock,
         _: Mock,
         mock_client: Mock,
+        mock_fetch_credentials: Mock,
     ) -> None:
         # Mock the return value of get_changes
         mock_get_changes.return_value = pd.DataFrame([{"row_id": "1", "field1": 1}])
@@ -262,6 +264,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         blob_1 = Mock(spec=Blob)
         blob_2 = Mock(spec=Blob)
 
+        mock_fetch_credentials.return_value = "token"
         mock_client.return_value.bucket.return_value.list_blobs.return_value = [
             blob_1,
             blob_2,
