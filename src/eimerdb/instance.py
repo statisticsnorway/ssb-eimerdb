@@ -38,6 +38,13 @@ from .query import update_pyarrow_table
 
 logger = logging.getLogger(__name__)
 
+ROW_ID_DEF = {"name": "row_id", "type": "string", "label": "Unique row ID"}
+PANDAS_OUTPUT_FORMAT = "pandas"
+ARROW_OUTPUT_FORMAT = "arrow"
+
+CHANGES_ALL = "all"
+CHANGES_RECENT = "recent"
+
 
 class EimerDBInstance:
     """Represents an instance of the EimerDB database.
@@ -189,35 +196,30 @@ class EimerDBInstance:
         Raises:
             PermissionError: If the current user is not an admin.
         """
-        if self.is_admin is True:
-            token = AuthClient.fetch_google_credentials()
-            client = storage.Client(credentials=token)
-            row_id_def = {"name": "row_id", "type": "string", "label": "Unique row ID"}
-            schema.insert(0, row_id_def)
-            arrow_schema = arrow_schema_from_json(schema)
-            tables = self.tables
-            bucket = client.bucket(self.bucket)
-            initials = get_initials()
-            new_table = {
-                table_name: {
-                    "created_by": initials,
-                    "table_path": f"{self.eimer_path}/{table_name}",
-                    "bucket": self.bucket,
-                    "editable": editable,
-                    "schema": arrow_schema,
-                }
-            }
-            if partition_columns:
-                new_table[table_name]["partition_columns"] = partition_columns
-            else:
-                new_table[table_name]["partition_columns"] = None
-            tables.update(new_table)
-            tables_blob = bucket.blob(f"{self.eimer_path}/config/tables.json")
-            tables_blob.upload_from_string(
-                data=json.dumps(tables), content_type=APPLICATION_JSON
-            )
-        else:
+        if self.is_admin is not True:
             raise PermissionError("Cannot create table. You are not an admin!")
+
+        schema.insert(0, ROW_ID_DEF)
+
+        new_table = {
+            table_name: {
+                "created_by": get_initials(),
+                "table_path": f"{self.eimer_path}/{table_name}",
+                "bucket": self.bucket,
+                "editable": editable,
+                "schema": arrow_schema_from_json(schema),
+                "partition_columns": partition_columns,
+            }
+        }
+        self.tables.update(new_table)
+
+        token = AuthClient.fetch_google_credentials()
+        bucket = storage.Client(credentials=token).bucket(self.bucket)
+
+        tables_blob = bucket.blob(f"{self.eimer_path}/config/tables.json")
+        tables_blob.upload_from_string(
+            data=json.dumps(self.tables), content_type=APPLICATION_JSON
+        )
 
     def insert(self, table_name: str, df: pd.DataFrame) -> None:
         """Insert unedited data into a main table.
@@ -229,67 +231,63 @@ class EimerDBInstance:
         Raises:
             PermissionError: If the current user is not an admin.
         """
-        if self.is_admin is True:
-            json_data = self.tables[table_name]
-            arrow_schema = arrow_schema_from_json(json_data["schema"])
-            df["row_id"] = df.apply(lambda row: uuid4(), axis=1)
-            df["row_id"] = df["row_id"].astype(str)
-            table = pa.Table.from_pandas(df, schema=arrow_schema)
-
-            df_raw = df.copy()
-            df_raw["user"] = get_initials()
-            df_raw["datetime"] = get_datetime()
-            df_raw["operation"] = "insert"
-
-            arrow_schema_raw = arrow_schema
-            arrow_schema_raw = arrow_schema_raw.append(pa.field("user", pa.string()))
-            arrow_schema_raw = arrow_schema_raw.append(
-                pa.field("datetime", pa.string())
-            )
-            arrow_schema_raw = arrow_schema_raw.append(
-                pa.field("operation", pa.string())
-            )
-
-            table_raw = pa.Table.from_pandas(df_raw, schema=arrow_schema_raw)
-            timestamp_column = table_raw["datetime"].cast(pa.timestamp("ns"))
-
-            table_raw = table_raw.drop(["datetime"])
-
-            table_raw = table_raw.add_column(
-                len(table_raw.column_names),
-                pa.field("datetime", pa.timestamp("ns")),
-                timestamp_column,
-            )
-
-            insert_id = uuid4()
-            table_path = json_data["table_path"]
-            partitions = json_data["partition_columns"]
-            filename = f"insert_{insert_id}_{{i}}.parquet"
-
-            fs = FileClient.get_gcs_file_system()
-
-            # noinspection PyTypeChecker
-            pq.write_to_dataset(
-                table,
-                root_path=f"gs://{self.bucket}/{table_path}",
-                partition_cols=partitions,
-                basename_template=filename,
-                filesystem=fs,
-                schema=arrow_schema,
-            )
-            # noinspection PyTypeChecker
-            pq.write_to_dataset(
-                table_raw,
-                root_path=f"gs://{self.bucket}/{table_path}_raw",
-                partition_cols=partitions,
-                basename_template=filename,
-                filesystem=fs,
-            )
-            print("Data successfully inserted!")
-        else:
+        if self.is_admin is not True:
             raise PermissionError(
                 "Cannot insert into main table. You are not an admin!"
             )
+
+        json_data = self.tables[table_name]
+        arrow_schema = arrow_schema_from_json(json_data["schema"])
+        df["row_id"] = df.apply(lambda row: uuid4(), axis=1)
+        df["row_id"] = df["row_id"].astype(str)
+        table = pa.Table.from_pandas(df, schema=arrow_schema)
+
+        df_raw = df.copy()
+        df_raw["user"] = get_initials()
+        df_raw["datetime"] = get_datetime()
+        df_raw["operation"] = "insert"
+
+        arrow_schema_raw = arrow_schema
+        arrow_schema_raw = arrow_schema_raw.append(pa.field("user", pa.string()))
+        arrow_schema_raw = arrow_schema_raw.append(pa.field("datetime", pa.string()))
+        arrow_schema_raw = arrow_schema_raw.append(pa.field("operation", pa.string()))
+
+        table_raw = pa.Table.from_pandas(df_raw, schema=arrow_schema_raw)
+        timestamp_column = table_raw["datetime"].cast(pa.timestamp("ns"))
+
+        table_raw = table_raw.drop(["datetime"])
+
+        table_raw = table_raw.add_column(
+            len(table_raw.column_names),
+            pa.field("datetime", pa.timestamp("ns")),
+            timestamp_column,
+        )
+
+        insert_id = uuid4()
+        table_path = json_data["table_path"]
+        partitions = json_data["partition_columns"]
+        filename = f"insert_{insert_id}_{{i}}.parquet"
+
+        fs = FileClient.get_gcs_file_system()
+
+        # noinspection PyTypeChecker
+        pq.write_to_dataset(
+            table,
+            root_path=f"gs://{self.bucket}/{table_path}",
+            partition_cols=partitions,
+            basename_template=filename,
+            filesystem=fs,
+            schema=arrow_schema,
+        )
+        # noinspection PyTypeChecker
+        pq.write_to_dataset(
+            table_raw,
+            root_path=f"gs://{self.bucket}/{table_path}_raw",
+            partition_cols=partitions,
+            basename_template=filename,
+            filesystem=fs,
+        )
+        print("Data successfully inserted!")
 
     def query(
         self,
@@ -314,7 +312,7 @@ class EimerDBInstance:
         """
         instance_name = self.eimerdb_name
         if output_format is None:
-            output_format = "pandas"
+            output_format = PANDAS_OUTPUT_FORMAT
 
         parsed_query = parse_sql_query(sql_query)
         try:
@@ -349,12 +347,12 @@ class EimerDBInstance:
                 df_changes = None
 
                 if editable is True and unedited is False:
-                    slct_qry = "SELECT * FROM"
+                    select_query = "SELECT * FROM"
                     df_changes = self.query_changes(
-                        f"{slct_qry} {table_name}",
+                        f"{select_query} {table_name}",
                         partition_select,
-                        output_format="arrow",
-                        changes_output="recent",
+                        output_format=ARROW_OUTPUT_FORMAT,
+                        changes_output=CHANGES_RECENT,
                     )
 
                 if editable is True and unedited is False and df_changes is not None:
@@ -363,9 +361,9 @@ class EimerDBInstance:
                 con.register(table_name, df)
                 del df
 
-            if output_format == "pandas":
+            if output_format == PANDAS_OUTPUT_FORMAT:
                 output = con.execute(sql_query).df()
-            elif output_format == "arrow":
+            elif output_format == ARROW_OUTPUT_FORMAT:
                 output = con.execute(sql_query).arrow()
             else:
                 raise ValueError(f"Invalid output format: {output_format}")
@@ -376,14 +374,18 @@ class EimerDBInstance:
             table_name = parsed_query["table_name"]
             table_config = self.tables[table_name]
             editable = table_config["editable"]
+
             if editable is False:
                 raise ValueError(f"The table {table_name} is not editable!")
+
             try:
                 columns = parsed_query["columns"]
             except ValueError:
                 columns = None
+
             if columns == ["*"]:
                 columns = None
+
             json_data = self.tables[table_name]
             table_name = parsed_query["table_name"]
             arrow_schema = arrow_schema_from_json(json_data["schema"])
@@ -395,10 +397,10 @@ class EimerDBInstance:
             arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
             arrow_schema = arrow_schema.append(pa.field("operation", pa.string()))
 
-            slct_qry = "SELECT * FROM"
+            select_query = "SELECT * FROM"
 
             df_update_results: pd.DataFrame = self.query(
-                f"{slct_qry} {table_name} WHERE {where_clause}", partition_select
+                f"{select_query} {table_name} WHERE {where_clause}", partition_select
             )
 
             df_update_results["user"] = get_initials()
@@ -456,10 +458,10 @@ class EimerDBInstance:
             arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
             arrow_schema = arrow_schema.append(pa.field("operation", pa.string()))
 
-            slct_qry = "SELECT * FROM"
+            select_query = "SELECT * FROM"
 
             df_delete_results: pd.DataFrame = self.query(
-                f"{slct_qry} {table_name} WHERE {where_clause}", partition_select
+                f"{select_query} {table_name} WHERE {where_clause}", partition_select
             )
 
             df_delete_results["user"] = get_initials()
@@ -477,14 +479,14 @@ class EimerDBInstance:
             table_path = self.tables[table_name]["table_path"] + "_changes"
             fs = FileClient.get_gcs_file_system()
 
-            deletion_Table = pa.Table.from_pandas(df_deletions, schema=arrow_schema)
+            deletion_table = pa.Table.from_pandas(df_deletions, schema=arrow_schema)
 
             unique_file_id = uuid4()
             filename = f"commit_{unique_file_id}_{{i}}.parquet"
 
             # noinspection PyTypeChecker
             pq.write_to_dataset(
-                deletion_Table,
+                deletion_table,
                 root_path=f"gs://{self.bucket}/{table_path}",
                 partition_cols=partitions,
                 basename_template=filename,
@@ -500,7 +502,7 @@ class EimerDBInstance:
         partition_select: Optional[dict[str, Any]] = None,
         unedited: Optional[bool] = False,
         output_format: Optional[str] = None,
-        changes_output: Optional[str] = "all",
+        changes_output: Optional[str] = CHANGES_ALL,
     ) -> Union[pd.DataFrame, pa.Table, None]:
         """Query changes made in the database table.
 
@@ -521,7 +523,7 @@ class EimerDBInstance:
                 an arrow Table if 'arrow' output format is specified,
         """
         if output_format is None:
-            output_format = "pandas"
+            output_format = PANDAS_OUTPUT_FORMAT
 
         parsed_query = parse_sql_query(sql_query)
         table_name = parsed_query["table_name"][0]
@@ -538,8 +540,10 @@ class EimerDBInstance:
                 columns = parsed_query["columns"]
             except ValueError:
                 columns = None
+
             if columns == ["*"]:
                 columns = None
+
             partitions = table_config["partition_columns"]
             bucket_name = table_config["bucket"]
             partitions_len = len(partitions)
@@ -556,9 +560,9 @@ class EimerDBInstance:
                 no_changes = False
             except ValueError:
                 no_changes = True
-                if output_format == "pandas":
+                if output_format == PANDAS_OUTPUT_FORMAT:
                     df_changes = pd.DataFrame()
-                elif output_format == "arrow":
+                elif output_format == ARROW_OUTPUT_FORMAT:
                     df_changes = pa.table(pd.DataFrame())
 
             if no_changes is not True:
@@ -576,15 +580,15 @@ class EimerDBInstance:
                 sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
-                    if output_format == "pandas":
+                    if output_format == PANDAS_OUTPUT_FORMAT:
                         df_changes = con.execute(sql_query).df()
-                    elif output_format == "arrow":
+                    elif output_format == ARROW_OUTPUT_FORMAT:
                         df_changes = con.execute(sql_query).arrow()
 
                 elif dataset.num_rows == 0:
-                    if output_format == "pandas":
+                    if output_format == PANDAS_OUTPUT_FORMAT:
                         df_changes = pd.DataFrame()
-                    elif output_format == "arrow":
+                    elif output_format == ARROW_OUTPUT_FORMAT:
                         df_changes = pa.table(pd.DataFrame())
 
             table_name_changes_all = table_name + "_changes_all"
@@ -618,20 +622,20 @@ class EimerDBInstance:
                     sql_query = sql_query.replace(" FROM", ", row_id FROM")
                 if dataset.num_rows != 0:
                     con = duckdb.connect()
-                    if output_format == "pandas":
+                    if output_format == PANDAS_OUTPUT_FORMAT:
                         df_changes_all = con.execute(sql_query).df()
                         df = pd.concat([df_changes_all, df_changes])
-                    elif output_format == "arrow":
+                    elif output_format == ARROW_OUTPUT_FORMAT:
                         df_changes_all = con.execute(sql_query).arrow()
                         df = pa.concat_tables([df_changes_all, df_changes])
                         df = df.cast(table_schema)
 
-            if changes_output == "all":
+            if changes_output == CHANGES_ALL:
                 if no_changes_all is not True:
                     return df
                 elif no_changes_all is True:
                     return df_changes
-            elif changes_output == "recent":
+            elif changes_output == CHANGES_RECENT:
                 return df_changes
             else:
                 return None

@@ -22,9 +22,7 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
             {"table1": {"created_by": "admin_user"}},
         ]
 
-        self.bucket_name = "test_bucket"
-        self.eimer_name = "test_eimer"
-        self.instance = EimerDBInstance(self.bucket_name, self.eimer_name)
+        self.instance = EimerDBInstance("test_bucket", "test_eimer")
 
     def test_init_non_admin(self) -> None:
         self.assertEqual(self.instance.created_by, "admin_user")
@@ -32,7 +30,7 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
         self.assertIsNone(self.instance.role_groups)
         self.assertEqual(self.instance.is_admin, False)
 
-    def test_add_user_not_admin(self) -> None:
+    def test_add_user_non_admin(self) -> None:
         # Test & Assertion
         with self.assertRaises(PermissionError) as context:
             self.instance.add_user("new_user", "user")
@@ -40,10 +38,18 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
             str(context.exception), "Cannot add user. You are not an admin!"
         )
 
-    def test_remove_user_not_admin(self) -> None:
+    def test_remove_user_non_admin(self) -> None:
         # Test & Assertion
         with self.assertRaises(PermissionError) as context:
             self.instance.remove_user("non_admin_user")
         self.assertEqual(
             str(context.exception), "Cannot remove user. You are not an admin!"
+        )
+
+    def test_create_table_non_admin(self) -> None:
+        # Test & Assertion
+        with self.assertRaises(PermissionError) as context:
+            self.instance.create_table("table2", [{"name": "field1", "type": "int8"}])
+        self.assertEqual(
+            str(context.exception), "Cannot create table. You are not an admin!"
         )
