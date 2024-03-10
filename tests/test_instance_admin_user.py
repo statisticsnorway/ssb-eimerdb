@@ -16,8 +16,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         mock_get_json.side_effect = [
             {
                 "eimerdb_name": "test_eimerdb",
-                "path": "/path/to/config",
-                "eimer_path": "/path/to/eimer",
+                "path": "path/to/config",
+                "eimer_path": "path/to/eimer",
                 "created_by": "admin_user",
                 "time_created": "2024-03-09T12:00:00Z",
             },
@@ -33,7 +33,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
                         {"label": "Unique row ID", "name": "row_id", "type": "string"},
                         {"label": "Field 1", "name": "field1", "type": "int8"},
                     ],
-                    "table_path": "/path/to/eimer/table1",
+                    "table_path": "path/to/eimer/table1",
                 },
             },
         ]
@@ -43,8 +43,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     def test_init_admin(self) -> None:
         self.assertEqual(self.instance.bucket, "test_bucket")
         self.assertEqual(self.instance.eimerdb_name, "test_eimerdb")
-        self.assertEqual(self.instance.path, "/path/to/config")
-        self.assertEqual(self.instance.eimer_path, "/path/to/eimer")
+        self.assertEqual(self.instance.path, "path/to/config")
+        self.assertEqual(self.instance.eimer_path, "path/to/eimer")
         self.assertEqual(self.instance.created_by, "admin_user")
         self.assertEqual(self.instance.time_created, "2024-03-09T12:00:00Z")
         self.assertEqual(self.instance.users, {"admin_user": "admin"})
@@ -70,7 +70,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         # Assertions
         mock_fetch_credentials.assert_called_once()
         mock_storage_client.assert_called_once_with(credentials=mock_credentials)
-        mock_bucket.blob.assert_called_once_with("/path/to/eimer/config/users.json")
+        mock_bucket.blob.assert_called_once_with("path/to/eimer/config/users.json")
         mock_blob.upload_from_string.assert_called_once()
 
     def test_add_user_user_exists(self) -> None:
@@ -96,7 +96,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         # Assertions
         mock_fetch_credentials.assert_called_once()
         mock_storage_client.assert_called_once_with(credentials=mock_credentials)
-        mock_bucket.blob.assert_called_once_with("/path/to/eimer/config/users.json")
+        mock_bucket.blob.assert_called_once_with("path/to/eimer/config/users.json")
         mock_blob.upload_from_string.assert_called_once()
 
     def test_remove_user_user_not_exists(self) -> None:
@@ -136,7 +136,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
                         {"label": "Unique row ID", "name": "row_id", "type": "string"},
                         {"label": "Field 1", "name": "field1", "type": "int8"},
                     ],
-                    "table_path": "/path/to/eimer/table1",
+                    "table_path": "path/to/eimer/table1",
                 },
                 table_name: {
                     "bucket": "test_bucket",
@@ -147,7 +147,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
                         {"label": "Unique row ID", "name": "row_id", "type": "string"},
                         {"label": "Field 1", "name": "field1", "type": "int8"},
                     ],
-                    "table_path": "/path/to/eimer/table2",
+                    "table_path": "path/to/eimer/table2",
                 },
             },
         )
@@ -155,7 +155,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         # Mock assertions
         mock_fetch_credentials.assert_called_once()
         mock_storage_client.assert_called_once_with(credentials=mock_credentials)
-        mock_bucket.blob.assert_called_once_with("/path/to/eimer/config/tables.json")
+        mock_bucket.blob.assert_called_once_with("path/to/eimer/config/tables.json")
         mock_blob.upload_from_string.assert_called_once()
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")

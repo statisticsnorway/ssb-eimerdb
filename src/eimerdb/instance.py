@@ -253,7 +253,7 @@ class EimerDBInstance:
         # noinspection PyTypeChecker
         pq.write_to_dataset(
             table=table,
-            root_path=f"gs://{self.bucket}{table_meta_json['table_path']}",
+            root_path=f"gs://{self.bucket}/{table_meta_json['table_path']}",
             partition_cols=table_meta_json["partition_columns"],
             basename_template=basename_template,
             filesystem=fs,
@@ -263,7 +263,7 @@ class EimerDBInstance:
             # noinspection PyTypeChecker
             pq.write_to_dataset(
                 table=table,
-                root_path=f"gs://{self.bucket}{table_meta_json['table_path']}_raw",
+                root_path=f"gs://{self.bucket}/{table_meta_json['table_path']}_raw",
                 partition_cols=table_meta_json["partition_columns"],
                 basename_template=basename_template,
                 filesystem=fs,
