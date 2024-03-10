@@ -45,6 +45,10 @@ ARROW_OUTPUT_FORMAT = "arrow"
 CHANGES_ALL = "all"
 CHANGES_RECENT = "recent"
 
+TABLE_PATH_KEY = "table_path"
+PARTITION_COLUMNS_KEY = "partition_columns"
+SCHEMA_KEY = "schema"
+
 
 class EimerDBInstance:
     """Represents an instance of the EimerDB database.
@@ -204,11 +208,11 @@ class EimerDBInstance:
         new_table = {
             table_name: {
                 "created_by": get_initials(),
-                "table_path": f"{self.eimer_path}/{table_name}",
+                TABLE_PATH_KEY: f"{self.eimer_path}/{table_name}",
                 "bucket": self.bucket,
                 "editable": editable,
-                "schema": schema,
-                "partition_columns": partition_columns,
+                SCHEMA_KEY: schema,
+                PARTITION_COLUMNS_KEY: partition_columns,
             }
         }
         self.tables.update(new_table)
@@ -243,7 +247,7 @@ class EimerDBInstance:
 
         table_meta_json = self.tables[table_name]
         table = pa.Table.from_pandas(
-            df, schema=arrow_schema_from_json(table_meta_json["schema"])
+            df, schema=arrow_schema_from_json(table_meta_json[SCHEMA_KEY])
         )
 
         basename_template = f"{table_name}_data_{{i}}.parquet"
@@ -254,7 +258,7 @@ class EimerDBInstance:
         pq.write_to_dataset(
             table=table,
             root_path=f"gs://{self.bucket}/{table_meta_json['table_path']}",
-            partition_cols=table_meta_json["partition_columns"],
+            partition_cols=table_meta_json[PARTITION_COLUMNS_KEY],
             basename_template=basename_template,
             filesystem=fs,
         )
@@ -264,11 +268,70 @@ class EimerDBInstance:
             pq.write_to_dataset(
                 table=table,
                 root_path=f"gs://{self.bucket}/{table_meta_json['table_path']}_raw",
-                partition_cols=table_meta_json["partition_columns"],
+                partition_cols=table_meta_json[PARTITION_COLUMNS_KEY],
                 basename_template=basename_template,
                 filesystem=fs,
             )
         print("Data successfully inserted!")
+
+    def get_changes(self, table_name: str) -> DataFrame:
+        """Retrieve changes for a given table.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be retrieved.
+
+        Returns:
+            DataFrame: A pandas DataFrame containing the changes for the specified table.
+        """
+        path = self.tables[table_name][TABLE_PATH_KEY]
+
+        fs = FileClient.get_gcs_file_system()
+        # noinspection PyTypeChecker
+        dataset = ds.dataset(
+            f"{self.bucket}/{path}_changes/",
+            format="parquet",
+            partitioning="hive",
+            filesystem=fs,
+        )
+
+        df_changes: DataFrame = dataset.to_table().to_pandas()
+        return df_changes
+
+    def combine_changes(self, table_name: str) -> None:
+        """Combines the files containing the changes of the table into one file.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be merged.
+        """
+        fs = FileClient.get_gcs_file_system()
+        df_changes = self.get_changes(table_name)
+
+        token = AuthClient.fetch_google_credentials()
+        client = storage.Client(credentials=token)
+        bucket = client.bucket(self.bucket)
+        path = self.tables[table_name][TABLE_PATH_KEY]
+        partitions = self.tables[table_name][PARTITION_COLUMNS_KEY]
+        source_folder = path + "_changes"
+        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
+        filename = f"merged_commit_{uuid4()}_{{i}}.parquet"
+        table = pa.Table.from_pandas(df_changes)
+
+        # noinspection PyTypeChecker
+        pq.write_to_dataset(
+            table,
+            root_path=f"gs://{self.bucket}/{source_folder}",
+            partition_cols=partitions,
+            basename_template=filename,
+            filesystem=fs,
+        )
+        for blob in blobs_to_delete:
+            blob.delete()
+
+        logging.info(
+            "The changes were successfully combined into one file per partition!"
+        )
+
+        print("The changes were successfully combined into one file per partition!")
 
     def query(
         self,
@@ -369,10 +432,10 @@ class EimerDBInstance:
 
             json_data = self.tables[table_name]
             table_name = parsed_query["table_name"]
-            arrow_schema = arrow_schema_from_json(json_data["schema"])
+            arrow_schema = arrow_schema_from_json(json_data[SCHEMA_KEY])
             where_clause = parsed_query["where_clause"]
             table_config = self.tables[table_name]
-            partitions = table_config["partition_columns"]
+            partitions = table_config[PARTITION_COLUMNS_KEY]
 
             arrow_schema = arrow_schema.append(pa.field("user", pa.string()))
             arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
@@ -397,7 +460,7 @@ class EimerDBInstance:
 
             df_updates_len = len(df_updates_commits)
 
-            table_path = self.tables[table_name]["table_path"] + "_changes"
+            table_path = self.tables[table_name][TABLE_PATH_KEY] + "_changes"
             fs = FileClient.get_gcs_file_system()
 
             update_table = pa.Table.from_pandas(df_updates_commits, schema=arrow_schema)
@@ -429,11 +492,11 @@ class EimerDBInstance:
                 columns = None
             json_data = self.tables[table_name]
             table_name = parsed_query["table_name"]
-            arrow_schema = arrow_schema_from_json(json_data["schema"])
+            arrow_schema = arrow_schema_from_json(json_data[SCHEMA_KEY])
             where_clause = parsed_query["where_clause"]
             instance_name = self.eimerdb_name
             table_config = self.tables[table_name]
-            partitions = table_config["partition_columns"]
+            partitions = table_config[PARTITION_COLUMNS_KEY]
 
             arrow_schema = arrow_schema.append(pa.field("user", pa.string()))
             arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
@@ -457,7 +520,7 @@ class EimerDBInstance:
 
             df_deletions_len = len(df_deletions)
 
-            table_path = self.tables[table_name]["table_path"] + "_changes"
+            table_path = self.tables[table_name][TABLE_PATH_KEY] + "_changes"
             fs = FileClient.get_gcs_file_system()
 
             deletion_table = pa.Table.from_pandas(df_deletions, schema=arrow_schema)
@@ -511,7 +574,7 @@ class EimerDBInstance:
         table_config = self.tables[table_name]
         editable = table_config["editable"]
         instance_name = self.eimerdb_name
-        table_schema = arrow_schema_from_json(self.tables[table_name]["schema"])
+        table_schema = arrow_schema_from_json(self.tables[table_name][SCHEMA_KEY])
 
         df: Optional[Any] = None
         df_changes: Optional[Any] = None
@@ -525,7 +588,7 @@ class EimerDBInstance:
             if columns == ["*"]:
                 columns = None
 
-            partitions = table_config["partition_columns"]
+            partitions = table_config[PARTITION_COLUMNS_KEY]
             bucket_name = table_config["bucket"]
             partitions_len = len(partitions)
             partition_levels = "**/" * partitions_len + "*"
@@ -622,63 +685,3 @@ class EimerDBInstance:
                 return None
         else:
             return None
-
-    def get_changes(self, table_name: str) -> DataFrame:
-        """Retrieve changes for a given table.
-
-        Args:
-            table_name (str): The name of the table for which changes are to be retrieved.
-
-        Returns:
-            DataFrame: A pandas DataFrame containing the changes for the specified table.
-        """
-        fs = FileClient.get_gcs_file_system()
-        bucket = self.bucket
-        path = self.tables[table_name]["table_path"]
-
-        # noinspection PyTypeChecker
-        dataset = ds.dataset(
-            f"{bucket}/{path}_changes/",
-            format="parquet",
-            partitioning="hive",
-            filesystem=fs,
-        )
-
-        df_changes: DataFrame = dataset.to_table().to_pandas()
-        return df_changes
-
-    def combine_changes(self, table_name: str) -> None:
-        """Combines the files containing the changes of the table into one file.
-
-        Args:
-            table_name (str): The name of the table for which changes are to be merged.
-        """
-        fs = FileClient.get_gcs_file_system()
-        df_changes = self.get_changes(table_name)
-
-        token = AuthClient.fetch_google_credentials()
-        client = storage.Client(credentials=token)
-        bucket = client.bucket(self.bucket)
-        path = self.tables[table_name]["table_path"]
-        partitions = self.tables[table_name]["partition_columns"]
-        source_folder = path + "_changes"
-        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
-        filename = f"merged_commit_{uuid4()}_{{i}}.parquet"
-        table = pa.Table.from_pandas(df_changes)
-
-        # noinspection PyTypeChecker
-        pq.write_to_dataset(
-            table,
-            root_path=f"gs://{self.bucket}/{source_folder}",
-            partition_cols=partitions,
-            basename_template=filename,
-            filesystem=fs,
-        )
-        for blob in blobs_to_delete:
-            blob.delete()
-
-        logging.info(
-            "The changes were successfully combined into one file per partition!"
-        )
-
-        print("The changes were successfully combined into one file per partition!")

@@ -5,6 +5,7 @@ from unittest.mock import call
 from unittest.mock import patch
 
 import pandas as pd
+import pyarrow.dataset as ds
 
 from eimerdb.instance import EimerDBInstance
 
@@ -213,3 +214,26 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             # Call the method under test
             self.instance.main_table_insert(table_name="table1", df=df, raw=True)
             mock_write_to_dataset.assert_has_calls(expected_calls)
+
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    @patch("eimerdb.instance.ds.dataset")
+    def test_get_changes(self, mock_dataset: Mock, _: Mock) -> None:
+        expected_df = pd.DataFrame([{"row_id": "1", "field1": 1}])
+
+        dataset = Mock(spec=ds.Dataset)
+        dataset.to_table.return_value.to_pandas.return_value = expected_df
+        mock_dataset.return_value = dataset
+
+        # Call the get_changes method
+        changes_df = self.instance.get_changes("table1")
+
+        # Assert that ds.dataset is called with the correct arguments
+        mock_dataset.assert_called_once_with(
+            "test_bucket/path/to/eimer/table1_changes/",
+            format="parquet",
+            partitioning="hive",
+            filesystem=ANY,
+        )
+
+        # Assert that the returned DataFrame is the same as the mock DataFrame
+        self.assertIs(expected_df, changes_df)
