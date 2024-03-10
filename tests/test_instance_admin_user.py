@@ -283,3 +283,44 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         )
         blob_1.delete.assert_called_once()
         blob_2.delete.assert_called_once()
+
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    @patch("eimerdb.instance.pq.read_table")
+    @patch("eimerdb.instance.duckdb.connect")
+    @patch("eimerdb.instance.pa.concat_tables")
+    @patch("eimerdb.instance.pd.concat")
+    @patch("eimerdb.instance.pd.DataFrame")
+    def test_query_changes(
+        self,
+        mock_pd_dataframe: Mock,
+        mock_pd_concat: Mock,
+        mock_pa_concat_tables: Mock,
+        mock_duckdb_connect: Mock,
+        mock_pq_read_table: Mock,
+        mock_fileclient_gcs: Mock,
+    ):
+        # Set up mocks
+        mock_pd_dataframe.return_value = Mock()
+        mock_pd_concat.return_value = Mock()
+        mock_pa_concat_tables.return_value = Mock()
+
+        mock_duckdb_connect.return_value.execute.return_value.df.return_value = Mock()
+        mock_duckdb_connect.return_value.execute.return_value.arrow.return_value = (
+            Mock()
+        )
+        mock_pq_read_table.return_value = Mock()
+
+        mock_fileclient_gcs.glob.return_value = [
+            "gs://example_bucket/eimerdb/example_instance/example_table_suffix/date=2022-01-01/file1.parquet",
+            "gs://example_bucket/eimerdb/example_instance/example_table_suffix/date=2022-01-01/file2.parquet",
+        ]
+
+        # Test SELECT
+        result = self.instance.query_changes("SELECT * FROM table1")
+        self.assertIsInstance(result, Mock)
+
+        # Test DELETE
+        result = self.instance.query_changes(
+            "UPDATE table1 SET row_id = 1 WHERE row_id = 2"
+        )
+        self.assertIsNone(result)

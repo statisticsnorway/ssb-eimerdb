@@ -67,11 +67,12 @@ class TestFunctions(unittest.TestCase):
         sql_query = "SELECT * FROM table WHERE condition"
         result = parse_sql_query(sql_query)
         assert result == {
-            "columns": ["*"],
+            "columns": [
+                "*",
+            ],
             "operation": "SELECT",
-            "select_clause": "",
-            "table_name": ["table"],
-            "where_clause": "condition",
+            "sql_filter": "WHERE condition",
+            "table_name": "table",
         }
 
     @patch("eimerdb.functions.AuthClient.fetch_google_credentials")

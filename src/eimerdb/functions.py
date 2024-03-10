@@ -107,13 +107,11 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
     Raises:
         ValueError: If there is a syntax error or if the query is not supported.
     """
-    select_pattern = re.compile(r"\bSELECT\b")
-    from_pattern = re.compile(r"\bFROM\s+(\w+)")
-    join_pattern = re.compile(r"JOIN\s+(\w+)\s+ON")
-    where_pattern = re.compile(
-        r"WHERE\s+((?!(?:GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET|FETCH|UNION|"
-        r"INTERSECT|EXCEPT|INTO|TABLESAMPLE)).*?)\s*(?:GROUP\s+BY|HAVING|ORDER\s+BY|"
-        r"LIMIT|OFFSET|FETCH|UNION|INTERSECT|EXCEPT|INTO|TABLESAMPLE|$)",
+    select_pattern = re.compile(
+        r"""
+        ^SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(.*))?$
+    """,
+        re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE,
     )
 
     update_pattern = re.compile(
@@ -123,39 +121,28 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
         re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE,
     )
 
+    select_match = re.match(select_pattern, sql_query)
     update_match = re.match(update_pattern, sql_query)
 
-    delete_pattern = re.compile(
-        r"^DELETE\s+FROM\s+(\w+)\s+(?:WHERE\s+(.*))?$", re.IGNORECASE | re.DOTALL
-    )
-
-    delete_match = re.match(delete_pattern, sql_query)
-
-    select_clause = ""
-    where_clause = ""
-
-    select_match = select_pattern.search(sql_query)
-
-    from_match: list[Any] = from_pattern.findall(sql_query)
-    join_tables: list[Any] = join_pattern.findall(sql_query)
-
-    tables = from_match + join_tables
-
-    where_match = where_pattern.search(sql_query)
-
-    if where_match:
-        where_clause = where_match.group(1).strip()
-
-    if delete_match:
-        table_name, where_clause = delete_match.groups()
+    if select_match:
+        groups = select_match.groups()
+        columns_str, table_name, rest_of_query = groups
+        columns = [
+            re.sub(
+                r"^COUNT\((.*?)\)$",
+                r"\1",
+                col.strip().split(" AS ")[0],
+            )
+            for col in columns_str.split(",")
+        ]
 
         return {
-            "operation": "DELETE",
+            "operation": "SELECT",
+            "columns": columns,
             "table_name": table_name,
-            "where_clause": where_clause.strip() if where_clause else None,
+            "sql_filter": rest_of_query.strip() if rest_of_query else None,
         }
-
-    if update_match:
+    elif update_match:
         groups = update_match.groups()
         table_name, set_clause, where_clause = groups
 
@@ -165,21 +152,9 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
             "set_clause": set_clause,
             "where_clause": where_clause.strip() if where_clause else None,
         }
-
-    elif select_match:
-        result = {
-            "operation": "SELECT",
-            "columns": ["*"],
-            "select_clause": select_clause,
-            "table_name": tables,
-            "where_clause": where_clause,
-        }
-
-        return result
-
     else:
         raise ValueError(
-            "Error parsing sql-query. Syntax error or query not supported."
+            "Unsupported SQL operation. Only SELECT and UPDATE statements are allowed."
         )
 
 
