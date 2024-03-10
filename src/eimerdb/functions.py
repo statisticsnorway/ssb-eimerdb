@@ -16,6 +16,8 @@ from google.cloud import storage
 
 logger = logging.getLogger(__name__)
 
+APPLICATION_JSON = "application/json"
+
 
 def get_datetime() -> str:
     """A function that returns a datetime string.
@@ -206,13 +208,13 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
 
     about_blob = bucket.blob(f"{full_path}/config/about.json")
     about_blob.upload_from_string(
-        data=json.dumps(json_about), content_type="application/json"
+        data=json.dumps(json_about), content_type=APPLICATION_JSON
     )
 
     user_roles = {creator: "admin"}
     user_roles_blob = bucket.blob(f"{full_path}/config/users.json")
     user_roles_blob.upload_from_string(
-        data=json.dumps(user_roles), content_type="application/json"
+        data=json.dumps(user_roles), content_type=APPLICATION_JSON
     )
 
     role_groups = {
@@ -238,9 +240,9 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
     role_groups_blob = bucket.blob(f"{full_path}/config/role_groups.json")
     role_groups_blob.upload_from_string(
         data=json.dumps(role_groups),
-        content_type="application/json",
+        content_type=APPLICATION_JSON,
     )
 
     tables_blob = bucket.blob(f"{full_path}/config/tables.json")
-    tables_blob.upload_from_string(data=json.dumps({}), content_type="application/json")
+    tables_blob.upload_from_string(data=json.dumps({}), content_type=APPLICATION_JSON)
     logger.info("EimerDB instance %s created.", db_name)

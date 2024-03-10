@@ -26,7 +26,7 @@ from dapla import FileClient
 from google.cloud import storage
 from pandas import DataFrame
 
-from .functions import arrow_schema_from_json
+from .functions import arrow_schema_from_json, APPLICATION_JSON
 from .functions import get_datetime
 from .functions import get_initials
 from .functions import get_json
@@ -140,7 +140,7 @@ class EimerDBInstance:
         user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
 
         user_roles_blob.upload_from_string(
-            data=json.dumps(self.users), content_type="application/json"
+            data=json.dumps(self.users), content_type=APPLICATION_JSON
         )
         print(f"User {username} added with the role {role}!")
 
@@ -166,7 +166,7 @@ class EimerDBInstance:
         del self.users[username]
         user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
         user_roles_blob.upload_from_string(
-            data=json.dumps(self.users), content_type="application/json"
+            data=json.dumps(self.users), content_type=APPLICATION_JSON
         )
         print(f"User {username} successfully removed!")
 
@@ -213,7 +213,7 @@ class EimerDBInstance:
             tables.update(new_table)
             tables_blob = bucket.blob(f"{self.eimer_path}/config/tables.json")
             tables_blob.upload_from_string(
-                data=json.dumps(tables), content_type="application/json"
+                data=json.dumps(tables), content_type=APPLICATION_JSON
             )
         else:
             raise PermissionError("Cannot create table. You are not an admin!")
