@@ -298,7 +298,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         mock_duckdb_connect: Mock,
         mock_pq_read_table: Mock,
         mock_fileclient_gcs: Mock,
-    ):
+    ) -> None:
         # Set up mocks
         mock_pd_dataframe.return_value = Mock()
         mock_pd_concat.return_value = Mock()
