@@ -162,35 +162,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         mock_blob.upload_from_string.assert_called_once()
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance.pq.write_to_dataset")
-    def test_main_table_insert_raw_false(
-        self, mock_write_to_dataset: Mock, mock_get_gcs_file_system: Mock
-    ) -> None:
-        # mock_from_pandas.return_value = Mock()
-        mock_fs = mock_get_gcs_file_system.return_value
-        # Mock pq.write_to_dataset
-        mock_write_to_dataset.side_effect = [
-            Mock(),  # For main table
-            Mock(),  # For raw table
-        ]
-
-        # Sample DataFrame for testing
-        df = pd.DataFrame({"row_id": ["1", "2", "2"], "field1": [1, 2, 3]})
-
-        # Call the method under test
-        self.instance.main_table_insert(table_name="table1", df=df, raw=False)
-
-        # Assertions
-        mock_write_to_dataset.assert_called_with(
-            table=ANY,
-            root_path="gs://test_bucket/path/to/eimer/table1",
-            partition_cols=None,
-            basename_template="table1_data_{i}.parquet",
-            filesystem=mock_fs,
-        )
-
-    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    def test_main_table_insert_raw_true(self, mock_get_gcs_file_system: Mock) -> None:
+    def test_main_table_insert(self, mock_get_gcs_file_system: Mock) -> None:
         mock_fs = mock_get_gcs_file_system.return_value
 
         # Sample DataFrame for testing
@@ -201,20 +173,21 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
                 table=ANY,
                 root_path="gs://test_bucket/path/to/eimer/table1",
                 partition_cols=None,
-                basename_template="table1_data_{i}.parquet",
+                basename_template=ANY,
                 filesystem=mock_fs,
+                schema=ANY,
             ),
             call(
                 table=ANY,
                 root_path="gs://test_bucket/path/to/eimer/table1_raw",
                 partition_cols=None,
-                basename_template="table1_data_{i}.parquet",
+                basename_template=ANY,
                 filesystem=mock_fs,
             ),
         ]
         with patch("eimerdb.instance.pq.write_to_dataset") as mock_write_to_dataset:
             # Call the method under test
-            self.instance.main_table_insert(table_name="table1", df=df, raw=True)
+            self.instance.insert(table_name="table1", df=df)
             mock_write_to_dataset.assert_has_calls(expected_calls)
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
@@ -246,7 +219,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.uuid4")
     @patch("eimerdb.instance.pq.write_to_dataset")
     @patch("eimerdb.instance.EimerDBInstance.get_changes")
-    def test_merge_changes(
+    def test_combine_changes(
         self,
         mock_get_changes: Mock,
         mock_write_to_dataset: Mock,
@@ -271,7 +244,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         ]
 
         # Call the merge_changes method
-        self.instance.merge_changes("table1")
+        self.instance.combine_changes("table1")
 
         # Assert that the dependencies are called with the expected arguments
         mock_write_to_dataset.assert_called_once_with(
@@ -316,10 +289,10 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         ]
 
         # Test SELECT
-        result = self.instance.query_changes("SELECT * FROM table1")
+        result = self.instance.query_changes("SELECT * FROM table1 WHERE condition")
         self.assertIsInstance(result, Mock)
 
-        # Test DELETE
+        # Test UPDATE
         result = self.instance.query_changes(
             "UPDATE table1 SET row_id = 1 WHERE row_id = 2"
         )

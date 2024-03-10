@@ -107,42 +107,53 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
     Raises:
         ValueError: If there is a syntax error or if the query is not supported.
     """
-    select_pattern = re.compile(
-        r"""
-        ^SELECT\s+(.*?)\s+FROM\s+(\w+)(?:\s+(.*))?$
-    """,
-        re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE,
+    select_pattern = re.compile(r"\bSELECT\b")
+    from_pattern = re.compile(r"\bFROM\s+(\w+)")
+    join_pattern = re.compile(r"JOIN\s+(\w+)\s+ON")
+    where_pattern = re.compile(
+        r"WHERE\s+((?!(?:GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET|FETCH|UNION|"
+        r"INTERSECT|EXCEPT|INTO|TABLESAMPLE)).*?)\s*(?:GROUP\s+BY|HAVING|ORDER\s+BY|"
+        r"LIMIT|OFFSET|FETCH|UNION|INTERSECT|EXCEPT|INTO|TABLESAMPLE|$)",
     )
 
     update_pattern = re.compile(
-        r"""
-        ^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$
-    """,
+        r"^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$",
         re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE,
     )
 
-    select_match = re.match(select_pattern, sql_query)
     update_match = re.match(update_pattern, sql_query)
 
-    if select_match:
-        groups = select_match.groups()
-        columns_str, table_name, rest_of_query = groups
-        columns = [
-            re.sub(
-                r"^COUNT\((.*?)\)$",
-                r"\1",
-                col.strip().split(" AS ")[0],
-            )
-            for col in columns_str.split(",")
-        ]
+    delete_pattern = re.compile(
+        r"^DELETE\s+FROM\s+(\w+)\s+(?:WHERE\s+(.*))?$", re.IGNORECASE | re.DOTALL
+    )
+
+    delete_match = re.match(delete_pattern, sql_query)
+
+    select_clause = ""
+    where_clause = ""
+
+    select_match = select_pattern.search(sql_query)
+
+    from_match: list[Any] = from_pattern.findall(sql_query)
+    join_tables: list[Any] = join_pattern.findall(sql_query)
+
+    tables = from_match + join_tables
+
+    where_match = where_pattern.search(sql_query)
+
+    if where_match:
+        where_clause = where_match.group(1).strip()
+
+    if delete_match:
+        table_name, where_clause = delete_match.groups()
 
         return {
-            "operation": "SELECT",
-            "columns": columns,
+            "operation": "DELETE",
             "table_name": table_name,
-            "sql_filter": rest_of_query.strip() if rest_of_query else None,
+            "where_clause": where_clause.strip() if where_clause else None,
         }
-    elif update_match:
+
+    if update_match:
         groups = update_match.groups()
         table_name, set_clause, where_clause = groups
 
@@ -152,9 +163,21 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
             "set_clause": set_clause,
             "where_clause": where_clause.strip() if where_clause else None,
         }
+
+    elif select_match:
+        result = {
+            "operation": "SELECT",
+            "columns": ["*"],
+            "select_clause": select_clause,
+            "table_name": tables,
+            "where_clause": where_clause,
+        }
+
+        return result
+
     else:
         raise ValueError(
-            "Unsupported SQL operation. Only SELECT and UPDATE statements are allowed."
+            "Error parsing sql-query. Syntax error or query not supported."
         )
 
 
@@ -183,13 +206,13 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
 
     about_blob = bucket.blob(f"{full_path}/config/about.json")
     about_blob.upload_from_string(
-        data=json.dumps(json_about), content_type=APPLICATION_JSON
+        data=json.dumps(json_about), content_type="application/json"
     )
 
     user_roles = {creator: "admin"}
     user_roles_blob = bucket.blob(f"{full_path}/config/users.json")
     user_roles_blob.upload_from_string(
-        data=json.dumps(user_roles), content_type=APPLICATION_JSON
+        data=json.dumps(user_roles), content_type="application/json"
     )
 
     role_groups = {
@@ -215,9 +238,9 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
     role_groups_blob = bucket.blob(f"{full_path}/config/role_groups.json")
     role_groups_blob.upload_from_string(
         data=json.dumps(role_groups),
-        content_type=APPLICATION_JSON,
+        content_type="application/json",
     )
 
     tables_blob = bucket.blob(f"{full_path}/config/tables.json")
-    tables_blob.upload_from_string(data=json.dumps({}), content_type=APPLICATION_JSON)
+    tables_blob.upload_from_string(data=json.dumps({}), content_type="application/json")
     logger.info("EimerDB instance %s created.", db_name)
