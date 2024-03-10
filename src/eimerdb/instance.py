@@ -207,7 +207,7 @@ class EimerDBInstance:
                 "table_path": f"{self.eimer_path}/{table_name}",
                 "bucket": self.bucket,
                 "editable": editable,
-                "schema": arrow_schema_from_json(schema),
+                "schema": schema,
                 "partition_columns": partition_columns,
             }
         }

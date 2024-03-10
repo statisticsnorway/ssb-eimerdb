@@ -19,12 +19,17 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             },
             {"admin_user": "admin"},
             {"admin_user": {"admin_group": ["admin_user"]}},
-            {"table1": {"created_by": "admin_user"}},
+            {
+                "table1": {
+                    "created_by": "admin_user",
+                    "table_path": "some_path",
+                    "editable": True,
+                    "schema": [{"name": "field1", "type": "int8"}],
+                }
+            },
         ]
 
-        self.bucket_name = "test_bucket"
-        self.eimer_name = "test_eimer"
-        self.instance = EimerDBInstance(self.bucket_name, self.eimer_name)
+        self.instance = EimerDBInstance("test_bucket", "test_eimer")
 
     def test_init_admin(self) -> None:
         self.assertEqual(self.instance.bucket, "test_bucket")
@@ -90,3 +95,51 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             self.instance.remove_user("new_user")
         self.assertEqual(str(context.exception), "User new_user does not exist.")
+
+    @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
+    @patch("eimerdb.instance.storage.Client")
+    def test_create_table_admin(
+        self, mock_storage_client: Mock, mock_fetch_credentials: Mock
+    ) -> None:
+        # Setup
+        mock_credentials = Mock()
+        mock_fetch_credentials.return_value = mock_credentials
+
+        mock_bucket = mock_storage_client.return_value.bucket.return_value
+        mock_blob = mock_bucket.blob.return_value
+
+        table_name = "table2"
+        schema = [{"name": "field1", "type": "int8", "label": "Field 1"}]
+
+        # Test
+        self.instance.create_table(table_name, schema)
+
+        # Assertions
+        self.assertEqual(
+            self.instance.tables,
+            {
+                "table1": {
+                    "created_by": "admin_user",
+                    "editable": True,
+                    "schema": [{"name": "field1", "type": "int8"}],
+                    "table_path": "some_path",
+                },
+                table_name: {
+                    "bucket": "test_bucket",
+                    "created_by": "user",
+                    "editable": True,
+                    "partition_columns": None,
+                    "schema": [
+                        {"label": "Unique row ID", "name": "row_id", "type": "string"},
+                        {"label": "Field 1", "name": "field1", "type": "int8"},
+                    ],
+                    "table_path": "/path/to/eimer/table2",
+                },
+            },
+        )
+
+        # Mock assertions
+        mock_fetch_credentials.assert_called_once()
+        mock_storage_client.assert_called_once_with(credentials=mock_credentials)
+        mock_bucket.blob.assert_called_once_with("/path/to/eimer/config/tables.json")
+        mock_blob.upload_from_string.assert_called_once()
