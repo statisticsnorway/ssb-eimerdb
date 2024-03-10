@@ -221,12 +221,15 @@ class EimerDBInstance:
             data=json.dumps(self.tables), content_type=APPLICATION_JSON
         )
 
-    def insert(self, table_name: str, df: pd.DataFrame) -> None:
+    def main_table_insert(
+        self, table_name: str, df: pd.DataFrame, raw: Optional[bool] = True
+    ) -> None:
         """Insert unedited data into a main table.
 
         Args:
             table_name (str): Name of the table to insert data into.
-            df (pandas.DataFrame): DataFrame containing the data to insert.
+            df (pandas.DataFrame): DataFrame containing the data to insert
+            raw (bool, optional): Indicates whether to include unedited data.
 
         Raises:
             PermissionError: If the current user is not an admin.
@@ -236,57 +239,35 @@ class EimerDBInstance:
                 "Cannot insert into main table. You are not an admin!"
             )
 
-        json_data = self.tables[table_name]
-        arrow_schema = arrow_schema_from_json(json_data["schema"])
-        df["row_id"] = df.apply(lambda row: uuid4(), axis=1)
-        df["row_id"] = df["row_id"].astype(str)
-        table = pa.Table.from_pandas(df, schema=arrow_schema)
+        df["row_id"] = df.apply(lambda row: str(uuid4()), axis=1)
 
-        df_raw = df.copy()
-        df_raw["user"] = get_initials()
-        df_raw["datetime"] = get_datetime()
-        df_raw["operation"] = "insert"
-
-        arrow_schema_raw = arrow_schema
-        arrow_schema_raw = arrow_schema_raw.append(pa.field("user", pa.string()))
-        arrow_schema_raw = arrow_schema_raw.append(pa.field("datetime", pa.string()))
-        arrow_schema_raw = arrow_schema_raw.append(pa.field("operation", pa.string()))
-
-        table_raw = pa.Table.from_pandas(df_raw, schema=arrow_schema_raw)
-        timestamp_column = table_raw["datetime"].cast(pa.timestamp("ns"))
-
-        table_raw = table_raw.drop(["datetime"])
-
-        table_raw = table_raw.add_column(
-            len(table_raw.column_names),
-            pa.field("datetime", pa.timestamp("ns")),
-            timestamp_column,
+        table_meta_json = self.tables[table_name]
+        table = pa.Table.from_pandas(
+            df, schema=arrow_schema_from_json(table_meta_json["schema"])
         )
 
-        insert_id = uuid4()
-        table_path = json_data["table_path"]
-        partitions = json_data["partition_columns"]
-        filename = f"insert_{insert_id}_{{i}}.parquet"
+        filename = f"{table_name}_data_{{i}}.parquet"
 
         fs = FileClient.get_gcs_file_system()
 
         # noinspection PyTypeChecker
         pq.write_to_dataset(
             table,
-            root_path=f"gs://{self.bucket}/{table_path}",
-            partition_cols=partitions,
-            basename_template=filename,
-            filesystem=fs,
-            schema=arrow_schema,
-        )
-        # noinspection PyTypeChecker
-        pq.write_to_dataset(
-            table_raw,
-            root_path=f"gs://{self.bucket}/{table_path}_raw",
-            partition_cols=partitions,
+            root_path=f"gs://{self.bucket}/{table_meta_json['table_path']}",
+            partition_cols=table_meta_json["partition_columns"],
             basename_template=filename,
             filesystem=fs,
         )
+
+        if raw is True:
+            # noinspection PyTypeChecker
+            pq.write_to_dataset(
+                table,
+                root_path=f"gs://{self.bucket}/{table_meta_json['table_path']}_raw",
+                partition_cols=table_meta_json["partition_columns"],
+                basename_template=filename,
+                filesystem=fs,
+            )
         print("Data successfully inserted!")
 
     def query(
