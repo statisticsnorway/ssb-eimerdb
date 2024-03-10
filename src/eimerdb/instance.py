@@ -297,41 +297,31 @@ class EimerDBInstance:
         df_changes: DataFrame = dataset.to_table().to_pandas()
         return df_changes
 
-    def combine_changes(self, table_name: str) -> None:
+    def merge_changes(self, table_name: str) -> None:
         """Combines the files containing the changes of the table into one file.
 
         Args:
             table_name (str): The name of the table for which changes are to be merged.
         """
-        fs = FileClient.get_gcs_file_system()
-        df_changes = self.get_changes(table_name)
-
-        token = AuthClient.fetch_google_credentials()
-        client = storage.Client(credentials=token)
+        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
         bucket = client.bucket(self.bucket)
-        path = self.tables[table_name][TABLE_PATH_KEY]
+
         partitions = self.tables[table_name][PARTITION_COLUMNS_KEY]
-        source_folder = path + "_changes"
+        source_folder = self.tables[table_name][TABLE_PATH_KEY] + "_changes"
         blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
-        filename = f"merged_commit_{uuid4()}_{{i}}.parquet"
-        table = pa.Table.from_pandas(df_changes)
 
         # noinspection PyTypeChecker
         pq.write_to_dataset(
-            table,
+            table=pa.Table.from_pandas(self.get_changes(table_name)),
             root_path=f"gs://{self.bucket}/{source_folder}",
             partition_cols=partitions,
-            basename_template=filename,
-            filesystem=fs,
+            basename_template=f"merged_commit_{uuid4()}_{{i}}.parquet",
+            filesystem=FileClient.get_gcs_file_system(),
         )
         for blob in blobs_to_delete:
             blob.delete()
 
-        logging.info(
-            "The changes were successfully combined into one file per partition!"
-        )
-
-        print("The changes were successfully combined into one file per partition!")
+        print("The changes were successfully merged into one file per partition!")
 
     def query(
         self,
