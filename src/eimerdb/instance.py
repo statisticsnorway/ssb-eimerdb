@@ -550,6 +550,7 @@ class EimerDBInstance:
             Union[pd.DataFrame, pa.Table, None]:
                 Returns a pandas DataFrame if 'pandas' output format is specified,
                 an arrow Table if 'arrow' output format is specified,
+                or None if operation is different from SELECT.
         """
         if output_format not in (PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT):
             raise ValueError(f"Invalid output format: {output_format}")
