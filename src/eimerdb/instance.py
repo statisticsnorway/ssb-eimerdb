@@ -547,7 +547,7 @@ class EimerDBInstance:
                 The changes that are to be retrieved ('recent' or 'all'). Defaults to 'all'.
 
         Returns:
-            Union[pd.DataFrame, pa.Table, str]:
+            Union[pd.DataFrame, pa.Table, None]:
                 Returns a pandas DataFrame if 'pandas' output format is specified,
                 an arrow Table if 'arrow' output format is specified,
         """
