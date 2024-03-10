@@ -559,11 +559,11 @@ class EimerDBInstance:
             sql_query (str): The SQL query to execute.
             partition_select (Dict, optional):
                 Dictionary containing partition selection criteria. Defaults to None.
-            unedited (bool, optional):
+            unedited (bool):
                 Flag indicating whether to retrieve unedited changes. Defaults to False.
-            output_format (str, optional):
+            output_format (str):
                 The desired output format ('pandas' or 'arrow'). Defaults to 'pandas'.
-            changes_output (str, optional):
+            changes_output (str):
                 The changes that are to be retrieved ('recent' or 'all'). Defaults to 'all'.
 
         Returns:
