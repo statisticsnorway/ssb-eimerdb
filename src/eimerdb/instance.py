@@ -529,28 +529,27 @@ class EimerDBInstance:
         self,
         sql_query: str,
         partition_select: Optional[dict[str, Any]] = None,
-        unedited: Optional[bool] = False,
-        output_format: Optional[str] = PANDAS_OUTPUT_FORMAT,
-        changes_output: Optional[str] = CHANGES_ALL,
-    ) -> Union[pd.DataFrame, pa.Table, None]:
+        unedited: bool = False,
+        output_format: str = PANDAS_OUTPUT_FORMAT,
+        changes_output: str = CHANGES_ALL,
+    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
         """Query changes made in the database table.
 
         Args:
             sql_query (str): The SQL query to execute.
-            partition_select (Dict, optional):
-                Dictionary containing partition selection criteria. Defaults to None.
-            unedited (bool, optional):
-                Flag indicating whether to retrieve unedited changes. Defaults to False.
-            output_format (str, optional):
-                The desired output format ('pandas' or 'arrow'). Defaults to 'pandas'.
-            changes_output (str, optional):
-                The changes that are to be retrieved ('recent' or 'all'). Defaults to 'all'.
+            partition_select (Dict, optional): Dictionary containing partition selection criteria. Defaults to None.
+            unedited (bool): Flag indicating whether to retrieve unedited changes. Defaults to False.
+            output_format (str): The desired output format ('pandas' or 'arrow'). Defaults to 'pandas'.
+            changes_output (str): The changes that are to be retrieved ('recent' or 'all'). Defaults to 'all'.
 
         Returns:
-            Union[pd.DataFrame, pa.Table, None]:
+            Optional[pd.DataFrame, pa.Table]:
                 Returns a pandas DataFrame if 'pandas' output format is specified,
                 an arrow Table if 'arrow' output format is specified,
                 or None if operation is different from SELECT.
+
+        Raises:
+            ValueError: If the output format is invalid.
         """
         if output_format not in (PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT):
             raise ValueError(f"Invalid output format: {output_format}")
