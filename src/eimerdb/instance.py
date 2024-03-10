@@ -246,26 +246,26 @@ class EimerDBInstance:
             df, schema=arrow_schema_from_json(table_meta_json["schema"])
         )
 
-        filename = f"{table_name}_data_{{i}}.parquet"
+        basename_template = f"{table_name}_data_{{i}}.parquet"
 
         fs = FileClient.get_gcs_file_system()
 
         # noinspection PyTypeChecker
         pq.write_to_dataset(
-            table,
-            root_path=f"gs://{self.bucket}/{table_meta_json['table_path']}",
+            table=table,
+            root_path=f"gs://{self.bucket}{table_meta_json['table_path']}",
             partition_cols=table_meta_json["partition_columns"],
-            basename_template=filename,
+            basename_template=basename_template,
             filesystem=fs,
         )
 
         if raw is True:
             # noinspection PyTypeChecker
             pq.write_to_dataset(
-                table,
-                root_path=f"gs://{self.bucket}/{table_meta_json['table_path']}_raw",
+                table=table,
+                root_path=f"gs://{self.bucket}{table_meta_json['table_path']}_raw",
                 partition_cols=table_meta_json["partition_columns"],
-                basename_template=filename,
+                basename_template=basename_template,
                 filesystem=fs,
             )
         print("Data successfully inserted!")

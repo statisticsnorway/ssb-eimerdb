@@ -2,6 +2,8 @@ import unittest
 from unittest.mock import Mock
 from unittest.mock import patch
 
+import pandas as pd
+
 from eimerdb.instance import EimerDBInstance
 
 
@@ -35,7 +37,7 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
         with self.assertRaises(PermissionError) as context:
             self.instance.add_user("new_user", "user")
         self.assertEqual(
-            str(context.exception), "Cannot add user. You are not an admin!"
+            "Cannot add user. You are not an admin!", str(context.exception)
         )
 
     def test_remove_user_non_admin(self) -> None:
@@ -43,7 +45,7 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
         with self.assertRaises(PermissionError) as context:
             self.instance.remove_user("non_admin_user")
         self.assertEqual(
-            str(context.exception), "Cannot remove user. You are not an admin!"
+            "Cannot remove user. You are not an admin!", str(context.exception)
         )
 
     def test_create_table_non_admin(self) -> None:
@@ -51,5 +53,14 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
         with self.assertRaises(PermissionError) as context:
             self.instance.create_table("table2", [{"name": "field1", "type": "int8"}])
         self.assertEqual(
-            str(context.exception), "Cannot create table. You are not an admin!"
+            "Cannot create table. You are not an admin!", str(context.exception)
+        )
+
+    def test_main_table_insert_non_admin(self) -> None:
+        # Test & Assertion
+        with self.assertRaises(PermissionError) as context:
+            self.instance.main_table_insert("table1", pd.DataFrame())
+        self.assertEqual(
+            "Cannot insert into main table. You are not an admin!",
+            str(context.exception),
         )

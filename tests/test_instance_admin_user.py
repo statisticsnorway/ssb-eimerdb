@@ -1,6 +1,10 @@
 import unittest
+from unittest.mock import ANY
 from unittest.mock import Mock
+from unittest.mock import call
 from unittest.mock import patch
+
+import pandas as pd
 
 from eimerdb.instance import EimerDBInstance
 
@@ -21,11 +25,16 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             {"admin_user": {"admin_group": ["admin_user"]}},
             {
                 "table1": {
+                    "bucket": "test_bucket",
                     "created_by": "admin_user",
-                    "table_path": "some_path",
                     "editable": True,
-                    "schema": [{"name": "field1", "type": "int8"}],
-                }
+                    "partition_columns": None,
+                    "schema": [
+                        {"label": "Unique row ID", "name": "row_id", "type": "string"},
+                        {"label": "Field 1", "name": "field1", "type": "int8"},
+                    ],
+                    "table_path": "/path/to/eimer/table1",
+                },
             },
         ]
 
@@ -42,7 +51,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         self.assertEqual(
             self.instance.role_groups, {"admin_user": {"admin_group": ["admin_user"]}}
         )
-        self.assertEqual(self.instance.is_admin, True)
+        self.assertEqual(True, self.instance.is_admin)
 
     @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
     @patch("eimerdb.instance.storage.Client")
@@ -68,7 +77,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         # Test & Assertion
         with self.assertRaises(ValueError) as context:
             self.instance.add_user("admin_user", "admin")
-        self.assertEqual(str(context.exception), "User admin_user already exists!")
+        self.assertEqual("User admin_user already exists!", str(context.exception))
 
     @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
     @patch("eimerdb.instance.storage.Client")
@@ -94,7 +103,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         # Test & Assertion
         with self.assertRaises(ValueError) as context:
             self.instance.remove_user("new_user")
-        self.assertEqual(str(context.exception), "User new_user does not exist.")
+        self.assertEqual("User new_user does not exist.", str(context.exception))
 
     @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
     @patch("eimerdb.instance.storage.Client")
@@ -119,10 +128,15 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             self.instance.tables,
             {
                 "table1": {
+                    "bucket": "test_bucket",
                     "created_by": "admin_user",
                     "editable": True,
-                    "schema": [{"name": "field1", "type": "int8"}],
-                    "table_path": "some_path",
+                    "partition_columns": None,
+                    "schema": [
+                        {"label": "Unique row ID", "name": "row_id", "type": "string"},
+                        {"label": "Field 1", "name": "field1", "type": "int8"},
+                    ],
+                    "table_path": "/path/to/eimer/table1",
                 },
                 table_name: {
                     "bucket": "test_bucket",
@@ -143,3 +157,59 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         mock_storage_client.assert_called_once_with(credentials=mock_credentials)
         mock_bucket.blob.assert_called_once_with("/path/to/eimer/config/tables.json")
         mock_blob.upload_from_string.assert_called_once()
+
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    @patch("eimerdb.instance.pq.write_to_dataset")
+    def test_main_table_insert_raw_false(
+        self, mock_write_to_dataset: Mock, mock_get_gcs_file_system: Mock
+    ) -> None:
+        # mock_from_pandas.return_value = Mock()
+        mock_fs = mock_get_gcs_file_system.return_value
+        # Mock pq.write_to_dataset
+        mock_write_to_dataset.side_effect = [
+            Mock(),  # For main table
+            Mock(),  # For raw table
+        ]
+
+        # Sample DataFrame for testing
+        df = pd.DataFrame({"row_id": ["1", "2", "2"], "field1": [1, 2, 3]})
+
+        # Call the method under test
+        self.instance.main_table_insert(table_name="table1", df=df, raw=False)
+
+        # Assertions
+        mock_write_to_dataset.assert_called_with(
+            table=ANY,
+            root_path="gs://test_bucket/path/to/eimer/table1",
+            partition_cols=None,
+            basename_template="table1_data_{i}.parquet",
+            filesystem=mock_fs,
+        )
+
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    def test_main_table_insert_raw_true(self, mock_get_gcs_file_system: Mock) -> None:
+        mock_fs = mock_get_gcs_file_system.return_value
+
+        # Sample DataFrame for testing
+        df = pd.DataFrame({"row_id": ["1", "2", "2"], "field1": [1, 2, 3]})
+
+        expected_calls = [
+            call(
+                table=ANY,
+                root_path="gs://test_bucket/path/to/eimer/table1",
+                partition_cols=None,
+                basename_template="table1_data_{i}.parquet",
+                filesystem=mock_fs,
+            ),
+            call(
+                table=ANY,
+                root_path="gs://test_bucket/path/to/eimer/table1_raw",
+                partition_cols=None,
+                basename_template="table1_data_{i}.parquet",
+                filesystem=mock_fs,
+            ),
+        ]
+        with patch("eimerdb.instance.pq.write_to_dataset") as mock_write_to_dataset:
+            # Call the method under test
+            self.instance.main_table_insert(table_name="table1", df=df, raw=True)
+            mock_write_to_dataset.assert_has_calls(expected_calls)
