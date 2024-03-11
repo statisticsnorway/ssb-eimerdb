@@ -1,64 +1,99 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import Mock
 
 from eimerdb.query import filter_partitions
 from eimerdb.query import get_partitioned_files
 
 
-class TestQuery(unittest.TestCase):
+class TestGetPartitionedFiles(unittest.TestCase):
 
-    def test_get_partitioned_files(self) -> None:
-        mock_fs = MagicMock()
+    def setUp(self):
+        self.table_name = "table1"
+        self.instance_name = "example_instance"
+        self.table_config = {
+            "partition_columns": ["date"],
+            "bucket": "example_bucket",
+        }
+        self.suffix = "_suffix"
+        self.fs = Mock()
+        self.partition_select = {"partition_col1": ["value1"]}
 
-        # Example input values
-        table_name = "example_table"
-        instance_name = "example_instance"
-        table_config = {"partition_columns": ["date"], "bucket": "example_bucket"}
-        suffix = "_suffix"
-        partition_select = {"date": ["2022-01-01"]}
-        unedited = True
-
-        # Mocking fs.glob() to return some example file paths
-        mock_fs.glob.return_value = [
-            "gs://example_bucket/eimerdb/example_instance/example_table_suffix/date=2022-01-01/file1.parquet",
-            "gs://example_bucket/eimerdb/example_instance/example_table_suffix/date=2022-01-01/file2.parquet",
+    def test_get_partitioned_files_no_partition_select(self):
+        self.fs.glob.return_value = [
+            "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value2",
         ]
 
-        # Calling the function under test
-        result = get_partitioned_files(
-            table_name,
-            instance_name,
-            table_config,
-            suffix,
-            mock_fs,
-            partition_select,
-            unedited,
+        files = get_partitioned_files(
+            self.table_name, self.instance_name, self.table_config, self.suffix, self.fs
         )
 
-        # Asserting the result
-        expected_result = [
-            "gs://example_bucket/eimerdb/example_instance/example_table_suffix/date=2022-01-01/file1.parquet",
-            "gs://example_bucket/eimerdb/example_instance/example_table_suffix/date=2022-01-01/file2.parquet",
+        self.assertEqual(
+            [
+                "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value2"
+            ],
+            files,
+        )
+
+    def test_get_partitioned_files_with_partition_select(self):
+        self.fs.glob.return_value = [
+            "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value1",
+            "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value2",
         ]
-        self.assertEqual(result, expected_result)
 
-        # Asserting that fs.glob() was called with the correct arguments
-        mock_fs.glob.assert_called_once_with(
-            "gs://example_bucket/eimerdb/example_instance/example_table_suffix/**/*"
+        files = get_partitioned_files(
+            self.table_name,
+            self.instance_name,
+            self.table_config,
+            self.suffix,
+            self.fs,
+            self.partition_select,
         )
 
-    def test_filter_partitions(self) -> None:
+        self.assertEqual(
+            [
+                "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value1"
+            ],
+            files,
+        )
+
+    def test_get_partitioned_files_with_partition_select_and_unedited(self):
+        self.fs.glob.return_value = [
+            "gs://example_bucket/eimerdb/example_instance/table1_suffix/partition_col1=value1",
+            "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value2",
+        ]
+
+        files = get_partitioned_files(
+            self.table_name,
+            self.instance_name,
+            self.table_config,
+            self.suffix,
+            self.fs,
+            self.partition_select,
+            True,
+        )
+
+        self.assertEqual(
+            [
+                "gs://example_bucket/eimerdb/example_instance/table1_suffix/partition_col1=value1"
+            ],
+            files,
+        )
+
+        self.fs.glob.assert_called_with(
+            "gs://example_bucket/eimerdb/example_instance/table1_suffix/**/*"
+        )
+
+    def test_filter_partitions(self):
         table_files = [
             "file1/partition_col1=value1/partition_col2=value2",
-            "file2/partition_col1=value1/partition_col2=value2",
             "file3/partition_col1=value2/partition_col2=value3",
         ]
-        partition_select = {"partition_col1": ["value1"], "partition_col2": ["value2"]}
-        result = filter_partitions(table_files, partition_select)
+
+        filtered_files = filter_partitions(table_files, self.partition_select)
+
         self.assertEqual(
-            result,
+            filtered_files,
             [
                 "file1/partition_col1=value1/partition_col2=value2",
-                "file2/partition_col1=value1/partition_col2=value2",
             ],
         )

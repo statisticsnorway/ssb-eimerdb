@@ -88,6 +88,7 @@ def filter_partitions(
 
         if all_matches:
             filtered_files.append(file)
+
     return filtered_files
 
 
