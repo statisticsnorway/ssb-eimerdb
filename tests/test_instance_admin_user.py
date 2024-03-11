@@ -399,7 +399,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.duckdb.connect")
-    def test__query_delete(self, mock_connect: Mock, _: Mock) -> None:
+    @patch("eimerdb.instance.EimerDBInstance.query")
+    def test_query_delete(self, mock_query: Mock, mock_connect: Mock, _: Mock) -> None:
         # Mocking objects
         mock_fs = MagicMock()
         mock_connect.return_value = MagicMock()
@@ -407,6 +408,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             num_rows=2
         )
         mock_fs.glob.return_value = ["file1.parquet", "file2.parquet"]
+        mock_query.return_value = pd.DataFrame({"row_id": [1, 2, 3]})
 
         # Setting up test data
         table_name = "test_table"
