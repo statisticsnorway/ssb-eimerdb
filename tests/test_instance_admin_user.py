@@ -398,12 +398,26 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         )
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    def test__query_delete(self, _: Mock) -> None:
+    @patch("eimerdb.instance.duckdb.connect")
+    def test_query_delete(self, mock_connect: Mock, _: Mock) -> None:
+        # Mocking objects
+        mock_fs = MagicMock()
+        mock_connect.return_value = MagicMock()
+        mock_connect.return_value.table.return_value.df.return_value = MagicMock(
+            num_rows=2
+        )
+        mock_fs.glob.return_value = ["file1.parquet", "file2.parquet"]
+
+        # Setting up test data
+        table_name = "test_table"
+        where_clause = "id = 1"
+        partition_select = {"partition_key": "partition_value"}
+
         # Calling the method under test
         result = self.instance._query_delete(
-            MagicMock(),
-            {"table_name": "table1", "where_clause": "id = 1"},
-            {"partition_key": "partition_value"},
+            mock_fs,
+            {"table_name": table_name, "where_clause": where_clause},
+            partition_select,
         )
 
         # Asserting the result
