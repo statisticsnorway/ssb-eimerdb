@@ -128,12 +128,24 @@ prodcombasen.query(
 )
 ```
 
-### Unedited Data Access
+### Easy access to the unedited version of the data
 
 Retrieve the unedited version of your data by specifying unedited=True.
 
 ```python
 prodcombasen.query(
+    """SELECT *
+    FROM prodcom_prefill""",
+    unedited=True
+)
+```
+
+### Query the changes made to a table
+
+You can query alle the changes made to the table with the query_changes method.
+
+```python
+prodcombasen.query_changes(
     """SELECT *
     FROM prodcom_prefill""",
     unedited=True
@@ -187,8 +199,8 @@ Add and remove users from your instance.
 Assign specific roles to users for access control.
 
 ```python
-mvabasen.add_user(username="newuser", role="admin")
-mvabasen.remove_user(username="olduser")
+prodcombasen.add_user(username="newuser", role="admin")
+prodcombasen.remove_user(username="olduser")
 ```
 
 ## Requirements
