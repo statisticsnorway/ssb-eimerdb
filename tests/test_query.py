@@ -7,7 +7,7 @@ from eimerdb.query import get_partitioned_files
 
 class TestGetPartitionedFiles(unittest.TestCase):
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.table_name = "table1"
         self.instance_name = "example_instance"
         self.table_config = {
@@ -18,7 +18,7 @@ class TestGetPartitionedFiles(unittest.TestCase):
         self.fs = Mock()
         self.partition_select = {"partition_col1": ["value1"]}
 
-    def test_get_partitioned_files_no_partition_select(self):
+    def test_get_partitioned_files_no_partition_select(self) -> None:
         self.fs.glob.return_value = [
             "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value2",
         ]
@@ -34,7 +34,7 @@ class TestGetPartitionedFiles(unittest.TestCase):
             files,
         )
 
-    def test_get_partitioned_files_with_partition_select(self):
+    def test_get_partitioned_files_with_partition_select(self) -> None:
         self.fs.glob.return_value = [
             "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value1",
             "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value2",
@@ -56,7 +56,7 @@ class TestGetPartitionedFiles(unittest.TestCase):
             files,
         )
 
-    def test_get_partitioned_files_with_partition_select_and_unedited(self):
+    def test_get_partitioned_files_with_partition_select_and_unedited(self) -> None:
         self.fs.glob.return_value = [
             "gs://example_bucket/eimerdb/example_instance/table1_suffix/partition_col1=value1",
             "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value2",
@@ -83,7 +83,7 @@ class TestGetPartitionedFiles(unittest.TestCase):
             "gs://example_bucket/eimerdb/example_instance/table1_suffix/**/*"
         )
 
-    def test_filter_partitions(self):
+    def test_filter_partitions(self) -> None:
         table_files = [
             "file1/partition_col1=value1/partition_col2=value2",
             "file3/partition_col1=value2/partition_col2=value3",
