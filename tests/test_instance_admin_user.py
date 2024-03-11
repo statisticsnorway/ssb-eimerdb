@@ -297,3 +297,46 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             "UPDATE table1 SET row_id = 1 WHERE row_id = 2"
         )
         self.assertIsNone(result)
+
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    @patch("eimerdb.instance.get_partitioned_files")
+    @patch("eimerdb.instance.pq.read_table")
+    def test_query_select(
+        self,
+        mock_pq_read_table: Mock,
+        mock_get_partitioned_files: Mock,
+        mock_gcs_filesystem: Mock,
+    ) -> None:
+        # Mock input parameters
+        parsed_query = {"table_name": ["table1"]}
+        sql_query = "SELECT * FROM table1"
+        fs_mock = mock_gcs_filesystem.return_value
+        partition_select = None
+        unedited = False
+        output_format = "pandas"
+
+        # Mock return values
+        mock_pq_read_table.return_value = pd.DataFrame({"row_id": [1, 2, 3]})
+
+        # Call the method
+        result = self.instance._query_select(
+            fs=fs_mock,
+            parsed_query=parsed_query,
+            sql_query=sql_query,
+            partition_select=partition_select,
+            unedited=unedited,
+            output_format=output_format,
+        )
+
+        assert result.equals(pd.DataFrame({"row_id": [1, 2, 3]}))
+
+        mock_get_partitioned_files.assert_called_once_with(
+            table_name="table1",
+            instance_name="test_eimerdb",
+            table_config=self.instance.tables["table1"],
+            suffix="_raw",
+            fs=fs_mock,
+            partition_select=partition_select,
+            unedited=unedited,
+        )
+        mock_pq_read_table.assert_called_once()
