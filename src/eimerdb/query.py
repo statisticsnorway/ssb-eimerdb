@@ -33,7 +33,7 @@ def get_partitioned_files(
     """
     partitions = table_config["partition_columns"]
     bucket_name = table_config["bucket"]
-    partitions_len = len(partitions)
+    partitions_len = len(partitions) if partitions is not None else 0
     partition_levels = "**/" * partitions_len + "*"
 
     if unedited is True:
