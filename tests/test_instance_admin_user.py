@@ -400,7 +400,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.duckdb.connect")
     @patch("eimerdb.instance.EimerDBInstance.query")
-    def test_query_delete(self, mock_query: Mock, mock_connect: Mock, _: Mock) -> None:
+    def test__query_delete(self, mock_query: Mock, mock_connect: Mock, _: Mock) -> None:
         # Mocking objects
         mock_fs = MagicMock()
         mock_connect.return_value = MagicMock()
