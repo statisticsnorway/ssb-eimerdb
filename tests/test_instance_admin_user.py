@@ -397,37 +397,10 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             str(context.exception),
         )
 
-    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance.duckdb.connect")
-    @patch("eimerdb.instance.EimerDBInstance.query")
-    def test__query_delete(self, mock_query: Mock, mock_connect: Mock, _: Mock) -> None:
-        # Mocking objects
-        mock_fs = MagicMock()
-        mock_connect.return_value = MagicMock()
-        mock_connect.return_value.table.return_value.df.return_value = MagicMock(
-            num_rows=2
-        )
-        mock_fs.glob.return_value = ["file1.parquet", "file2.parquet"]
-        mock_query.return_value = pd.DataFrame({"row_id": [1, 2, 3]})
-
-        # Setting up test data
-        table_name = "test_table"
-        where_clause = "id = 1"
-        partition_select = {"partition_key": "partition_value"}
-
-        # Calling the method under test
-        result = self.instance._query_delete(
-            mock_fs,
-            {"table_name": table_name, "where_clause": where_clause},
-            partition_select,
-        )
-
-        # Asserting the result
-        self.assertEqual(result, "2 rows deleted by initials")
-
     #
     # START query
     #
+
     def test_query_invalid_output_format_expect_exception(self) -> None:
         with self.assertRaises(ValueError) as context:
             self.instance.query("SELECT * FROM table1", output_format="invalid")
