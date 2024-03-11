@@ -543,10 +543,10 @@ class EimerDBInstance:
             output_format (str): Desired output format ('pandas' or 'arrow').
 
         Returns:
-            pandas.DataFrame: Resulting DataFrame from the query.
+            pandas.DataFrame, pyarrow.Table, str: The result of the SQL query.
 
         Raises:
-            ValueError: If the output format is invalid or table is not editable.
+            ValueError: If the output format is invalid, table is not editable, or invalid query.
         """
         if output_format not in [PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT]:
             raise ValueError(f"Invalid output format: {output_format}")
@@ -577,11 +577,6 @@ class EimerDBInstance:
                     fs=fs,
                     parsed_query=parsed_query,
                     partition_select=partition_select,
-                )
-            case _:
-                raise ValueError(
-                    f"Unsupported SQL operation: {query_operation}. "
-                    f"Only SELECT, UPDATE, and DELETE statements are allowed."
                 )
 
     def query_changes(

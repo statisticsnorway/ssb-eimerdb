@@ -307,7 +307,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.get_partitioned_files")
     @patch("eimerdb.instance.pq.read_table")
-    def test_query_select(
+    def test__query_select(
         self,
         mock_pq_read_table: Mock,
         mock_get_partitioned_files: Mock,
@@ -347,10 +347,14 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         )
         mock_pq_read_table.assert_called_once()
 
+    #
+    # START _query_update
+    #
+
     @unittest.skip("FIX ME")
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.EimerDBInstance.query")
-    def test_query_update_success(self, mock_query: Mock, _: Mock) -> None:
+    def test__query_update_success(self, mock_query: Mock, _: Mock) -> None:
         with patch("eimerdb.instance.duckdb.connect"):
             # Set up test data
             # self.instance._get_arrow_schema = MagicMock(return_value=None)
@@ -375,7 +379,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             # Assertions
             self.assertIn("rows updated by user", result)
 
-    def test_query_update_non_editable_table(self) -> None:
+    def test__query_update_non_editable_table(self) -> None:
         parsed_query = {
             "operation": "UPDATE",
             "set_clause": "field1='1'",
@@ -390,5 +394,46 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             )
         self.assertEqual(
             "The table table2 is not editable!",
+            str(context.exception),
+        )
+
+    #
+    # START query
+    #
+
+    @patch("eimerdb.instance.EimerDBInstance._query_select")
+    def test_query_select(self, mock_query_select: Mock) -> None:
+        mock_query_select.return_value = pd.DataFrame({"row_id": [1, 2, 3]})
+
+        self.instance.query("SELECT * FROM table1")
+
+        mock_query_select.assert_called_once()
+
+    @patch("eimerdb.instance.EimerDBInstance._query_update")
+    def test_query_update(self, mock_query_update: Mock) -> None:
+        mock_query_update.return_value = "1 rows updated by user"
+
+        result = self.instance.query(
+            "UPDATE table1 SET col1='value' WHERE col2='value'"
+        )
+
+        assert result == "1 rows updated by user"
+        mock_query_update.assert_called_once()
+
+    @patch("eimerdb.instance.EimerDBInstance._query_delete")
+    def test_query_delete(self, mock_query_delete: Mock) -> None:
+        mock_query_delete.return_value = "1 rows deleted by user"
+
+        result = self.instance.query("DELETE FROM table1 WHERE col='value'")
+
+        assert result == "1 rows deleted by user"
+        mock_query_delete.assert_called_once()
+
+    def test_query_drop_table_expect_exception(self) -> None:
+        with self.assertRaises(ValueError) as context:
+            self.instance.query("DROP TABLE table1")
+
+        self.assertEqual(
+            "Error parsing sql-query. Syntax error or query not supported.",
             str(context.exception),
         )
