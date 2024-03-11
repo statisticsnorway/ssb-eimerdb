@@ -21,10 +21,10 @@ def get_partitioned_files(
         instance_name (str): The name of the instance.
         table_config (dict[str, Any]): Configuration details for the table.
         suffix (str): The suffix to be appended to the table name.
-        fs (Any): The filesystem object.
+        fs (GCSFileSystem): The filesystem object.
         partition_select (Optional[dict[str, Any]]): Optional dictionary specifying partition
             selection criteria. Defaults to None.
-        unedited (Optional[bool]): Optional flag indicating whether the file paths should include
+        unedited (bool): Flag indicating whether the file paths should include
             the suffix or not. Defaults to False.
 
     Returns:
