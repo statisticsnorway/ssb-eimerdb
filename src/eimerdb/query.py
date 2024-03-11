@@ -2,7 +2,7 @@ from typing import Any
 from typing import Optional
 
 import pyarrow as pa
-from dapla import FileClient
+from gcsfs import GCSFileSystem
 
 
 def get_partitioned_files(
@@ -10,9 +10,9 @@ def get_partitioned_files(
     instance_name: str,
     table_config: dict[str, Any],
     suffix: str,
-    fs: Any,
+    fs: GCSFileSystem,
     partition_select: Optional[dict[str, Any]] = None,
-    unedited: Optional[bool] = False,
+    unedited: bool = False,
 ) -> list[str]:
     """Retrieve the paths of partitioned files for a given table.
 
@@ -35,7 +35,7 @@ def get_partitioned_files(
     bucket_name = table_config["bucket"]
     partitions_len = len(partitions)
     partition_levels = "**/" * partitions_len + "*"
-    fs = FileClient.get_gcs_file_system()
+
     if unedited is True:
         table_name_parts = table_name + f"{suffix}"
     else:
@@ -49,7 +49,13 @@ def get_partitioned_files(
     filtered_files: list[str] = [
         obj for obj in table_files if obj.count("/") == max_depth
     ]
-    return filtered_files
+
+    if partition_select is None:
+        return filtered_files
+
+    return filter_partitions(
+        table_files=filtered_files, partition_select=partition_select
+    )
 
 
 def filter_partitions(

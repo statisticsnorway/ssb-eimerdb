@@ -1,7 +1,5 @@
 import unittest
 from unittest.mock import MagicMock
-from unittest.mock import Mock
-from unittest.mock import patch
 
 from eimerdb.query import filter_partitions
 from eimerdb.query import get_partitioned_files
@@ -9,11 +7,8 @@ from eimerdb.query import get_partitioned_files
 
 class TestQuery(unittest.TestCase):
 
-    @patch("eimerdb.query.FileClient.get_gcs_file_system")
-    def test_get_partitioned_files(self, mock_get_gcs_file_system: Mock) -> None:
-        # Mocking FileClient.get_gcs_file_system()
+    def test_get_partitioned_files(self) -> None:
         mock_fs = MagicMock()
-        mock_get_gcs_file_system.return_value = mock_fs
 
         # Example input values
         table_name = "example_table"
