@@ -400,6 +400,30 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     #
     # START query
     #
+    def test_query_invalid_output_format_expect_exception(self) -> None:
+        with self.assertRaises(ValueError) as context:
+            self.instance.query("SELECT * FROM table1", output_format="invalid")
+        self.assertEqual(
+            "Invalid output format: invalid. Supported formats: pandas, arrow.",
+            str(context.exception),
+        )
+
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    @patch("eimerdb.instance.parse_sql_query")
+    def test_query_invalid_sql_operation_expect_exception(
+        self, mock_parse_sql_query: Mock, _: Mock
+    ) -> None:
+        mock_parse_sql_query.return_value = {
+            "operation": "INVALID OPERATION",
+            "table_name": "table1",
+        }
+
+        with self.assertRaises(ValueError) as context:
+            self.instance.query("INVALID OPERATION")
+        self.assertEqual(
+            "Unsupported SQL operation: INVALID OPERATION.",
+            str(context.exception),
+        )
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.EimerDBInstance._query_select")
