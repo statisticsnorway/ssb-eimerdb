@@ -25,27 +25,69 @@
 [black]: https://github.com/psf/black
 [poetry]: https://python-poetry.org/
 
+## About
+
+EimerDB is a python package that gives database-like functionality to parquet files stored in google cloud storage.
+It achieves this by organising the parquet files in a certain way, reads and combines them with pyarrow and then query the combined pyarrow tables with
+duckdb. For use as a part of the statistical production process at Statistics Norway.
+
 ## Features
 
-### Google Cloud Storage Integration
+### Create and connect to a database
 
-Create your own database for data storage by specifying bucket name and a database name.
+Create a new database by specifying the bucket name and a database name.
 
 ```python
-create_eimerdb(bucket="bucket-name", db_name="prodcombasen")
+import eimerdb as db
+
+db.create_eimerdb(bucket="bucket-name", db_name="prodcombasen")
 ```
 
-Connect to your EimerDB database hosted on Google Cloud Storage.
+Connect to your EimerDB database.
 
 ```python
-prodcombasen = EimerDBInstance("bucket-name", "prodcombasen")
+prodcombasen = db.EimerDBInstance("bucket-name", "prodcombasen")
 ```
 
 ### Table Management
 
-Easily create tables with defined schemas.
+You can create a new table with the create_table method. Specify the table name, the schema, the partition columns and set if the
+table is editable or not. Define the columns in the schema, with a column name, type and a label.
 
 ```python
+schema = [
+    {
+        "name": "aar",
+        "type": "int16",
+        "label": "Årgangen."
+    },
+    {
+        "name": "ident",
+        "type": "string",
+        "label": "Foretakets identifikator."
+    },
+    {
+        "name": "skjemaversjon",
+        "type": "string",
+        "label": "Skjemaets versjon."
+    },
+    {
+        "name": "råvarekode",
+        "type": "string",
+        "label": "Prefillet råvarekode. Disse kodene lages av NR."
+    },
+    {
+        "name": "beskrivelse",
+        "type": "string",
+        "label": "Prefillet råvarebeskrivelse. Disse beskrivelsene lages av NR."
+    },
+    {
+        "name": "forbruk",
+        "type": "int64",
+        "label": "Oppgitt forbruk (i 1 000 NOK) til den tilhørende råvarekoden."
+    },
+]
+
 prodcombasen.create_table(
     table_name="prefill_prod",
     schema,
@@ -54,11 +96,11 @@ prodcombasen.create_table(
 )
 ```
 
-Partition tables for efficient data organization.
+Partitioning the table by one or more columns will help improve query performance
 
 ### SQL Query Support
 
-Query your tables with SQL syntax. Specify partition selection for row skipping, making queries faster
+Query your tables with SQL syntax. You can optionally specify the partition to be queried.
 
 ```python
 prodcombasen.query(
@@ -70,10 +112,11 @@ prodcombasen.query(
         }
 ```
 
-### Data Updates
+### Updates
 
 Perform updates using SQL statements
-Each update is saved as a separate file for versioning. The update files includes a username column with the user who made the update and a datetime column for when the update happened.
+Each update is saved as a separate parquet file for versioning. The update files includes a username column and
+a datetime column for when the update happened.
 
 ```python
 prodcombasen.query(
@@ -85,12 +128,24 @@ prodcombasen.query(
 )
 ```
 
-### Unedited Data Access
+### Easily access the unedited version of a table
 
-Retrieve the unedited version of your data.
+Retrieve the unedited version of your data by specifying unedited=True.
 
 ```python
 prodcombasen.query(
+    """SELECT *
+    FROM prodcom_prefill""",
+    unedited=True
+)
+```
+
+### Query the changes made to a table
+
+You can query alle the changes made to the table with the query_changes method.
+
+```python
+prodcombasen.query_changes(
     """SELECT *
     FROM prodcom_prefill""",
     unedited=True
@@ -138,14 +193,14 @@ prodcombasen.query(
     )
 ```
 
-### User Management
+### User Management (in development)
 
 Add and remove users from your instance.
 Assign specific roles to users for access control.
 
 ```python
-mvabasen.add_user(username="newuser", role="admin")
-mvabasen.remove_user(username="olduser")
+prodcombasen.add_user(username="newuser", role="admin")
+prodcombasen.remove_user(username="olduser")
 ```
 
 ## Requirements
