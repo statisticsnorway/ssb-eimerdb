@@ -574,7 +574,8 @@ class EimerDBInstance:
                 )
             case _:
                 raise ValueError(
-                    f"Unsupported SQL operation: {query_operation}. Only SELECT, UPDATE, and DELETE statements are allowed."
+                    f"Unsupported SQL operation: {query_operation}. "
+                    f"Only SELECT, UPDATE, and DELETE statements are allowed."
                 )
 
     def query_changes(
