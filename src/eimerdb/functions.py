@@ -16,6 +16,8 @@ from google.cloud import storage
 
 logger = logging.getLogger(__name__)
 
+APPLICATION_JSON = "application/json"
+
 
 def get_datetime() -> str:
     """A function that returns a datetime string.
@@ -115,9 +117,7 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
     )
 
     update_pattern = re.compile(
-        r"""
-        ^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$
-    """,
+        r"^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$",
         re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE,
     )
 
@@ -187,10 +187,6 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
     Args:
         bucket_name: A GCP bucket.
         db_name: Name of the instance.
-
-    Returns:
-        success or failure
-
     """
     creator = get_initials()
     token = AuthClient.fetch_google_credentials()
@@ -248,4 +244,3 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
     tables_blob = bucket.blob(f"{full_path}/config/tables.json")
     tables_blob.upload_from_string(data=json.dumps({}), content_type="application/json")
     logger.info("EimerDB instance %s created.", db_name)
-    return None

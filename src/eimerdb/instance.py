@@ -26,6 +26,7 @@ from dapla import FileClient
 from google.cloud import storage
 from pandas import DataFrame
 
+from .functions import APPLICATION_JSON
 from .functions import arrow_schema_from_json
 from .functions import get_datetime
 from .functions import get_initials
@@ -36,6 +37,19 @@ from .query import get_partitioned_files
 from .query import update_pyarrow_table
 
 logger = logging.getLogger(__name__)
+
+ROW_ID_DEF = {"name": "row_id", "type": "string", "label": "Unique row ID"}
+PANDAS_OUTPUT_FORMAT = "pandas"
+ARROW_OUTPUT_FORMAT = "arrow"
+
+CHANGES_ALL = "all"
+CHANGES_RECENT = "recent"
+
+TABLE_PATH_KEY = "table_path"
+PARTITION_COLUMNS_KEY = "partition_columns"
+SCHEMA_KEY = "schema"
+
+SELECT_STAR_QUERY = "SELECT * FROM"
 
 
 class EimerDBInstance:
@@ -70,7 +84,6 @@ class EimerDBInstance:
             of a specified schema.
         query(sql_query, partition_select=None, unedited=False): Execute an SQL
             query on a table in EimerDB.
-
     """
 
     def __init__(self, bucket_name: str, eimer_name: str) -> None:
@@ -81,16 +94,8 @@ class EimerDBInstance:
             eimer_name (str): Name of EimerDB instance.
 
         Attributes:
-            bucket (str): GCS bucket name.
-            eimerdb_name (str): EimerDB instance name.
-            path (str): Configuration path.
-            eimer_path (str): Instance path.
-            created_by (str): Creator's name.
-            time_created (str): Creation timestamp.
-            users (dict): EimerDB users and roles.
-            role_groups (dict): Role groups.
-            is_admin (bool): Admin status.
-
+            bucket_name (str): GCS bucket name.
+            eimer_name (str): EimerDB instance name.
         """
         self.bucket = bucket_name
 
@@ -133,30 +138,25 @@ class EimerDBInstance:
             role (Any): Role to assign (admin or user).
 
         Raises:
-            Exception: If the user is not an admin or the user already exists.
-
-        Returns:
-            None
-
+            PermissionError: If the user is not an admin.
+            ValueError: If the user already exists.
         """
-        if self.is_admin is True:
-            token = AuthClient.fetch_google_credentials()
-            client = storage.Client(credentials=token)
-            bucket = client.bucket(self.bucket)
-            users = self.users
-            new_user = {username: role}
-            if username not in users:
-                users.update(new_user)
-                user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
-                user_roles_blob.upload_from_string(
-                    data=json.dumps(users), content_type="application/json"
-                )
-                print(f"User {username} added with the role {role}!")
-            else:
-                raise Exception(f"User {username} already exists!")
-        else:
-            raise Exception("Cannot add user. You are not an admin!")
-        return None
+        if self.is_admin is not True:
+            raise PermissionError("Cannot add user. You are not an admin!")
+
+        if username in self.users:
+            raise ValueError(f"User {username} already exists!")
+
+        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        bucket = client.bucket(self.bucket)
+
+        self.users.update({username: role})
+        user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
+
+        user_roles_blob.upload_from_string(
+            data=json.dumps(self.users), content_type=APPLICATION_JSON
+        )
+        print(f"User {username} added with the role {role}!")
 
     def remove_user(self, username: str) -> None:
         """Remove a users access to the database.
@@ -165,25 +165,24 @@ class EimerDBInstance:
             username (str): Name of the user to remove.
 
         Raises:
-            Exception: If the user is not an admin or the user does not exist.
-
+            PermissionError: If the user is not an admin.
+            ValueError: If the user does not exist.
         """
-        if self.is_admin is True:
-            token = AuthClient.fetch_google_credentials()
-            client = storage.Client(credentials=token)
-            bucket = client.bucket(self.bucket)
-            users = self.users
-            if username in users:
-                del users[username]
-                user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
-                user_roles_blob.upload_from_string(
-                    data=json.dumps(users), content_type="application/json"
-                )
-                print(f"User {username} successfully removed!")
-            else:
-                print(f"The user {username} does not exist.")
-        else:
-            raise Exception("Cannot remove user. You are not an admin!")
+        if self.is_admin is not True:
+            raise PermissionError("Cannot remove user. You are not an admin!")
+
+        if username not in self.users:
+            raise ValueError(f"User {username} does not exist.")
+
+        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        bucket = client.bucket(self.bucket)
+
+        del self.users[username]
+        user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
+        user_roles_blob.upload_from_string(
+            data=json.dumps(self.users), content_type=APPLICATION_JSON
+        )
+        print(f"User {username} successfully removed!")
 
     def create_table(
         self,
@@ -201,108 +200,149 @@ class EimerDBInstance:
             editable (bool, optional): Indicates if the table is editable.
 
         Raises:
-            Exception: If the current user is not an admin.
-
+            PermissionError: If the current user is not an admin.
         """
-        if self.is_admin is True:
-            token = AuthClient.fetch_google_credentials()
-            client = storage.Client(credentials=token)
-            row_id_def = {"name": "row_id", "type": "string", "label": "Unique row ID"}
-            schema.insert(0, row_id_def)
-            arrow_schema = arrow_schema_from_json(schema)
-            tables = self.tables
-            bucket = client.bucket(self.bucket)
-            initials = get_initials()
-            new_table = {
-                table_name: {
-                    "created_by": initials,
-                    "table_path": f"{self.eimer_path}/{table_name}",
-                    "bucket": self.bucket,
-                    "editable": editable,
-                    "schema": arrow_schema,
-                }
+        if self.is_admin is not True:
+            raise PermissionError("Cannot create table. You are not an admin!")
+
+        schema.insert(0, ROW_ID_DEF)
+
+        new_table = {
+            table_name: {
+                "created_by": get_initials(),
+                TABLE_PATH_KEY: f"{self.eimer_path}/{table_name}",
+                "bucket": self.bucket,
+                "editable": editable,
+                SCHEMA_KEY: schema,
+                PARTITION_COLUMNS_KEY: partition_columns,
             }
-            if partition_columns:
-                new_table[table_name]["partition_columns"] = partition_columns
-            else:
-                new_table[table_name]["partition_columns"] = None
-            tables.update(new_table)
-            tables_blob = bucket.blob(f"{self.eimer_path}/config/tables.json")
-            tables_blob.upload_from_string(
-                data=json.dumps(tables), content_type="application/json"
-            )
-        else:
-            raise Exception("Cannot create table. You are not an admin!")
+        }
+        self.tables.update(new_table)
+
+        token = AuthClient.fetch_google_credentials()
+        bucket = storage.Client(credentials=token).bucket(self.bucket)
+
+        tables_blob = bucket.blob(f"{self.eimer_path}/config/tables.json")
+        tables_blob.upload_from_string(
+            data=json.dumps(self.tables), content_type=APPLICATION_JSON
+        )
 
     def insert(self, table_name: str, df: pd.DataFrame) -> None:
         """Insert unedited data into a main table.
 
         Args:
             table_name (str): Name of the table to insert data into.
-            df (pandas.DataFrame): DataFrame containing the data to insert.
+            df (pandas.DataFrame): DataFrame containing the data to insert
 
         Raises:
-            Exception: If the current user is not an admin.
-
+            PermissionError: If the current user is not an admin.
         """
-        if self.is_admin is True:
-            json_data = self.tables[table_name]
-            arrow_schema = arrow_schema_from_json(json_data["schema"])
-            df["row_id"] = df.apply(lambda row: uuid4(), axis=1)
-            df["row_id"] = df["row_id"].astype(str)
-            table = pa.Table.from_pandas(df, schema=arrow_schema)
-
-            df_raw = df.copy()
-            df_raw["user"] = get_initials()
-            df_raw["datetime"] = get_datetime()
-            df_raw["operation"] = "insert"
-
-            arrow_schema_raw = arrow_schema
-            arrow_schema_raw = arrow_schema_raw.append(pa.field("user", pa.string()))
-            arrow_schema_raw = arrow_schema_raw.append(
-                pa.field("datetime", pa.string())
-            )
-            arrow_schema_raw = arrow_schema_raw.append(
-                pa.field("operation", pa.string())
+        if self.is_admin is not True:
+            raise PermissionError(
+                "Cannot insert into main table. You are not an admin!"
             )
 
-            table_raw = pa.Table.from_pandas(df_raw, schema=arrow_schema_raw)
-            timestamp_column = table_raw["datetime"].cast(pa.timestamp("ns"))
+        df["row_id"] = df.apply(lambda row: str(uuid4()), axis=1)
 
-            table_raw = table_raw.drop(["datetime"])
+        json_data = self.tables[table_name]
+        arrow_schema = arrow_schema_from_json(json_data["schema"])
+        table = pa.Table.from_pandas(df, schema=arrow_schema)
 
-            table_raw = table_raw.add_column(
-                len(table_raw.column_names),
-                pa.field("datetime", pa.timestamp("ns")),
-                timestamp_column,
-            )
+        df_raw = df.copy()
+        df_raw["user"] = get_initials()
+        df_raw["datetime"] = get_datetime()
+        df_raw["operation"] = "insert"
 
-            insert_id = uuid4()
-            table_path = json_data["table_path"]
-            partitions = json_data["partition_columns"]
-            filename = f"insert_{insert_id}_{{i}}.parquet"
+        arrow_schema_raw = arrow_schema
+        arrow_schema_raw = arrow_schema_raw.append(pa.field("user", pa.string()))
+        arrow_schema_raw = arrow_schema_raw.append(pa.field("datetime", pa.string()))
+        arrow_schema_raw = arrow_schema_raw.append(pa.field("operation", pa.string()))
 
-            fs = FileClient.get_gcs_file_system()
+        table_raw = pa.Table.from_pandas(df_raw, schema=arrow_schema_raw)
+        timestamp_column = table_raw["datetime"].cast(pa.timestamp("ns"))
 
-            # noinspection PyTypeChecker
-            pq.write_to_dataset(
-                table,
-                root_path=f"gs://{self.bucket}/{table_path}",
-                partition_cols=partitions,
-                basename_template=filename,
-                filesystem=fs,
-                schema=arrow_schema,
-            )
-            pq.write_to_dataset(
-                table_raw,
-                root_path=f"gs://{self.bucket}/{table_path}_raw",
-                partition_cols=partitions,
-                basename_template=filename,
-                filesystem=fs,
-            )
-            print("Data successfully inserted!")
-        else:
-            raise Exception("Cannot insert into main table. You are not an admin!")
+        table_raw = table_raw.drop(["datetime"])
+
+        table_raw = table_raw.add_column(
+            len(table_raw.column_names),
+            pa.field("datetime", pa.timestamp("ns")),
+            timestamp_column,
+        )
+
+        insert_id = uuid4()
+        table_path = json_data["table_path"]
+        partitions = json_data["partition_columns"]
+        filename = f"insert_{insert_id}_{{i}}.parquet"
+
+        fs = FileClient.get_gcs_file_system()
+
+        # noinspection PyTypeChecker
+        pq.write_to_dataset(
+            table=table,
+            root_path=f"gs://{self.bucket}/{table_path}",
+            partition_cols=partitions,
+            basename_template=filename,
+            filesystem=fs,
+            schema=arrow_schema,
+        )
+        # noinspection PyTypeChecker
+        pq.write_to_dataset(
+            table=table_raw,
+            root_path=f"gs://{self.bucket}/{table_path}_raw",
+            partition_cols=partitions,
+            basename_template=filename,
+            filesystem=fs,
+        )
+        print("Data successfully inserted!")
+
+    def get_changes(self, table_name: str) -> DataFrame:
+        """Retrieve changes for a given table.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be retrieved.
+
+        Returns:
+            DataFrame: A pandas DataFrame containing the changes for the specified table.
+        """
+        path = self.tables[table_name][TABLE_PATH_KEY]
+
+        fs = FileClient.get_gcs_file_system()
+        # noinspection PyTypeChecker
+        dataset = ds.dataset(
+            f"{self.bucket}/{path}_changes/",
+            format="parquet",
+            partitioning="hive",
+            filesystem=fs,
+        )
+
+        df_changes: DataFrame = dataset.to_table().to_pandas()
+        return df_changes
+
+    def combine_changes(self, table_name: str) -> None:
+        """Combines the files containing the changes of the table into one file.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be merged.
+        """
+        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        bucket = client.bucket(self.bucket)
+
+        partitions = self.tables[table_name][PARTITION_COLUMNS_KEY]
+        source_folder = self.tables[table_name][TABLE_PATH_KEY] + "_changes"
+        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
+
+        # noinspection PyTypeChecker
+        pq.write_to_dataset(
+            table=pa.Table.from_pandas(self.get_changes(table_name)),
+            root_path=f"gs://{self.bucket}/{source_folder}",
+            partition_cols=partitions,
+            basename_template=f"merged_commit_{uuid4()}_{{i}}.parquet",
+            filesystem=FileClient.get_gcs_file_system(),
+        )
+        for blob in blobs_to_delete:
+            blob.delete()
+
+        print("The changes were successfully merged into one file per partition!")
 
     def query(
         self,
@@ -328,7 +368,7 @@ class EimerDBInstance:
         """
         instance_name = self.eimerdb_name
         if output_format is None:
-            output_format = "pandas"
+            output_format = PANDAS_OUTPUT_FORMAT
 
         parsed_query = parse_sql_query(sql_query)
         try:
@@ -362,9 +402,9 @@ class EimerDBInstance:
                 df_changes = None
 
                 if editable is True and unedited is False:
-                    slct_qry = "SELECT * FROM"
+                    select_query = SELECT_STAR_QUERY
                     df_changes = self.query_changes(
-                        f"{slct_qry} {table_name}",
+                        f"{select_query} {table_name}",
                         partition_select,
                         output_format="arrow",
                         changes_output="recent",
@@ -376,9 +416,9 @@ class EimerDBInstance:
                 con.register(table_name, df)
                 del df
 
-            if output_format == "pandas":
+            if output_format == PANDAS_OUTPUT_FORMAT:
                 output = con.execute(sql_query).df()
-            elif output_format == "arrow":
+            elif output_format == ARROW_OUTPUT_FORMAT:
                 output = con.execute(sql_query).arrow()
             else:
                 raise ValueError(f"Invalid output format: {output_format}")
@@ -393,25 +433,24 @@ class EimerDBInstance:
                 raise Exception(f"The table {table_name} is not editable!")
             try:
                 columns = parsed_query["columns"]
-            except Exception:
+            except ValueError:
                 columns = None
             if columns == ["*"]:
                 columns = None
             json_data = self.tables[table_name]
             table_name = parsed_query["table_name"]
-            arrow_schema = arrow_schema_from_json(json_data["schema"])
+            arrow_schema = arrow_schema_from_json(json_data[SCHEMA_KEY])
             where_clause = parsed_query["where_clause"]
             table_config = self.tables[table_name]
-            partitions = table_config["partition_columns"]
+            partitions = table_config[PARTITION_COLUMNS_KEY]
 
             arrow_schema = arrow_schema.append(pa.field("user", pa.string()))
             arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
             arrow_schema = arrow_schema.append(pa.field("operation", pa.string()))
 
-            slct_qry = "SELECT * FROM"
-
             df_update_results: pd.DataFrame = self.query(
-                f"{slct_qry} {table_name} WHERE {where_clause}", partition_select
+                f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}",
+                partition_select,
             )
 
             df_update_results["user"] = get_initials()
@@ -427,7 +466,7 @@ class EimerDBInstance:
 
             df_updates_len = len(df_updates_commits)
 
-            table_path = self.tables[table_name]["table_path"] + "_changes"
+            table_path = self.tables[table_name][TABLE_PATH_KEY] + "_changes"
             fs = FileClient.get_gcs_file_system()
 
             update_table = pa.Table.from_pandas(df_updates_commits, schema=arrow_schema)
@@ -435,6 +474,7 @@ class EimerDBInstance:
             unique_file_id = uuid4()
             filename = f"commit_{unique_file_id}_{{i}}.parquet"
 
+            # noinspection PyTypeChecker
             pq.write_to_dataset(
                 update_table,
                 root_path=f"gs://{self.bucket}/{table_path}",
@@ -449,29 +489,28 @@ class EimerDBInstance:
             table_config = self.tables[table_name]
             editable = table_config["editable"]
             if editable is False:
-                raise Exception(f"The table {table_name} is not editable!")
+                raise ValueError(f"The table {table_name} is not editable!")
             try:
                 columns = parsed_query["columns"]
-            except Exception:
+            except ValueError:
                 columns = None
             if columns == ["*"]:
                 columns = None
             json_data = self.tables[table_name]
             table_name = parsed_query["table_name"]
-            arrow_schema = arrow_schema_from_json(json_data["schema"])
+            arrow_schema = arrow_schema_from_json(json_data[SCHEMA_KEY])
             where_clause = parsed_query["where_clause"]
             instance_name = self.eimerdb_name
             table_config = self.tables[table_name]
-            partitions = table_config["partition_columns"]
+            partitions = table_config[PARTITION_COLUMNS_KEY]
 
             arrow_schema = arrow_schema.append(pa.field("user", pa.string()))
             arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
             arrow_schema = arrow_schema.append(pa.field("operation", pa.string()))
 
-            slct_qry = "SELECT * FROM"
-
             df_delete_results: pd.DataFrame = self.query(
-                f"{slct_qry} {table_name} WHERE {where_clause}", partition_select
+                f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}",
+                partition_select,
             )
 
             df_delete_results["user"] = get_initials()
@@ -486,16 +525,17 @@ class EimerDBInstance:
 
             df_deletions_len = len(df_deletions)
 
-            table_path = self.tables[table_name]["table_path"] + "_changes"
+            table_path = self.tables[table_name][TABLE_PATH_KEY] + "_changes"
             fs = FileClient.get_gcs_file_system()
 
-            deletion_Table = pa.Table.from_pandas(df_deletions, schema=arrow_schema)
+            deletion_table = pa.Table.from_pandas(df_deletions, schema=arrow_schema)
 
             unique_file_id = uuid4()
             filename = f"commit_{unique_file_id}_{{i}}.parquet"
 
+            # noinspection PyTypeChecker
             pq.write_to_dataset(
-                deletion_Table,
+                deletion_table,
                 root_path=f"gs://{self.bucket}/{table_path}",
                 partition_cols=partitions,
                 basename_template=filename,
@@ -509,199 +549,143 @@ class EimerDBInstance:
         self,
         sql_query: str,
         partition_select: Optional[dict[str, Any]] = None,
-        unedited: Optional[bool] = False,
-        output_format: Optional[str] = None,
-        changes_output: Optional[str] = "all",
-    ) -> Union[pd.DataFrame, pa.Table, None]:
+        unedited: bool = False,
+        output_format: str = PANDAS_OUTPUT_FORMAT,
+        changes_output: str = CHANGES_ALL,
+    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
         """Query changes made in the database table.
 
         Args:
             sql_query (str): The SQL query to execute.
             partition_select (Dict, optional):
                 Dictionary containing partition selection criteria. Defaults to None.
-            unedited (bool, optional):
+            unedited (bool):
                 Flag indicating whether to retrieve unedited changes. Defaults to False.
-            output_format (str, optional):
+            output_format (str):
                 The desired output format ('pandas' or 'arrow'). Defaults to 'pandas'.
-            changes_output (str, optional):
+            changes_output (str):
                 The changes that are to be retrieved ('recent' or 'all'). Defaults to 'all'.
 
         Returns:
-            Union[pd.DataFrame, pa.Table, str]:
+            Optional[pd.DataFrame, pa.Table]:
                 Returns a pandas DataFrame if 'pandas' output format is specified,
                 an arrow Table if 'arrow' output format is specified,
+                or None if operation is different from SELECT.
+
+        Raises:
+            ValueError: If the output format is invalid.
         """
-        if output_format is None:
-            output_format = "pandas"
+        if output_format not in (PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT):
+            raise ValueError(f"Invalid output format: {output_format}")
 
         parsed_query = parse_sql_query(sql_query)
+        if parsed_query["operation"] != "SELECT":
+            return None
+
         table_name = parsed_query["table_name"][0]
+
         table_config = self.tables[table_name]
         editable = table_config["editable"]
         instance_name = self.eimerdb_name
-        table_schema = arrow_schema_from_json(self.tables[table_name]["schema"])
+        table_schema = arrow_schema_from_json(self.tables[table_name][SCHEMA_KEY])
 
         df: Optional[Any] = None
         df_changes: Optional[Any] = None
 
-        if parsed_query["operation"] == "SELECT":
-            try:
-                columns = parsed_query["columns"]
-            except Exception:
-                columns = None
-            if columns == ["*"]:
-                columns = None
-            partitions = table_config["partition_columns"]
-            bucket_name = table_config["bucket"]
-            partitions_len = len(partitions)
-            partition_levels = "**/" * partitions_len + "*"
-            fs = FileClient.get_gcs_file_system()
-            table_name_changes = table_name + "_changes"
-            table_files_changes = fs.glob(
-                f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes}/{partition_levels}"
-            )
+        try:
+            columns = parsed_query["columns"]
+        except Exception:
+            columns = None
+        if columns == ["*"]:
+            columns = None
+        partitions = table_config["partition_columns"]
+        bucket_name = table_config["bucket"]
+        partitions_len = len(partitions) if partitions is not None else 0
+        partition_levels = "**/" * partitions_len + "*"
+        fs = FileClient.get_gcs_file_system()
+        table_name_changes = table_name + "_changes"
+        table_files_changes = fs.glob(
+            f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes}/{partition_levels}"
+        )
 
-            max_depth = 0
-            try:
-                max_depth = max(obj.count("/") for obj in table_files_changes)
-                no_changes = False
-            except ValueError:
-                no_changes = True
+        max_depth = 0
+        try:
+            max_depth = max(obj.count("/") for obj in table_files_changes)
+            no_changes = False
+        except ValueError:
+            no_changes = True
+            if output_format == "pandas":
+                df_changes = pd.DataFrame()
+            elif output_format == "arrow":
+                df_changes = pa.table(pd.DataFrame())
+
+        if no_changes is not True:
+            table_files_changes = [
+                obj for obj in table_files_changes if obj.count("/") == max_depth
+            ]
+            if partition_select is not None:
+                table_files_changes = filter_partitions(
+                    table_files_changes,
+                    partition_select,
+                )
+
+            dataset: pa.Table = pq.read_table(table_files_changes, filesystem=fs)
+            sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
+            if dataset.num_rows != 0:
+                con = duckdb.connect()
+                if output_format == "pandas":
+                    df_changes = con.execute(sql_query).df()
+                elif output_format == "arrow":
+                    df_changes = con.execute(sql_query).arrow()
+
+            elif dataset.num_rows == 0:
                 if output_format == "pandas":
                     df_changes = pd.DataFrame()
                 elif output_format == "arrow":
                     df_changes = pa.table(pd.DataFrame())
 
-            if no_changes is not True:
-                table_files_changes = [
-                    obj for obj in table_files_changes if obj.count("/") == max_depth
-                ]
-                if partition_select is not None:
-                    table_files_changes = filter_partitions(
-                        table_files_changes,
-                        partition_select,
-                    )
+        table_name_changes_all = table_name + "_changes_all"
+        table_files_changes_all = fs.glob(
+            f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes_all}/{partition_levels}"
+        )
+        try:
+            max_depth = max(obj.count("/") for obj in table_files_changes_all)
+            no_changes_all = False
+        except ValueError:
+            no_changes_all = True
 
-                dataset: pa.Table = pq.read_table(table_files_changes, filesystem=fs)
-                sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
-                if dataset.num_rows != 0:
-                    con = duckdb.connect()
-                    if output_format == "pandas":
-                        df_changes = con.execute(sql_query).df()
-                    elif output_format == "arrow":
-                        df_changes = con.execute(sql_query).arrow()
-
-                elif dataset.num_rows == 0:
-                    if output_format == "pandas":
-                        df_changes = pd.DataFrame()
-                    elif output_format == "arrow":
-                        df_changes = pa.table(pd.DataFrame())
-
-            table_name_changes_all = table_name + "_changes_all"
-            table_files_changes_all = fs.glob(
-                f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes_all}/{partition_levels}"
-            )
-            try:
-                max_depth = max(obj.count("/") for obj in table_files_changes_all)
-                no_changes_all = False
-            except ValueError:
-                no_changes_all = True
-
-            if no_changes_all is not True:
-                table_files_changes_all = [
-                    obj
-                    for obj in table_files_changes_all
-                    if obj.count("/") == max_depth
-                ]
-                if partition_select is not None:
-                    table_files_changes_all = filter_partitions(
-                        table_files_changes_all, partition_select
-                    )
-
-                dataset = pq.read_table(
-                    table_files_changes_all, filesystem=fs, columns=columns
+        if no_changes_all is not True:
+            table_files_changes_all = [
+                obj for obj in table_files_changes_all if obj.count("/") == max_depth
+            ]
+            if partition_select is not None:
+                table_files_changes_all = filter_partitions(
+                    table_files_changes_all, partition_select
                 )
 
-                sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
-                if columns is not None and editable is True and unedited is False:
-                    sql_query = sql_query.replace(" FROM", ", row_id FROM")
-                if dataset.num_rows != 0:
-                    con = duckdb.connect()
-                    if output_format == "pandas":
-                        df_changes_all = con.execute(sql_query).df()
-                        df = pd.concat([df_changes_all, df_changes])
-                    elif output_format == "arrow":
-                        df_changes_all = con.execute(sql_query).arrow()
-                        df = pa.concat_tables([df_changes_all, df_changes])
-                        df = df.cast(table_schema)
+            dataset = pq.read_table(
+                table_files_changes_all, filesystem=fs, columns=columns
+            )
 
-            if changes_output == "all":
-                if no_changes_all is not True:
-                    return df
-                elif no_changes_all is True:
-                    return df_changes
-            elif changes_output == "recent":
+            sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
+            if columns is not None and editable is True and unedited is False:
+                sql_query = sql_query.replace(" FROM", ", row_id FROM")
+            if dataset.num_rows != 0:
+                con = duckdb.connect()
+                if output_format == "pandas":
+                    df_changes_all = con.execute(sql_query).df()
+                    df = pd.concat([df_changes_all, df_changes])
+                elif output_format == "arrow":
+                    df_changes_all = con.execute(sql_query).arrow()
+                    df = pa.concat_tables([df_changes_all, df_changes])
+                    df = df.cast(table_schema)
+
+        if changes_output == "all":
+            if no_changes_all is not True:
+                return df
+            elif no_changes_all is True:
                 return df_changes
-            else:
-                return None
+        elif changes_output == "recent":
+            return df_changes
         else:
             return None
-
-    def get_changes(self, table_name: str) -> DataFrame:
-        """Retrieve changes for a given table.
-
-        Args:
-            table_name (str): The name of the table for which changes are to be retrieved.
-
-        Returns:
-            DataFrame: A pandas DataFrame containing the changes for the specified table.
-        """
-        fs = FileClient.get_gcs_file_system()
-        bucket = self.bucket
-        path = self.tables[table_name]["table_path"]
-        dataset = ds.dataset(
-            f"{bucket}/{path}_changes/",
-            format="parquet",
-            partitioning="hive",
-            filesystem=fs,
-        )
-        df_changes: DataFrame = dataset.to_table().to_pandas()
-        return df_changes
-
-    def combine_changes(self, table_name: str) -> None:
-        """Combines the files containing the changes of the table into one file.
-
-        Args:
-            table_name (str): The name of the table for which changes are to be merged.
-
-        Returns:
-            None
-        """
-        fs = FileClient.get_gcs_file_system()
-        df_changes = self.get_changes(table_name)
-
-        token = AuthClient.fetch_google_credentials()
-        client = storage.Client(credentials=token)
-        bucket = client.bucket(self.bucket)
-        path = self.tables[table_name]["table_path"]
-        partitions = self.tables[table_name]["partition_columns"]
-        source_folder = path + "_changes"
-        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
-        filename = f"merged_commit_{uuid4()}_{{i}}.parquet"
-        table = pa.Table.from_pandas(df_changes)
-        pq.write_to_dataset(
-            table,
-            root_path=f"gs://{self.bucket}/{source_folder}",
-            partition_cols=partitions,
-            basename_template=filename,
-            filesystem=fs,
-        )
-        for blob in blobs_to_delete:
-            blob.delete()
-
-        logging.info(
-            "The changes were successfully combined into one file per partition!"
-        )
-
-        print("The changes were successfully combined into one file per partition!")
-        return None
