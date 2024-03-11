@@ -81,10 +81,11 @@ show_error_context = true
 [[tool.mypy.overrides]]
 # Allow missing type hints in third-party libraries without type information.
 module = [
-    "pandas.*",
     "duckdb.*",
+    "gcsfs.*",
+    "google.cloud.*",
+    "pandas.*",
     "pyarrow.*",
-    "google.cloud.*"
 ]
 ignore_missing_imports = true
 

@@ -63,7 +63,7 @@ class TestFunctions(unittest.TestCase):
             ]
         )
 
-    def test_parse_sql_query(self) -> None:
+    def test_parse_sql_query_select(self) -> None:
         sql_query = "SELECT * FROM table WHERE condition"
         result = parse_sql_query(sql_query)
         assert result == {
@@ -72,6 +72,25 @@ class TestFunctions(unittest.TestCase):
             "select_clause": "",
             "table_name": ["table"],
             "where_clause": "condition",
+        }
+
+    def test_parse_sql_query_update(self) -> None:
+        sql_query = "UPDATE table1 SET field1='1' WHERE row_id=1"
+        result = parse_sql_query(sql_query)
+        assert result == {
+            "operation": "UPDATE",
+            "set_clause": "field1='1'",
+            "table_name": "table1",
+            "where_clause": "row_id=1",
+        }
+
+    def test_parse_sql_query_delete(self) -> None:
+        sql_query = "DELETE FROM table1 WHERE row_id=1"
+        result = parse_sql_query(sql_query)
+        assert result == {
+            "operation": "DELETE",
+            "table_name": "table1",
+            "where_clause": "row_id=1",
         }
 
     @patch("eimerdb.functions.AuthClient.fetch_google_credentials")

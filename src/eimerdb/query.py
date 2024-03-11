@@ -2,7 +2,7 @@ from typing import Any
 from typing import Optional
 
 import pyarrow as pa
-from dapla import FileClient
+from gcsfs import GCSFileSystem
 
 
 def get_partitioned_files(
@@ -10,9 +10,9 @@ def get_partitioned_files(
     instance_name: str,
     table_config: dict[str, Any],
     suffix: str,
-    fs: Any,
+    fs: GCSFileSystem,
     partition_select: Optional[dict[str, Any]] = None,
-    unedited: Optional[bool] = False,
+    unedited: bool = False,
 ) -> list[str]:
     """Retrieve the paths of partitioned files for a given table.
 
@@ -21,10 +21,10 @@ def get_partitioned_files(
         instance_name (str): The name of the instance.
         table_config (dict[str, Any]): Configuration details for the table.
         suffix (str): The suffix to be appended to the table name.
-        fs (Any): The filesystem object.
+        fs (GCSFileSystem): The filesystem object.
         partition_select (Optional[dict[str, Any]]): Optional dictionary specifying partition
             selection criteria. Defaults to None.
-        unedited (Optional[bool]): Optional flag indicating whether the file paths should include
+        unedited (bool): Flag indicating whether the file paths should include
             the suffix or not. Defaults to False.
 
     Returns:
@@ -33,9 +33,9 @@ def get_partitioned_files(
     """
     partitions = table_config["partition_columns"]
     bucket_name = table_config["bucket"]
-    partitions_len = len(partitions)
+    partitions_len = len(partitions) if partitions is not None else 0
     partition_levels = "**/" * partitions_len + "*"
-    fs = FileClient.get_gcs_file_system()
+
     if unedited is True:
         table_name_parts = table_name + f"{suffix}"
     else:
@@ -49,7 +49,13 @@ def get_partitioned_files(
     filtered_files: list[str] = [
         obj for obj in table_files if obj.count("/") == max_depth
     ]
-    return filtered_files
+
+    if partition_select is None:
+        return filtered_files
+
+    return filter_partitions(
+        table_files=filtered_files, partition_select=partition_select
+    )
 
 
 def filter_partitions(
@@ -68,9 +74,9 @@ def filter_partitions(
 
     """
     filtered_files = []
+
     for file in table_files:
         parts = file.split("/")
-
         all_matches = True
 
         for key, values in partition_select.items():
@@ -79,10 +85,11 @@ def filter_partitions(
             if not match_found:
                 all_matches = False
                 break
+
         if all_matches:
             filtered_files.append(file)
-        table_files = filtered_files
-    return table_files
+
+    return filtered_files
 
 
 def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
