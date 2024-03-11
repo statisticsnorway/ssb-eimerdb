@@ -128,7 +128,7 @@ prodcombasen.query(
 )
 ```
 
-### Easy access to the unedited version of the data
+### Easily access the unedited version of a table
 
 Retrieve the unedited version of your data by specifying unedited=True.
 
