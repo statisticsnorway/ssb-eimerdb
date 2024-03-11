@@ -397,6 +397,18 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             str(context.exception),
         )
 
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    def test__query_delete(self, _: Mock) -> None:
+        # Calling the method under test
+        result = self.instance._query_delete(
+            MagicMock(),
+            {"table_name": "table1", "where_clause": "id = 1"},
+            {"partition_key": "partition_value"},
+        )
+
+        # Asserting the result
+        self.assertEqual(result, "2 rows deleted by initials")
+
     #
     # START query
     #
