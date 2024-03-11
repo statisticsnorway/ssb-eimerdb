@@ -401,16 +401,18 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     # START query
     #
 
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.EimerDBInstance._query_select")
-    def test_query_select(self, mock_query_select: Mock) -> None:
+    def test_query_select(self, mock_query_select: Mock, _: Mock) -> None:
         mock_query_select.return_value = pd.DataFrame({"row_id": [1, 2, 3]})
 
         self.instance.query("SELECT * FROM table1")
 
         mock_query_select.assert_called_once()
 
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.EimerDBInstance._query_update")
-    def test_query_update(self, mock_query_update: Mock) -> None:
+    def test_query_update(self, mock_query_update: Mock, _: Mock) -> None:
         mock_query_update.return_value = "1 rows updated by user"
 
         result = self.instance.query(
@@ -420,8 +422,9 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         assert result == "1 rows updated by user"
         mock_query_update.assert_called_once()
 
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.EimerDBInstance._query_delete")
-    def test_query_delete(self, mock_query_delete: Mock) -> None:
+    def test_query_delete(self, mock_query_delete: Mock, _: Mock) -> None:
         mock_query_delete.return_value = "1 rows deleted by user"
 
         result = self.instance.query("DELETE FROM table1 WHERE col='value'")
@@ -429,7 +432,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         assert result == "1 rows deleted by user"
         mock_query_delete.assert_called_once()
 
-    def test_query_drop_table_expect_exception(self) -> None:
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    def test_query_drop_table_expect_exception(self, _: Mock) -> None:
         with self.assertRaises(ValueError) as context:
             self.instance.query("DROP TABLE table1")
 
