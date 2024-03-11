@@ -74,9 +74,9 @@ def filter_partitions(
 
     """
     filtered_files = []
+
     for file in table_files:
         parts = file.split("/")
-
         all_matches = True
 
         for key, values in partition_select.items():
@@ -85,10 +85,11 @@ def filter_partitions(
             if not match_found:
                 all_matches = False
                 break
+
         if all_matches:
             filtered_files.append(file)
-        table_files = filtered_files
-    return table_files
+
+    return filtered_files
 
 
 def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
