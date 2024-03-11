@@ -354,7 +354,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         mock_pq_read_table.assert_called_once()
 
     @patch("eimerdb.instance.pq.write_to_dataset")
-    def test_query_update_success(self, _: Mock):
+    def test_query_update_success(self, _: Mock) -> None:
         with patch("eimerdb.instance.duckdb.connect"):
             # Set up test data
             self.instance._get_arrow_schema = MagicMock(return_value=None)
