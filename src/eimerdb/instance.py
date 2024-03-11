@@ -578,6 +578,11 @@ class EimerDBInstance:
                     parsed_query=parsed_query,
                     partition_select=partition_select,
                 )
+            case _:
+                raise ValueError(
+                    f"Unsupported SQL operation: {query_operation}. "
+                    f"Only SELECT, UPDATE, and DELETE statements are allowed."
+                )
 
     def query_changes(
         self,
