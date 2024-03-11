@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import ANY
+from unittest.mock import MagicMock
 from unittest.mock import Mock
 from unittest.mock import call
 from unittest.mock import patch
@@ -37,6 +38,17 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
                         {"label": "Field 1", "name": "field1", "type": "int8"},
                     ],
                     "table_path": "path/to/eimer/table1",
+                },
+                "table2": {
+                    "bucket": "test_bucket",
+                    "created_by": "admin_user",
+                    "editable": False,
+                    "partition_columns": None,
+                    "schema": [
+                        {"label": "Unique row ID", "name": "row_id", "type": "string"},
+                        {"label": "Field 1", "name": "field1", "type": "int8"},
+                    ],
+                    "table_path": "path/to/eimer/table2",
                 },
             },
         ]
@@ -340,3 +352,46 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             unedited=unedited,
         )
         mock_pq_read_table.assert_called_once()
+
+    @patch("eimerdb.instance.pq.write_to_dataset")
+    def test_query_update_success(self, _: Mock):
+        with patch("eimerdb.instance.duckdb.connect"):
+            # Set up test data
+            self.instance._get_arrow_schema = MagicMock(return_value=None)
+
+            # Mock the query method
+            self.instance.query = MagicMock(return_value="Mock query result")
+            self.instance.query.return_value = pd.DataFrame({"row_id": [1, 2, 3]})
+
+            parsed_query = {
+                "operation": "UPDATE",
+                "set_clause": "field1='1'",
+                "table_name": "table1",
+                "where_clause": "row_id=1",
+            }
+
+            # Call the method
+            result = self.instance._query_update(
+                MagicMock(), parsed_query, "UPDATE table1 SET field1='1' WHERE row_id=1"
+            )
+
+            # Assertions
+            self.assertIn("rows updated by user", result)
+
+    def test_query_update_non_editable_table(self) -> None:
+        parsed_query = {
+            "operation": "UPDATE",
+            "set_clause": "field1='1'",
+            "table_name": "table2",
+            "where_clause": "row_id=1",
+        }
+
+        # Test & Assertion
+        with self.assertRaises(ValueError) as context:
+            self.instance._query_update(
+                MagicMock(), parsed_query, "UPDATE table2 SET field1='1' WHERE row_id=1"
+            )
+        self.assertEqual(
+            "The table table2 is not editable!",
+            str(context.exception),
+        )

@@ -253,8 +253,7 @@ class EimerDBInstance:
 
         df["row_id"] = df.apply(lambda row: str(uuid4()), axis=1)
 
-        json_data = self.tables[table_name]
-        arrow_schema = arrow_schema_from_json(json_data[SCHEMA_KEY])
+        arrow_schema = self._get_arrow_schema(table_name, False)
         table = pa.Table.from_pandas(df, schema=arrow_schema)
 
         df_raw = df.copy()
@@ -262,12 +261,9 @@ class EimerDBInstance:
         df_raw["datetime"] = get_datetime()
         df_raw["operation"] = "insert"
 
-        arrow_schema_raw = arrow_schema
-        arrow_schema_raw = arrow_schema_raw.append(pa.field("user", pa.string()))
-        arrow_schema_raw = arrow_schema_raw.append(pa.field("datetime", pa.string()))
-        arrow_schema_raw = arrow_schema_raw.append(pa.field("operation", pa.string()))
-
-        table_raw = pa.Table.from_pandas(df_raw, schema=arrow_schema_raw)
+        table_raw = pa.Table.from_pandas(
+            df_raw, schema=self._get_arrow_schema(table_name, True)
+        )
         timestamp_column = table_raw["datetime"].cast(pa.timestamp("ns"))
 
         table_raw = table_raw.drop(["datetime"])
@@ -279,6 +275,7 @@ class EimerDBInstance:
         )
 
         insert_id = uuid4()
+        json_data = self.tables[table_name]
         table_path = json_data[TABLE_PATH_KEY]
         partitions = json_data[PARTITION_COLUMNS_KEY]
         filename = f"insert_{insert_id}_{{i}}.parquet"
@@ -353,6 +350,30 @@ class EimerDBInstance:
 
         print("The changes were successfully merged into one file per partition!")
 
+    def _get_arrow_schema(
+        self,
+        table_name: str,
+        raw: bool,
+    ) -> pa.Schema:
+        """Get the arrow schema for a specified table.
+
+        Args:
+            table_name (str): The name of the table.
+            raw (bool): Indicates whether to retrieve the raw schema.
+
+        Returns:
+            pa.Schema: The arrow schema for the specified table.
+        """
+        json_data = self.tables[table_name]
+        arrow_schema = arrow_schema_from_json(json_data[SCHEMA_KEY])
+
+        if raw is True:
+            arrow_schema = arrow_schema.append(pa.field("user", pa.string()))
+            arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
+            arrow_schema = arrow_schema.append(pa.field("operation", pa.string()))
+
+        return arrow_schema
+
     def _query_select(
         self,
         fs: GCSFileSystem,
@@ -412,21 +433,13 @@ class EimerDBInstance:
         partition_select: Optional[dict[str, Any]] = None,
     ) -> str:
         table_name = parsed_query["table_name"]
-        table_config = self.tables[table_name]
-        editable = table_config["editable"]
-        if editable is False:
-            raise ValueError(f"The table {table_name} is not editable!")
-
-        json_data = self.tables[table_name]
-        table_name = parsed_query["table_name"]
-        arrow_schema = arrow_schema_from_json(json_data[SCHEMA_KEY])
         where_clause = parsed_query["where_clause"]
+
         table_config = self.tables[table_name]
         partitions = table_config[PARTITION_COLUMNS_KEY]
 
-        arrow_schema = arrow_schema.append(pa.field("user", pa.string()))
-        arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
-        arrow_schema = arrow_schema.append(pa.field("operation", pa.string()))
+        if table_config["editable"] is not True:
+            raise ValueError(f"The table {table_name} is not editable!")
 
         df_update_results: pd.DataFrame = self.query(
             f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}",
@@ -437,6 +450,8 @@ class EimerDBInstance:
         df_update_results["datetime"] = get_datetime()
         df_update_results["operation"] = "update"
 
+        arrow_schema = self._get_arrow_schema(table_name, True)
+
         dataset = pa.Table.from_pandas(df_update_results, schema=arrow_schema)
         con = duckdb.connect()
         con.register("dataset", dataset)
@@ -445,23 +460,18 @@ class EimerDBInstance:
         con.execute(sql_query)
         df_updates_commits = con.table("updates").df()
 
-        df_updates_len = len(df_updates_commits)
-
         table_path = self.tables[table_name][TABLE_PATH_KEY] + "_changes"
         update_table = pa.Table.from_pandas(df_updates_commits, schema=arrow_schema)
 
-        unique_file_id = uuid4()
-        filename = f"commit_{unique_file_id}_{{i}}.parquet"
-
         # noinspection PyTypeChecker
         pq.write_to_dataset(
-            update_table,
+            table=update_table,
             root_path=f"gs://{self.bucket}/{table_path}",
             partition_cols=partitions,
-            basename_template=filename,
+            basename_template=f"commit_{uuid4()}_{{i}}.parquet",
             filesystem=fs,
         )
-        return f"{df_updates_len} rows updated by {get_initials()}"
+        return f"{df_updates_commits.shape[0]} rows updated by {get_initials()}"
 
     def _query_delete(
         self,
@@ -476,17 +486,11 @@ class EimerDBInstance:
         if editable is False:
             raise ValueError(f"The table {table_name} is not editable!")
 
-        json_data = self.tables[table_name]
         table_name = parsed_query["table_name"]
-        arrow_schema = arrow_schema_from_json(json_data[SCHEMA_KEY])
         where_clause = parsed_query["where_clause"]
 
         table_config = self.tables[table_name]
         partitions = table_config[PARTITION_COLUMNS_KEY]
-
-        arrow_schema = arrow_schema.append(pa.field("user", pa.string()))
-        arrow_schema = arrow_schema.append(pa.field("datetime", pa.string()))
-        arrow_schema = arrow_schema.append(pa.field("operation", pa.string()))
 
         df_delete_results: pd.DataFrame = self.query(
             f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}",
@@ -496,6 +500,8 @@ class EimerDBInstance:
         df_delete_results["user"] = get_initials()
         df_delete_results["datetime"] = get_datetime()
         df_delete_results["operation"] = "delete"
+
+        arrow_schema = self._get_arrow_schema(table_name, True)
 
         dataset = pa.Table.from_pandas(df_delete_results, schema=arrow_schema)
         con = duckdb.connect()
