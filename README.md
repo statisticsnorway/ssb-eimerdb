@@ -33,7 +33,7 @@ duckdb. For use as a part of the statistical production process at Statistics No
 
 ## Features
 
-### Google Cloud Storage Integration
+### Create and connect to a database
 
 Create a new database by specifying the bucket name and a database name.
 
