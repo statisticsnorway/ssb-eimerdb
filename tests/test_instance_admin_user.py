@@ -304,7 +304,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
 
         # Assert that the dependencies are called with the expected arguments
         mock_write_to_dataset.assert_called_once_with(
-            table=pa.Table.from_pandas(mock_get_changes.return_value),
+            table=mock_get_changes.return_value,
             root_path="gs://test_bucket/path/to/eimer/table1_changes",
             partition_cols=None,
             basename_template="merged_commit_mocked_uuid_{i}.parquet",
@@ -336,7 +336,13 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         raw: bool,
     ) -> None:
         # Mock the return value of get_changes
-        mock_get_changes.return_value = pd.DataFrame([{"row_id": "1", "field1": 1}])
+        schema = pa.schema([("row_id", pa.string()), ("field1", pa.int64())])
+
+        expected_table = pa.Table.from_pydict(
+            {"row_id": ["1"], "field1": [1]}, schema=schema
+        )
+
+        mock_get_inserts.return_value = expected_table
 
         # Mock the return values of other dependencies
         mock_uuid4.return_value = "mocked_uuid"
@@ -355,7 +361,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
 
         # Assert that the dependencies are called with the expected arguments
         mock_write_to_dataset.assert_called_once_with(
-            table=pa.Table.from_pandas(mock_get_changes.return_value),
+            table=mock_get_inserts.return_value,
             root_path="gs://test_bucket/path/to/eimer/table1_changes",
             partition_cols=None,
             basename_template="merged_commit_mocked_uuid_{i}.parquet",
