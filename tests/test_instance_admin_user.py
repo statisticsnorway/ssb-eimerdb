@@ -289,13 +289,16 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             ]
         )
 
-        expected_table = pa.Table.from_pydict({
-            "row_id": ["1"],
-            "field1": [1],
-            "user": ["user42"],
-            "datetime": ["2024-03-12T12:00:00"],
-            "operation": ["insert"]
-        }, schema=schema)
+        expected_table = pa.Table.from_pydict(
+            {
+                "row_id": ["1"],
+                "field1": [1],
+                "user": ["user42"],
+                "datetime": ["2024-03-12T12:00:00"],
+                "operation": ["insert"],
+            },
+            schema=schema,
+        )
 
         mock_get_changes.return_value = expected_table
 
@@ -358,13 +361,16 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             ]
         )
 
-        expected_table = pa.Table.from_pydict({
-            "row_id": ["1"],
-            "field1": [1],
-            "user": ["user42"],
-            "datetime": ["2024-03-12T12:00:00"],
-            "operation": ["insert"]
-        }, schema=schema)
+        expected_table = pa.Table.from_pydict(
+            {
+                "row_id": ["1"],
+                "field1": [1],
+                "user": ["user42"],
+                "datetime": ["2024-03-12T12:00:00"],
+                "operation": ["insert"],
+            },
+            schema=schema,
+        )
 
         mock_get_inserts.return_value = expected_table
 
