@@ -87,6 +87,7 @@ module = [
     "google.cloud.*",
     "pandas.*",
     "pyarrow.*",
+    "parameterized.*",
 ]
 ignore_missing_imports = true
 
