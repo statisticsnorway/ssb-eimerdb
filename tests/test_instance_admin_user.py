@@ -232,7 +232,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.ds.dataset")
-    @parameterized.expand(
+    @parameterized(
         [
             (True,),
             (False,),
@@ -319,7 +319,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.uuid4")
     @patch("eimerdb.instance.pq.write_to_dataset")
     @patch("eimerdb.instance.EimerDBInstance.get_changes")
-    @parameterized.expand(
+    @parameterized(
         [
             (True,),
             (False,),
