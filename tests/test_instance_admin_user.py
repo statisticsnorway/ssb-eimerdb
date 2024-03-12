@@ -405,8 +405,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             filesystem=ANY,
         )
 
-
-#
+    #
     # START _query_delete
     #
 
