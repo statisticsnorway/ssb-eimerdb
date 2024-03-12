@@ -206,7 +206,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.ds.dataset")
     def test_get_changes(self, mock_dataset: Mock, _: Mock) -> None:
-        schema = pa.schema([('row_id', pa.string()), ('field1', pa.int64())])
+        schema = pa.schema([("row_id", pa.string()), ("field1", pa.int64())])
 
         expected_table = pa.Table.from_pydict(
             {"row_id": ["1"], "field1": [1]}, schema=schema
@@ -239,10 +239,10 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         ]
     )
     def test_get_inserts(self, mock_dataset: Mock, mock_fs: Mock, raw: bool) -> None:
-        schema = pa.schema([('row_id', pa.string()), ('field1', pa.int64())])
+        schema = pa.schema([("row_id", pa.string()), ("field1", pa.int64())])
 
         expected_table = pa.Table.from_pydict(
-            {'row_id': ['1'], 'field1': [1]}, schema=schema
+            {"row_id": ["1"], "field1": [1]}, schema=schema
         )
 
         dataset = Mock(spec=ds.Dataset)
