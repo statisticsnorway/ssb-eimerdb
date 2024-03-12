@@ -279,11 +279,23 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         mock_fetch_credentials: Mock,
     ) -> None:
         # Mock the return value of get_changes
-        schema = pa.schema([("row_id", pa.string()), ("field1", pa.int64())])
-
-        expected_table = pa.Table.from_pydict(
-            {"row_id": ["1"], "field1": [1]}, schema=schema
+        schema = pa.schema(
+            [
+                ("row_id", pa.string()),
+                ("field1", pa.int64()),
+                ("user", pa.string()),
+                ("datetime", pa.string()),
+                ("operation", pa.string()),
+            ]
         )
+
+        expected_table = pa.Table.from_pydict({
+            "row_id": ["1"],
+            "field1": [1],
+            "user": ["user42"],
+            "datetime": ["2024-03-12T12:00:00"],
+            "operation": ["insert"]
+        }, schema=schema)
 
         mock_get_changes.return_value = expected_table
 
@@ -336,11 +348,23 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         raw: bool,
     ) -> None:
         # Mock the return value of get_changes
-        schema = pa.schema([("row_id", pa.string()), ("field1", pa.int64())])
-
-        expected_table = pa.Table.from_pydict(
-            {"row_id": ["1"], "field1": [1]}, schema=schema
+        schema = pa.schema(
+            [
+                ("row_id", pa.string()),
+                ("field1", pa.int64()),
+                ("user", pa.string()),
+                ("datetime", pa.string()),
+                ("operation", pa.string()),
+            ]
         )
+
+        expected_table = pa.Table.from_pydict({
+            "row_id": ["1"],
+            "field1": [1],
+            "user": ["user42"],
+            "datetime": ["2024-03-12T12:00:00"],
+            "operation": ["insert"]
+        }, schema=schema)
 
         mock_get_inserts.return_value = expected_table
 
@@ -356,15 +380,15 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             blob_2,
         ]
 
-        # Call the merge_changes method
-        self.instance.combine_changes("table1")
+        suffix = "_raw" if raw else ""
 
-        # Assert that the dependencies are called with the expected arguments
+        self.instance.combine_inserts("table1", raw)
+
         mock_write_to_dataset.assert_called_once_with(
             table=mock_get_inserts.return_value,
-            root_path="gs://test_bucket/path/to/eimer/table1_changes",
+            root_path=f"gs://test_bucket/path/to/eimer/table1{suffix}",
             partition_cols=None,
-            basename_template="merged_commit_mocked_uuid_{i}.parquet",
+            basename_template="merged_insert_mocked_uuid_{i}.parquet",
             filesystem=ANY,
         )
         blob_1.delete.assert_called_once()
