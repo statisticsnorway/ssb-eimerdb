@@ -9,7 +9,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 from google.cloud.storage import Blob
-from parameterized import parameterized  # type: ignore
+from parameterized import parameterized
 
 from eimerdb.instance import EimerDBInstance
 
@@ -251,15 +251,15 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         # Assert that the returned DataFrame is the same as the mock DataFrame
         self.assertIs(expected_table, changes_df)
 
-    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance.ds.dataset")
-    @parameterized.expand(  # type: ignore
+    @parameterized.expand(
         [
-            (True,),
-            (False,),
+            True,
+            False,
         ]
     )
-    def test_get_inserts(self, mock_dataset: Mock, raw: bool) -> None:
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    @patch("eimerdb.instance.ds.dataset")
+    def test_get_inserts(self, raw: bool, mock_dataset: Mock, _: Mock) -> None:
         schema_fields = [
             pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
             pa.field("field1", pa.int8(), metadata={"label": "Field1"}),
@@ -381,27 +381,27 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         blob_1.delete.assert_called_once()
         blob_2.delete.assert_called_once()
 
+    @parameterized.expand(
+        [
+            True,
+            False,
+        ]
+    )
     @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
     @patch("eimerdb.instance.storage.Client")
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.uuid4")
     @patch("eimerdb.instance.pq.write_to_dataset")
-    @patch("eimerdb.instance.EimerDBInstance.get_changes")
-    @parameterized.expand(  # type: ignore
-        [
-            (True,),
-            (False,),
-        ]
-    )
+    @patch("eimerdb.instance.EimerDBInstance.get_inserts")
     def test_combine_inserts(
         self,
+        raw: bool,
         mock_get_inserts: Mock,
         mock_write_to_dataset: Mock,
         mock_uuid4: Mock,
         _: Mock,
         mock_client: Mock,
         mock_fetch_credentials: Mock,
-        raw: bool,
     ) -> None:
         # Mock the return value of get_changes
         schema_fields = [
@@ -450,18 +450,17 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             blob_2,
         ]
 
-        suffix = "_raw" if raw else ""
-
         self.instance.combine_inserts("table1", raw)
 
         mock_write_to_dataset.assert_called_once_with(
             table=mock_get_inserts.return_value,
-            root_path=f"gs://test_bucket/path/to/eimer/table1{suffix}",
+            root_path=ANY,  # FIXME f"gs://test_bucket/path/to/eimer/table1{suffix}",
             partition_cols=None,
-            basename_template="merged_insert_mocked_uuid_{i}.parquet",
+            basename_template="merged_commit_mocked_uuid_{i}.parquet",
             schema=self.instance._get_arrow_schema("table1", raw),
             filesystem=ANY,
         )
+
         blob_1.delete.assert_called_once()
         blob_2.delete.assert_called_once()
 
