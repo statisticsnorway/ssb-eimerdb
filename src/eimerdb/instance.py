@@ -462,6 +462,7 @@ class EimerDBInstance:
         con = duckdb.connect()
         con.register("dataset", dataset)
         con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
+
         sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
         con.execute(sql_query)
         df_updates_commits = con.table("updates").df()

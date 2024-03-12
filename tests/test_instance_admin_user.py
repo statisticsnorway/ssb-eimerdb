@@ -351,34 +351,6 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     # START _query_update
     #
 
-    @unittest.skip("FIX ME")
-    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance.EimerDBInstance.query")
-    def test__query_update_success(self, mock_query: Mock, _: Mock) -> None:
-        with patch("eimerdb.instance.duckdb.connect"):
-            # Set up test data
-            # self.instance._get_arrow_schema = MagicMock(return_value=None)
-
-            # Mock the query method
-            mock_query.return_value = pd.DataFrame(
-                {"field1": [1, 2, 3], "row_id": ["1", "2", "3"]}
-            )
-
-            parsed_query = {
-                "operation": "UPDATE",
-                "set_clause": "field1='1'",
-                "table_name": "table1",
-                "where_clause": "row_id=1",
-            }
-
-            # Call the method
-            result = self.instance._query_update(
-                MagicMock(), parsed_query, "UPDATE table1 SET field1=4 WHERE row_id='1'"
-            )
-
-            # Assertions
-            self.assertIn("rows updated by user", result)
-
     def test__query_update_non_editable_table(self) -> None:
         parsed_query = {
             "operation": "UPDATE",
@@ -397,7 +369,44 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             str(context.exception),
         )
 
-    #
+    @patch("eimerdb.instance.EimerDBInstance.query")
+    @patch("eimerdb.instance.pq.write_to_dataset")
+    @patch("eimerdb.instance.uuid4")
+    def test__query_update_success(
+        self, mock_uuid4: Mock, mock_write_to_dataset: Mock, mock_query_method: Mock
+    ) -> None:
+        # Setup mocks
+        mock_uuid4.return_value = "mocked_uuid"
+
+        mock_query_method.return_value = pd.DataFrame(
+            {"field1": [1, 2, 3], "row_id": ["1", "2", "3"]}
+        )
+
+        parsed_query = {
+            "operation": "UPDATE",
+            "set_clause": "field1='1'",
+            "table_name": "table1",
+            "where_clause": "row_id=1",
+        }
+
+        # Call the method
+        result = self.instance._query_update(
+            MagicMock(), parsed_query, "UPDATE table1 SET field1=4 WHERE row_id='1'"
+        )
+
+        # Assertions
+        self.assertEqual("1 rows updated by user", result)
+
+        mock_write_to_dataset.assert_called_with(
+            table=ANY,
+            root_path="gs://test_bucket/path/to/eimer/table1_changes",
+            partition_cols=None,
+            basename_template="commit_mocked_uuid_{i}.parquet",
+            filesystem=ANY,
+        )
+
+
+#
     # START _query_delete
     #
 
@@ -425,8 +434,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         # Setup mocks
         mock_uuid4.return_value = "mocked_uuid"
 
-        mock_query_method.return_value = pd.DataFrame().from_records(
-            [{"row_id": "1", "field1": 1}]
+        mock_query_method.return_value = pd.DataFrame(
+            {"field1": [1, 2, 3], "row_id": ["1", "2", "3"]}
         )
 
         parsed_query = {
