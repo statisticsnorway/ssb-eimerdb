@@ -234,8 +234,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.ds.dataset")
     @parameterized.expand(
         [
-            (True,),
-            (False,),
+            True,
+            False,
         ]
     )
     def test_get_inserts(self, mock_dataset: Mock, mock_fs: Mock, raw: bool) -> None:
@@ -279,7 +279,13 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         mock_fetch_credentials: Mock,
     ) -> None:
         # Mock the return value of get_changes
-        mock_get_changes.return_value = pd.DataFrame([{"row_id": "1", "field1": 1}])
+        schema = pa.schema([("row_id", pa.string()), ("field1", pa.int64())])
+
+        expected_table = pa.Table.from_pydict(
+            {"row_id": ["1"], "field1": [1]}, schema=schema
+        )
+
+        mock_get_changes.return_value = pexpected_table
 
         # Mock the return values of other dependencies
         mock_uuid4.return_value = "mocked_uuid"
