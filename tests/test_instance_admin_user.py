@@ -253,8 +253,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
 
     @parameterized.expand(
         [
-            True,
-            False,
+            (True,),
+            (False,),
         ]
     )
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
@@ -383,8 +383,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
 
     @parameterized.expand(
         [
-            True,
-            False,
+            (True,),
+            (False,),
         ]
     )
     @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
