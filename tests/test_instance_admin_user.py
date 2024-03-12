@@ -1,4 +1,3 @@
-from parameterized import parameterized
 import unittest
 from unittest.mock import ANY
 from unittest.mock import MagicMock
@@ -10,6 +9,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 from google.cloud.storage import Blob
+from parameterized import parameterized  # type: ignore
 
 from eimerdb.instance import EimerDBInstance
 

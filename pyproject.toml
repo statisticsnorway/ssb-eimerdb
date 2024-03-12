@@ -24,7 +24,7 @@ dapla-toolbelt = "^2.0.8"
 uuid = "^1.30"
 ipykernel = "^6.29.3"
 pandas = "^2.2.1"
-parameterized = "^0.9.0"
+parameterized = {extras = ["typed"], version = "^0.9.0"}
 
 [tool.poetry.group.dev.dependencies]
 Pygments = ">=2.10.0"
