@@ -4,8 +4,8 @@ from typing import Optional
 import pyarrow as pa
 from gcsfs import GCSFileSystem
 
-from eimerdb.eimerdb_constants import BUCKET_KEY
-from eimerdb.eimerdb_constants import PARTITION_COLUMNS_KEY
+from eimerdb_constants import BUCKET_KEY
+from eimerdb_constants import PARTITION_COLUMNS_KEY
 
 
 def get_partitioned_files(
@@ -138,7 +138,11 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
 
     df_filtered = pa.compute.filter(df, filter_array)
 
-    df_filtered = df_filtered.cast(df_updates.schema)
+    column_order = [
+        field.name for field in df_updates.schema
+    ]
+
+    df_filtered = df_filtered.select(column_order).cast(df_updates.schema)
 
     df_updated = pa.concat_tables([df_filtered, df_updates])
 

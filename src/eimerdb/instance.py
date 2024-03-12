@@ -708,7 +708,10 @@ class EimerDBInstance:
             if output_format == PANDAS_OUTPUT_FORMAT:
                 return query_result.df()
             else:
-                return query_result.arrow()
+                column_order = [
+                    field.name for field in self._get_arrow_schema(table_name, True)
+                ]
+                return query_result.arrow().select(column_order)
 
         def cast_if_arrow(
             table: Optional[Union[pd.DataFrame, pa.Table]]
@@ -716,7 +719,7 @@ class EimerDBInstance:
             if table is None or output_format == PANDAS_OUTPUT_FORMAT:
                 return table
 
-            return table.cast(arrow_schema_from_json(table_config[SCHEMA_KEY]))
+            return table.cast(self._get_arrow_schema(table_name, True))
 
         def concat_changes(
             first: Optional[Union[pd.DataFrame, pa.Table]],
