@@ -208,7 +208,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     def test_get_changes(self, mock_dataset: Mock, _: Mock) -> None:
         schema_fields = [
             pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
-            pa.field("field1", pa.int64(), metadata={"label": "Field1"}),
+            pa.field("field1", pa.int8(), metadata={"label": "Field1"}),
         ]
 
         schema_fields.extend(
@@ -261,7 +261,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     def test_get_inserts(self, mock_dataset: Mock, raw: bool) -> None:
         schema_fields = [
             pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
-            pa.field("field1", pa.int64(), metadata={"label": "Field1"}),
+            pa.field("field1", pa.int8(), metadata={"label": "Field1"}),
         ]
 
         if not raw:
@@ -327,7 +327,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         # Mock the return value of get_changes
         schema_fields = [
             pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
-            pa.field("field1", pa.int64(), metadata={"label": "Field1"}),
+            pa.field("field1", pa.int8(), metadata={"label": "Field1"}),
         ]
 
         schema_fields.extend(
