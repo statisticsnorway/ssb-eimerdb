@@ -211,11 +211,13 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             pa.field("field1", pa.int64(), metadata={"label": "Field1"}),
         ]
 
-        schema_fields.extend([
-            pa.field("user", pa.string()),
-            pa.field("datetime", pa.string()),
-            pa.field("operation", pa.string()),
-        ])
+        schema_fields.extend(
+            [
+                pa.field("user", pa.string()),
+                pa.field("datetime", pa.string()),
+                pa.field("operation", pa.string()),
+            ]
+        )
 
         schema = pa.schema(schema_fields)
 
@@ -263,11 +265,13 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         ]
 
         if not raw:
-            schema_fields.extend([
-                pa.field("user", pa.string()),
-                pa.field("datetime", pa.string()),
-                pa.field("operation", pa.string()),
-            ])
+            schema_fields.extend(
+                [
+                    pa.field("user", pa.string()),
+                    pa.field("datetime", pa.string()),
+                    pa.field("operation", pa.string()),
+                ]
+            )
 
         schema = pa.schema(schema_fields)
 
@@ -277,11 +281,13 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         }
 
         if not raw:
-            expected_data.update({
-                "user": ["user42"],
-                "datetime": ["2024-03-12T12:00:00"],
-                "operation": ["insert"],
-            })
+            expected_data.update(
+                {
+                    "user": ["user42"],
+                    "datetime": ["2024-03-12T12:00:00"],
+                    "operation": ["insert"],
+                }
+            )
 
         expected_table = pa.Table.from_pydict(expected_data, schema=schema)
 
@@ -324,11 +330,13 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             pa.field("field1", pa.int64(), metadata={"label": "Field1"}),
         ]
 
-        schema_fields.extend([
-            pa.field("user", pa.string()),
-            pa.field("datetime", pa.string()),
-            pa.field("operation", pa.string()),
-        ])
+        schema_fields.extend(
+            [
+                pa.field("user", pa.string()),
+                pa.field("datetime", pa.string()),
+                pa.field("operation", pa.string()),
+            ]
+        )
 
         schema = pa.schema(schema_fields)
 
@@ -401,11 +409,13 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         ]
 
         if not raw:
-            schema_fields.extend([
-                pa.field("user", pa.string()),
-                pa.field("datetime", pa.string()),
-                pa.field("operation", pa.string()),
-            ])
+            schema_fields.extend(
+                [
+                    pa.field("user", pa.string()),
+                    pa.field("datetime", pa.string()),
+                    pa.field("operation", pa.string()),
+                ]
+            )
 
         schema = pa.schema(schema_fields)
 
@@ -415,11 +425,13 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         }
 
         if not raw:
-            expected_data.update({
-                "user": ["user42"],
-                "datetime": ["2024-03-12T12:00:00"],
-                "operation": ["insert"],
-            })
+            expected_data.update(
+                {
+                    "user": ["user42"],
+                    "datetime": ["2024-03-12T12:00:00"],
+                    "operation": ["insert"],
+                }
+            )
 
         expected_table = pa.Table.from_pydict(expected_data, schema=schema)
 
