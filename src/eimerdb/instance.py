@@ -308,7 +308,7 @@ class EimerDBInstance:
             table_name (str): The name of the table for which changes are to be retrieved.
 
         Returns:
-            DataFrame: A pandas DataFrame containing the changes for the specified table.
+            Table: A pyarrow table containing the changes for the specified table.
         """
         path = self.tables[table_name][TABLE_PATH_KEY]
 
