@@ -205,7 +205,17 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.ds.dataset")
     def test_get_changes(self, mock_dataset: Mock, _: Mock) -> None:
-        expected_df = pd.DataFrame([{"row_id": "1", "field1": 1}])
+        data = [{"row_id": "1", "field1": 1}]
+
+        schema = pa.schema([
+            ('row_id', pa.string()),
+            ('field1', pa.int64())
+        ])
+
+        expected_table = pa.Table.from_pydict(
+            {"row_id": ["1"], "field1": [1]},
+            schema=schema
+        )
 
         dataset = Mock(spec=ds.Dataset)
         dataset.to_table.return_value.to_pandas.return_value = expected_df
@@ -224,6 +234,45 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
 
         # Assert that the returned DataFrame is the same as the mock DataFrame
         self.assertIs(expected_df, changes_df)
+
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    @patch("eimerdb.instance.ds.dataset")
+    @parameterized.expand(
+        [
+            (True,),
+            (False,),
+        ]
+    )
+    def test_get_inserts(self, mock_dataset: Mock, mock_fs: Mock, raw: bool) -> None:
+        data = [{"row_id": "1", "field1": 1}]
+
+        schema = pa.schema([
+            ('row_id', pa.string()),
+            ('field1', pa.int64())
+        ])
+
+        expected_table = pa.Table.from_pydict(
+            {'row_id': ['1'], 'field1': [1]},
+            schema=schema
+        )
+
+        dataset = Mock(spec=ds.Dataset)
+        dataset.to_table.return_value = expected_df
+        mock_dataset.return_value = dataset
+
+        inserts_table = self.instance.get_inserts("table1", raw=raw)
+
+        suffix = "_raw" if raw else ""
+
+        mock_dataset.assert_called_once_with(
+            f"{self.instance.bucket}/{self.instance.tables['table1'][instance.TABLE_PATH_KEY]}{suffix}/",
+            format="parquet",
+            partitioning="hive",
+            schema=self.instance._get_arrow_schema("table1", raw),
+            filesystem=ANY,
+        )
+
+        self.assertIs(expected_table, inserts_table)
 
     @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
     @patch("eimerdb.instance.storage.Client")
