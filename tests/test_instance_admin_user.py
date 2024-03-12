@@ -206,15 +206,18 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.ds.dataset")
     def test_get_changes(self, mock_dataset: Mock, _: Mock) -> None:
-        schema = pa.schema(
-            [
-                ("row_id", pa.string(), label="Unique row ID"),
-                ("field1", pa.int64(), label="Field 1"),
-                ("user", pa.string()),
-                ("datetime", pa.string()),
-                ("operation", pa.string()),
-            ]
-        )
+        schema_fields = [
+            pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
+            pa.field("field1", pa.int64(), metadata={"label": "Field1"}),
+        ]
+
+        schema_fields.extend([
+            pa.field("user", pa.string()),
+            pa.field("datetime", pa.string()),
+            pa.field("operation", pa.string()),
+        ])
+
+        schema = pa.schema(schema_fields)
 
         expected_table = pa.Table.from_pydict(
             {
@@ -226,6 +229,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             },
             schema=schema,
         )
+
+        expected_table = pa.Table.from_pydict(expected_data, schema=schema)
 
         dataset = Mock(spec=ds.Dataset)
         dataset.to_table.return_value = expected_table
@@ -255,15 +260,15 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     )
     def test_get_inserts(self, mock_dataset: Mock, raw: bool) -> None:
         schema_fields = [
-            ("row_id", pa.string(), label="Unique row ID"),
-            ("field1", pa.int64(), label="Field 1"),
+            pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
+            pa.field("field1", pa.int64(), metadata={"label": "Field1"}),
         ]
 
         if not raw:
             schema_fields.extend([
-                ("user", pa.string()),
-                ("datetime", pa.string()),
-                ("operation", pa.string()),
+                pa.field("user", pa.string()),
+                pa.field("datetime", pa.string()),
+                pa.field("operation", pa.string()),
             ])
 
         schema = pa.schema(schema_fields)
