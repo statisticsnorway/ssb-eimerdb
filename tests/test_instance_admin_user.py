@@ -303,7 +303,6 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             f"test_bucket/path/to/eimer/table1{suffix}/",
             format="parquet",
             partitioning="hive",
-            schema=self.instance._get_arrow_schema("table1", raw),
             filesystem=ANY,
         )
 
@@ -374,7 +373,6 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             root_path="gs://test_bucket/path/to/eimer/table1_changes",
             partition_cols=None,
             basename_template="merged_commit_mocked_uuid_{i}.parquet",
-            schema=schema,
             filesystem=ANY,
         )
         blob_1.delete.assert_called_once()
@@ -458,7 +456,6 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             root_path=f"gs://test_bucket/path/to/eimer/table1{suffix}",
             partition_cols=None,
             basename_template="merged_insert_mocked_uuid_{i}.parquet",
-            schema=schema,
             filesystem=ANY,
         )
         blob_1.delete.assert_called_once()
