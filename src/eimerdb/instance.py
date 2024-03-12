@@ -38,7 +38,6 @@ from .eimerdb_constants import SCHEMA_KEY
 from .eimerdb_constants import TABLE_NAME_KEY
 from .eimerdb_constants import TABLE_PATH_KEY
 from .eimerdb_constants import WHERE_CLAUSE_KEY
-
 from .functions import arrow_schema_from_json
 from .functions import get_datetime
 from .functions import get_initials

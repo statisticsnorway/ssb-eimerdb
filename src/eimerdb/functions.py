@@ -14,16 +14,14 @@ import pyarrow as pa
 from dapla import AuthClient
 from google.cloud import storage
 
-from eimerdb.eimerdb_constants import (
-    OPERATION_KEY,
-    TABLE_NAME_KEY,
-    WHERE_CLAUSE_KEY,
-    COLUMNS_KEY,
-    SELECT_CLAUSE_KEY,
-    BUCKET_KEY,
-    CREATED_BY_KEY,
-    APPLICATION_JSON,
-)
+from eimerdb.eimerdb_constants import APPLICATION_JSON
+from eimerdb.eimerdb_constants import BUCKET_KEY
+from eimerdb.eimerdb_constants import COLUMNS_KEY
+from eimerdb.eimerdb_constants import CREATED_BY_KEY
+from eimerdb.eimerdb_constants import OPERATION_KEY
+from eimerdb.eimerdb_constants import SELECT_CLAUSE_KEY
+from eimerdb.eimerdb_constants import TABLE_NAME_KEY
+from eimerdb.eimerdb_constants import WHERE_CLAUSE_KEY
 
 logger = logging.getLogger(__name__)
 
