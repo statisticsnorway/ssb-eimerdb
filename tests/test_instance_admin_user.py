@@ -398,6 +398,58 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         )
 
     #
+    # START _query_delete
+    #
+
+    def test__query_delete_non_editable_table(self) -> None:
+        parsed_query = {
+            "operation": "DELETE",
+            "table_name": "table2",
+            "where_clause": "row_id='1'",
+        }
+
+        # Test & Assertion
+        with self.assertRaises(ValueError) as context:
+            self.instance._query_delete(fs=MagicMock(), parsed_query=parsed_query)
+        self.assertEqual(
+            "The table table2 is not editable!",
+            str(context.exception),
+        )
+
+    @patch("eimerdb.instance.EimerDBInstance.query")
+    @patch("eimerdb.instance.pq.write_to_dataset")
+    @patch("eimerdb.instance.uuid4")
+    def test__query_delete_success(
+        self, mock_uuid4: Mock, mock_write_to_dataset: Mock, mock_query_method: Mock
+    ) -> None:
+        # Setup mocks
+        mock_uuid4.return_value = "mocked_uuid"
+
+        mock_query_method.return_value = pd.DataFrame().from_records(
+            [{"row_id": "1", "field1": 1}]
+        )
+
+        parsed_query = {
+            "operation": "DELETE",
+            "table_name": "table1",
+            "where_clause": "row_id='1'",
+        }
+
+        # Call the method
+        result = self.instance._query_delete(fs=MagicMock(), parsed_query=parsed_query)
+
+        # Assertions
+        self.assertEqual("1 rows deleted by user", result)
+
+        mock_write_to_dataset.assert_called_with(
+            table=ANY,
+            root_path="gs://test_bucket/path/to/eimer/table1_changes",
+            partition_cols=None,
+            basename_template="commit_mocked_uuid_{i}.parquet",
+            filesystem=ANY,
+        )
+
+    #
     # START query
     #
 

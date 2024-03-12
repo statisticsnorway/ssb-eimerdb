@@ -27,7 +27,19 @@ from gcsfs import GCSFileSystem
 from google.cloud import storage
 from pandas import DataFrame
 
-from .functions import APPLICATION_JSON
+from .eimerdb_constants import (
+    BUCKET_KEY,
+    EDITABLE_KEY,
+    SCHEMA_KEY,
+    PARTITION_COLUMNS_KEY,
+    CREATED_BY_KEY,
+    COLUMNS_KEY,
+    APPLICATION_JSON,
+    TABLE_PATH_KEY,
+    OPERATION_KEY,
+    TABLE_NAME_KEY,
+    WHERE_CLAUSE_KEY,
+)
 from .functions import arrow_schema_from_json
 from .functions import get_datetime
 from .functions import get_initials
@@ -45,10 +57,6 @@ ARROW_OUTPUT_FORMAT = "arrow"
 
 CHANGES_ALL = "all"
 CHANGES_RECENT = "recent"
-
-TABLE_PATH_KEY = "table_path"
-PARTITION_COLUMNS_KEY = "partition_columns"
-SCHEMA_KEY = "schema"
 
 SELECT_STAR_QUERY = "SELECT * FROM"
 
@@ -114,7 +122,7 @@ class EimerDBInstance:
         self.eimerdb_name = json_about["eimerdb_name"]
         self.path = json_about["path"]
         self.eimer_path = json_about["eimer_path"]
-        self.created_by = json_about["created_by"]
+        self.created_by = json_about[CREATED_BY_KEY]
         self.time_created = json_about["time_created"]
 
         initials = get_initials()
@@ -218,10 +226,10 @@ class EimerDBInstance:
 
         new_table = {
             table_name: {
-                "created_by": get_initials(),
+                CREATED_BY_KEY: get_initials(),
                 TABLE_PATH_KEY: f"{self.eimer_path}/{table_name}",
-                "bucket": self.bucket,
-                "editable": editable,
+                BUCKET_KEY: self.bucket,
+                EDITABLE_KEY: editable,
                 SCHEMA_KEY: schema,
                 PARTITION_COLUMNS_KEY: partition_columns,
             }
@@ -259,7 +267,7 @@ class EimerDBInstance:
         df_raw = df.copy()
         df_raw["user"] = get_initials()
         df_raw["datetime"] = get_datetime()
-        df_raw["operation"] = "insert"
+        df_raw[OPERATION_KEY] = "insert"
 
         table_raw = pa.Table.from_pandas(
             df_raw, schema=self._get_arrow_schema(table_name, True)
@@ -384,7 +392,7 @@ class EimerDBInstance:
         output_format: str = PANDAS_OUTPUT_FORMAT,
     ) -> Union[pd.DataFrame, pa.Table]:
         con = duckdb.connect()
-        tables = parsed_query["table_name"]
+        tables = parsed_query[TABLE_NAME_KEY]
 
         for table_name in tables:
             table_config = self.tables[table_name]
@@ -402,7 +410,7 @@ class EimerDBInstance:
             # noinspection PyTypeChecker
             df = pq.read_table(table_files, filesystem=fs)
             df_changes = None
-            editable = table_config["editable"]
+            editable = table_config[EDITABLE_KEY]
 
             if editable is True and unedited is False:
                 select_query = SELECT_STAR_QUERY
@@ -432,13 +440,13 @@ class EimerDBInstance:
         sql_query: str,
         partition_select: Optional[dict[str, Any]] = None,
     ) -> str:
-        table_name = parsed_query["table_name"]
-        where_clause = parsed_query["where_clause"]
+        table_name = parsed_query[TABLE_NAME_KEY]
+        where_clause = parsed_query[WHERE_CLAUSE_KEY]
 
         table_config = self.tables[table_name]
         partitions = table_config[PARTITION_COLUMNS_KEY]
 
-        if table_config["editable"] is not True:
+        if table_config[EDITABLE_KEY] is not True:
             raise ValueError(f"The table {table_name} is not editable!")
 
         df_update_results: pd.DataFrame = self.query(
@@ -479,22 +487,20 @@ class EimerDBInstance:
         parsed_query: dict[str, Any],
         partition_select: Optional[dict[str, Any]] = None,
     ) -> str:
-        table_name = parsed_query["table_name"]
-        table_config = self.tables[table_name]
-        editable = table_config["editable"]
+        table_name = parsed_query[TABLE_NAME_KEY]
+        where_clause = parsed_query[WHERE_CLAUSE_KEY]
 
-        if editable is False:
+        table_config = self.tables[table_name]
+
+        if table_config[EDITABLE_KEY] is not True:
             raise ValueError(f"The table {table_name} is not editable!")
 
-        table_name = parsed_query["table_name"]
-        where_clause = parsed_query["where_clause"]
-
-        table_config = self.tables[table_name]
         partitions = table_config[PARTITION_COLUMNS_KEY]
 
+        # MOCK THIS
         df_delete_results: pd.DataFrame = self.query(
-            f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}",
-            partition_select,
+            sql_query=f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}",
+            partition_select=partition_select,
         )
 
         df_delete_results["user"] = get_initials()
@@ -509,23 +515,18 @@ class EimerDBInstance:
         con.execute(f"CREATE TABLE deletes AS FROM dataset WHERE {where_clause}")
 
         df_deletions = con.table("deletes").df()
-        df_deletions_len = len(df_deletions)
-
-        table_path = self.tables[table_name][TABLE_PATH_KEY] + "_changes"
+        table_path = table_config[TABLE_PATH_KEY] + "_changes"
         deletion_table = pa.Table.from_pandas(df_deletions, schema=arrow_schema)
-
-        unique_file_id = uuid4()
-        filename = f"commit_{unique_file_id}_{{i}}.parquet"
 
         # noinspection PyTypeChecker
         pq.write_to_dataset(
-            deletion_table,
+            table=deletion_table,
             root_path=f"gs://{self.bucket}/{table_path}",
             partition_cols=partitions,
-            basename_template=filename,
+            basename_template=f"commit_{uuid4()}_{{i}}.parquet",
             filesystem=fs,
         )
-        return f"{df_deletions_len} rows deleted by {get_initials()}"
+        return f"{df_deletions.shape[0]} rows deleted by {get_initials()}"
 
     def query(
         self,
@@ -554,7 +555,7 @@ class EimerDBInstance:
             )
 
         parsed_query: dict[str, Any] = parse_sql_query(sql_query)
-        query_operation = parsed_query["operation"]
+        query_operation = parsed_query[OPERATION_KEY]
         fs = FileClient.get_gcs_file_system()
 
         match query_operation:
@@ -617,13 +618,13 @@ class EimerDBInstance:
             raise ValueError(f"Invalid output format: {output_format}")
 
         parsed_query = parse_sql_query(sql_query)
-        if parsed_query["operation"] != "SELECT":
+        if parsed_query[OPERATION_KEY] != "SELECT":
             return None
 
-        table_name = parsed_query["table_name"][0]
+        table_name = parsed_query[TABLE_NAME_KEY][0]
 
         table_config = self.tables[table_name]
-        editable = table_config["editable"]
+        editable = table_config[EDITABLE_KEY]
         instance_name = self.eimerdb_name
         table_schema = arrow_schema_from_json(self.tables[table_name][SCHEMA_KEY])
 
@@ -631,7 +632,7 @@ class EimerDBInstance:
         df_changes: Optional[Any] = None
 
         try:
-            columns = parsed_query["columns"]
+            columns = parsed_query[COLUMNS_KEY]
         except ValueError:
             columns = None
 
@@ -639,7 +640,7 @@ class EimerDBInstance:
             columns = None
 
         partitions = table_config[PARTITION_COLUMNS_KEY]
-        bucket_name = table_config["bucket"]
+        bucket_name = table_config[BUCKET_KEY]
         partitions_len = len(partitions) if partitions is not None else 0
         partition_levels = "**/" * partitions_len + "*"
         fs = FileClient.get_gcs_file_system()

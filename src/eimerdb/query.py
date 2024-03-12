@@ -4,6 +4,8 @@ from typing import Optional
 import pyarrow as pa
 from gcsfs import GCSFileSystem
 
+from eimerdb.eimerdb_constants import PARTITION_COLUMNS_KEY, BUCKET_KEY
+
 
 def get_partitioned_files(
     table_name: str,
@@ -31,8 +33,8 @@ def get_partitioned_files(
         list[str]: A list of file paths corresponding to the partitioned files of the table.
 
     """
-    partitions = table_config["partition_columns"]
-    bucket_name = table_config["bucket"]
+    partitions = table_config[PARTITION_COLUMNS_KEY]
+    bucket_name = table_config[BUCKET_KEY]
     partitions_len = len(partitions) if partitions is not None else 0
     partition_levels = "**/" * partitions_len + "*"
 
