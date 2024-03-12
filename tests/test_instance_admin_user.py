@@ -323,6 +323,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             root_path="gs://test_bucket/path/to/eimer/table1_changes",
             partition_cols=None,
             basename_template="merged_commit_mocked_uuid_{i}.parquet",
+            schema=schema,
             filesystem=ANY,
         )
         blob_1.delete.assert_called_once()
@@ -351,26 +352,33 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         raw: bool,
     ) -> None:
         # Mock the return value of get_changes
-        schema = pa.schema(
-            [
-                ("row_id", pa.string()),
-                ("field1", pa.int64()),
+        schema_fields = [
+            ("row_id", pa.string()),
+            ("field1", pa.int64()),
+        ]
+
+        if not raw:
+            schema_fields.extend([
                 ("user", pa.string()),
                 ("datetime", pa.string()),
                 ("operation", pa.string()),
-            ]
-        )
+            ])
 
-        expected_table = pa.Table.from_pydict(
-            {
-                "row_id": ["1"],
-                "field1": [1],
+        schema = pa.schema(schema_fields)
+
+        expected_data = {
+            "row_id": ["1"],
+            "field1": [1],
+        }
+
+        if not raw:
+            expected_data.update({
                 "user": ["user42"],
                 "datetime": ["2024-03-12T12:00:00"],
                 "operation": ["insert"],
-            },
-            schema=schema,
-        )
+            })
+
+        expected_table = pa.Table.from_pydict(expected_data, schema=schema)
 
         mock_get_inserts.return_value = expected_table
 
@@ -395,6 +403,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             root_path=f"gs://test_bucket/path/to/eimer/table1{suffix}",
             partition_cols=None,
             basename_template="merged_insert_mocked_uuid_{i}.parquet",
+            schema=schema,
             filesystem=ANY,
         )
         blob_1.delete.assert_called_once()
