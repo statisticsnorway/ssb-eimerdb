@@ -316,15 +316,18 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         mock_fetch_credentials: Mock,
     ) -> None:
         # Mock the return value of get_changes
-        schema = pa.schema(
-            [
-                ("row_id", pa.string(), label="Unique row ID"),
-                ("field1", pa.int64(), label="Field 1"),
-                ("user", pa.string()),
-                ("datetime", pa.string()),
-                ("operation", pa.string()),
-            ]
-        )
+        schema_fields = [
+            pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
+            pa.field("field1", pa.int64(), metadata={"label": "Field1"}),
+        ]
+
+        schema_fields.extend([
+            pa.field("user", pa.string()),
+            pa.field("datetime", pa.string()),
+            pa.field("operation", pa.string()),
+        ])
+
+        schema = pa.schema(schema_fields)
 
         expected_table = pa.Table.from_pydict(
             {
@@ -390,15 +393,15 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     ) -> None:
         # Mock the return value of get_changes
         schema_fields = [
-            ("row_id", pa.string(), label="Unique row ID"),
-            ("field1", pa.int64(), label="Field1"),
+            pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
+            pa.field("field1", pa.int64(), metadata={"label": "Field1"}),
         ]
 
         if not raw:
             schema_fields.extend([
-                ("user", pa.string()),
-                ("datetime", pa.string()),
-                ("operation", pa.string()),
+                pa.field("user", pa.string()),
+                pa.field("datetime", pa.string()),
+                pa.field("operation", pa.string()),
             ])
 
         schema = pa.schema(schema_fields)
