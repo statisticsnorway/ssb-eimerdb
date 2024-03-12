@@ -230,8 +230,6 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             schema=schema,
         )
 
-        expected_table = pa.Table.from_pydict(expected_data, schema=schema)
-
         dataset = Mock(spec=ds.Dataset)
         dataset.to_table.return_value = expected_table
         mock_dataset.return_value = dataset
