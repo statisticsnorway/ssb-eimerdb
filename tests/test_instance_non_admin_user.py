@@ -56,7 +56,7 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
             "Cannot create table. You are not an admin!", str(context.exception)
         )
 
-    def test_main_table_insert_non_admin(self) -> None:
+    def test_main_table_insert_non_admin_(self) -> None:
         # Test & Assertion
         with self.assertRaises(PermissionError) as context:
             self.instance.insert("table1", pd.DataFrame())
