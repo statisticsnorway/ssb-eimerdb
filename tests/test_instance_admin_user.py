@@ -238,7 +238,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             (False,),
         ]
     )
-    def test_get_inserts(self, mock_dataset: Mock, mock_fs: Mock, raw: bool) -> None:
+    def test_get_inserts(self, mock_dataset: Mock, raw: bool) -> None:
         schema = pa.schema([("row_id", pa.string()), ("field1", pa.int64())])
 
         expected_table = pa.Table.from_pydict(
