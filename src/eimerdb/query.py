@@ -4,7 +4,8 @@ from typing import Optional
 import pyarrow as pa
 from gcsfs import GCSFileSystem
 
-from eimerdb.eimerdb_constants import PARTITION_COLUMNS_KEY, BUCKET_KEY
+from eimerdb.eimerdb_constants import BUCKET_KEY
+from eimerdb.eimerdb_constants import PARTITION_COLUMNS_KEY
 
 
 def get_partitioned_files(

@@ -27,19 +27,18 @@ from gcsfs import GCSFileSystem
 from google.cloud import storage
 from pandas import DataFrame
 
-from .eimerdb_constants import (
-    BUCKET_KEY,
-    EDITABLE_KEY,
-    SCHEMA_KEY,
-    PARTITION_COLUMNS_KEY,
-    CREATED_BY_KEY,
-    COLUMNS_KEY,
-    APPLICATION_JSON,
-    TABLE_PATH_KEY,
-    OPERATION_KEY,
-    TABLE_NAME_KEY,
-    WHERE_CLAUSE_KEY,
-)
+from .eimerdb_constants import APPLICATION_JSON
+from .eimerdb_constants import BUCKET_KEY
+from .eimerdb_constants import COLUMNS_KEY
+from .eimerdb_constants import CREATED_BY_KEY
+from .eimerdb_constants import EDITABLE_KEY
+from .eimerdb_constants import OPERATION_KEY
+from .eimerdb_constants import PARTITION_COLUMNS_KEY
+from .eimerdb_constants import SCHEMA_KEY
+from .eimerdb_constants import TABLE_NAME_KEY
+from .eimerdb_constants import TABLE_PATH_KEY
+from .eimerdb_constants import WHERE_CLAUSE_KEY
+
 from .functions import arrow_schema_from_json
 from .functions import get_datetime
 from .functions import get_initials
@@ -497,7 +496,6 @@ class EimerDBInstance:
 
         partitions = table_config[PARTITION_COLUMNS_KEY]
 
-        # MOCK THIS
         df_delete_results: pd.DataFrame = self.query(
             sql_query=f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}",
             partition_select=partition_select,
