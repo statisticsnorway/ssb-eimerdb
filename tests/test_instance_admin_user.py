@@ -232,7 +232,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.ds.dataset")
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore
         [
             (True,),
             (False,),
@@ -319,7 +319,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.uuid4")
     @patch("eimerdb.instance.pq.write_to_dataset")
     @patch("eimerdb.instance.EimerDBInstance.get_changes")
-    @parameterized.expand(
+    @parameterized.expand(  # Type: Ignore
         [
             (True,),
             (False,),
@@ -327,7 +327,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     )
     def test_combine_inserts(
         self,
-        mock_get_changes: Mock,
+        mock_get_inserts: Mock,
         mock_write_to_dataset: Mock,
         mock_uuid4: Mock,
         _: Mock,
