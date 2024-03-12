@@ -26,6 +26,7 @@ from dapla import FileClient
 from gcsfs import GCSFileSystem
 from google.cloud import storage
 from pandas import DataFrame
+from pyarrow import Table
 
 from .eimerdb_constants import APPLICATION_JSON
 from .eimerdb_constants import BUCKET_KEY
@@ -615,118 +616,132 @@ class EimerDBInstance:
         if output_format not in (PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT):
             raise ValueError(f"Invalid output format: {output_format}")
 
+        # Validate changes_output
+        if changes_output not in (CHANGES_ALL, CHANGES_RECENT):
+            raise ValueError(f"Invalid changes output: {changes_output}")
+
         parsed_query = parse_sql_query(sql_query)
+        # Check if the operation is SELECT
         if parsed_query[OPERATION_KEY] != "SELECT":
-            return None
+            raise ValueError(
+                f"Operation {parsed_query[OPERATION_KEY]} is not supported."
+            )
 
         table_name = parsed_query[TABLE_NAME_KEY][0]
-
         table_config = self.tables[table_name]
-        editable = table_config[EDITABLE_KEY]
-        instance_name = self.eimerdb_name
-        table_schema = arrow_schema_from_json(self.tables[table_name][SCHEMA_KEY])
 
-        df: Optional[Any] = None
-        df_changes: Optional[Any] = None
+        def get_partition_levels() -> str:
+            partitions = table_config[PARTITION_COLUMNS_KEY]
+            partitions_len = len(partitions) if partitions is not None else 0
+            return "**/" * partitions_len + "*"
 
-        try:
-            columns = parsed_query[COLUMNS_KEY]
-        except ValueError:
-            columns = None
+        def get_columns(_local_changes_output: str) -> Optional[list[str]]:
+            if _local_changes_output == CHANGES_RECENT:
+                return None
 
-        if columns == ["*"]:
-            columns = None
+            columns = parsed_query.get(COLUMNS_KEY)
+            if columns == ["*"]:
+                return None
 
-        partitions = table_config[PARTITION_COLUMNS_KEY]
-        bucket_name = table_config[BUCKET_KEY]
-        partitions_len = len(partitions) if partitions is not None else 0
-        partition_levels = "**/" * partitions_len + "*"
+            return columns
+
+        def get_duckdb_query(_local_changes_output: str) -> str:
+            modified_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
+
+            if _local_changes_output == CHANGES_RECENT:
+                return modified_query
+
+            if (
+                get_columns(_local_changes_output) is not None
+                and table_config[EDITABLE_KEY] is True
+                and unedited is not True
+            ):
+                # add row_id to the select clause
+                return modified_query.replace(" FROM", ", row_id FROM")
+
+            return modified_query
+
         fs = FileClient.get_gcs_file_system()
-        table_name_changes = table_name + "_changes"
-        table_files_changes = fs.glob(
-            f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes}/{partition_levels}"
-        )
 
-        max_depth = 0
-        try:
-            max_depth = max(obj.count("/") for obj in table_files_changes)
-            no_changes = False
-        except ValueError:
-            no_changes = True
-            if output_format == PANDAS_OUTPUT_FORMAT:
-                df_changes = pd.DataFrame()
-            elif output_format == ARROW_OUTPUT_FORMAT:
-                df_changes = pa.table(pd.DataFrame())
+        def get_change_dataset(local_changes_output: str) -> Optional[Table]:
+            changes_suffix = (
+                "changes_all" if local_changes_output == CHANGES_ALL else "changes"
+            )
 
-        if no_changes is not True:
-            table_files_changes = [
-                obj for obj in table_files_changes if obj.count("/") == max_depth
+            changes_files = fs.glob(
+                f"gs://{table_config[BUCKET_KEY]}/eimerdb/{self.eimerdb_name}/{table_name}_{changes_suffix}/"
+                f"{get_partition_levels()}"
+            )
+
+            try:
+                max_depth = max(obj.count("/") for obj in changes_files)
+            except ValueError:
+                return None
+
+            changes_files_max_depth = [
+                obj for obj in changes_files if obj.count("/") == max_depth
             ]
+
             if partition_select is not None:
-                table_files_changes = filter_partitions(
-                    table_files_changes,
-                    partition_select,
-                )
-
-            # noinspection PyTypeChecker
-            dataset: pa.Table = pq.read_table(table_files_changes, filesystem=fs)
-            sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
-            if dataset.num_rows != 0:
-                con = duckdb.connect()
-                if output_format == PANDAS_OUTPUT_FORMAT:
-                    df_changes = con.execute(sql_query).df()
-                elif output_format == ARROW_OUTPUT_FORMAT:
-                    df_changes = con.execute(sql_query).arrow()
-
-            elif dataset.num_rows == 0:
-                if output_format == PANDAS_OUTPUT_FORMAT:
-                    df_changes = pd.DataFrame()
-                elif output_format == ARROW_OUTPUT_FORMAT:
-                    df_changes = pa.table(pd.DataFrame())
-
-        table_name_changes_all = table_name + "_changes_all"
-        table_files_changes_all = fs.glob(
-            f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes_all}/{partition_levels}"
-        )
-        try:
-            max_depth = max(obj.count("/") for obj in table_files_changes_all)
-            no_changes_all = False
-        except ValueError:
-            no_changes_all = True
-
-        if no_changes_all is not True:
-            table_files_changes_all = [
-                obj for obj in table_files_changes_all if obj.count("/") == max_depth
-            ]
-            if partition_select is not None:
-                table_files_changes_all = filter_partitions(
-                    table_files_changes_all, partition_select
+                changes_files_max_depth = filter_partitions(
+                    table_files=changes_files_max_depth,
+                    partition_select=partition_select,
                 )
 
             # noinspection PyTypeChecker
             dataset = pq.read_table(
-                table_files_changes_all, filesystem=fs, columns=columns
+                source=changes_files_max_depth,
+                filesystem=fs,
+                columns=get_columns(local_changes_output),
             )
 
-            sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
-            if columns is not None and editable is True and unedited is False:
-                sql_query = sql_query.replace(" FROM", ", row_id FROM")
-            if dataset.num_rows != 0:
-                con = duckdb.connect()
-                if output_format == PANDAS_OUTPUT_FORMAT:
-                    df_changes_all = con.execute(sql_query).df()
-                    df = pd.concat([df_changes_all, df_changes])
-                elif output_format == ARROW_OUTPUT_FORMAT:
-                    df_changes_all = con.execute(sql_query).arrow()
-                    df = pa.concat_tables([df_changes_all, df_changes])
-                    df = df.cast(table_schema)
+            return dataset if dataset.num_rows > 0 else None
 
+        def get_changes_query_result(
+            local_changes_output: str,
+        ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+            dataset = get_change_dataset(local_changes_output)
+            if dataset is None:
+                return None
+
+            query_result = duckdb.query(get_duckdb_query(local_changes_output))
+            if output_format == PANDAS_OUTPUT_FORMAT:
+                return query_result.df()
+            else:
+                return query_result.arrow()
+
+        def cast_if_arrow(
+            table: Optional[Union[pd.DataFrame, pa.Table]]
+        ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+            if table is None or output_format == PANDAS_OUTPUT_FORMAT:
+                return table
+
+            return table.cast(arrow_schema_from_json(table_config[SCHEMA_KEY]))
+
+        def concat_changes(
+            first: Optional[Union[pd.DataFrame, pa.Table]],
+            second: Optional[Union[pd.DataFrame, pa.Table]],
+        ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+            if first is None and second is None:
+                return None
+
+            if first is None:
+                return cast_if_arrow(second)
+
+            if second is None:
+                return cast_if_arrow(first)
+
+            if output_format == PANDAS_OUTPUT_FORMAT:
+                return pd.concat([first, second])
+            else:
+                table = pa.concat_tables([first, second])
+                return cast_if_arrow(table)
+
+        # method body
         if changes_output == CHANGES_ALL:
-            if no_changes_all is not True:
-                return df
-            elif no_changes_all is True:
-                return df_changes
-        elif changes_output == CHANGES_RECENT:
-            return df_changes
+            return concat_changes(
+                first=get_changes_query_result(CHANGES_ALL),
+                second=get_changes_query_result(CHANGES_RECENT),
+            )
         else:
-            return None
+            return cast_if_arrow(get_changes_query_result(changes_output))

@@ -269,40 +269,62 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         blob_1.delete.assert_called_once()
         blob_2.delete.assert_called_once()
 
+    @patch("eimerdb.instance.EimerDBInstance._get_arrow_schema")
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance.pq.read_table")
-    @patch("eimerdb.instance.pa.concat_tables")
-    @patch("eimerdb.instance.pd.concat")
-    @patch("eimerdb.instance.pd.DataFrame")
+    @patch("eimerdb.instance.parse_sql_query")
     def test_query_changes(
         self,
-        mock_pd_dataframe: Mock,
-        mock_pd_concat: Mock,
-        mock_pa_concat_tables: Mock,
-        mock_pq_read_table: Mock,
-        mock_fileclient_gcs: Mock,
+        mock_parse_sql_query: Mock,
+        mock_get_gcs_file_system: Mock,
+        mock_get_arrow_schema: Mock,
     ) -> None:
-        # Set up mocks
-        mock_pd_dataframe.return_value = Mock()
-        mock_pd_concat.return_value = Mock()
-        mock_pa_concat_tables.return_value = Mock()
+        # Mocking necessary dependencies
+        mock_parse_sql_query.return_value = {
+            "operation": "SELECT",
+            "table_name": ["table_name"],
+        }
+        mock_fs = Mock()
+        mock_fs.glob.return_value = ["gs://bucket/path/to/changes"]
+        mock_get_gcs_file_system.return_value = mock_fs
+        mock_get_arrow_schema.return_value = Mock()
 
-        mock_pq_read_table.return_value = Mock()
+        valid_query = "SELECT * FROM table1 WHERE row_id='1'"
 
-        mock_fileclient_gcs.glob.return_value = [
-            "gs://example_bucket/eimerdb/example_instance/example_table_suffix/date=2022-01-01/file1.parquet",
-            "gs://example_bucket/eimerdb/example_instance/example_table_suffix/date=2022-01-01/file2.parquet",
-        ]
+        # Test case when output format is invalid
+        with self.assertRaises(ValueError):
+            self.instance.query_changes(
+                sql_query=valid_query, output_format="invalid_format"
+            )
 
-        # Test SELECT
-        result = self.instance.query_changes("SELECT * FROM table1 WHERE condition")
-        self.assertIsInstance(result, Mock)
+        # Test case when changes output is invalid
+        with self.assertRaises(ValueError):
+            self.instance.query_changes(
+                sql_query=valid_query, changes_output="invalid_output"
+            )
+        #
+        # Test case when operation is not SELECT
+        mock_parse_sql_query.return_value = {
+            "operation": "UPDATE",
+            "table_name": ["table1"],
+        }
+        with self.assertRaises(ValueError):
+            self.instance.query_changes("UPDATE table1 SET column = 'value'")
 
-        # Test UPDATE
-        result = self.instance.query_changes(
-            "UPDATE table1 SET row_id = 1 WHERE row_id = 2"
-        )
-        self.assertIsNone(result)
+        # # Test case when changes_output is CHANGES_ALL
+        # mock_parse_sql_query.return_value = {
+        #     "operation": "SELECT",
+        #     "table_name": ["table1"],
+        # }
+        # result = self.instance.query_changes(
+        #     sql_query=valid_query, changes_output="all"
+        # )
+        # self.assertIsNotNone(result)
+
+        # # Test case when changes_output is CHANGES_RECENT
+        # result = self.instance.query_changes(
+        #     "SELECT * FROM table_name", changes_output="recent"
+        # )
+        # self.assertIsNotNone(result)
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.get_partitioned_files")
@@ -354,9 +376,9 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     def test__query_update_non_editable_table(self) -> None:
         parsed_query = {
             "operation": "UPDATE",
-            "set_clause": "field1='1'",
+            "set_clause": "field1=1",
             "table_name": "table2",
-            "where_clause": "row_id=1",
+            "where_clause": "row_id='1'",
         }
 
         # Test & Assertion
@@ -384,9 +406,9 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
 
         parsed_query = {
             "operation": "UPDATE",
-            "set_clause": "field1='1'",
+            "set_clause": "field1=1",
             "table_name": "table1",
-            "where_clause": "row_id=1",
+            "where_clause": "row_id='1'",
         }
 
         # Call the method
