@@ -217,7 +217,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         )
 
         dataset = Mock(spec=ds.Dataset)
-        dataset.to_table.return_value.to_pandas.return_value = expected_df
+        dataset.to_table.return_value = expected_table
         mock_dataset.return_value = dataset
 
         # Call the get_changes method
@@ -254,7 +254,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         )
 
         dataset = Mock(spec=ds.Dataset)
-        dataset.to_table.return_value = expected_df
+        dataset.to_table.return_value = expected_table
         mock_dataset.return_value = dataset
 
         inserts_table = self.instance.get_inserts("table1", raw=raw)
@@ -262,7 +262,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         suffix = "_raw" if raw else ""
 
         mock_dataset.assert_called_once_with(
-            f"{self.instance.bucket}/{self.instance.tables['table1'][instance.TABLE_PATH_KEY]}{suffix}/",
+            f"test_bucket/path/to/eimer/table1{suffix}/",
             format="parquet",
             partitioning="hive",
             schema=self.instance._get_arrow_schema("table1", raw),

@@ -27,15 +27,15 @@ from gcsfs import GCSFileSystem
 from google.cloud import storage
 from pandas import DataFrame
 
-from functions import APPLICATION_JSON
-from functions import arrow_schema_from_json
-from functions import get_datetime
-from functions import get_initials
-from functions import get_json
-from functions import parse_sql_query
-from query import filter_partitions
-from query import get_partitioned_files
-from query import update_pyarrow_table
+from .functions import APPLICATION_JSON
+from .functions import arrow_schema_from_json
+from .functions import get_datetime
+from .functions import get_initials
+from .functions import get_json
+from .functions import parse_sql_query
+from .query import filter_partitions
+from .query import get_partitioned_files
+from .query import update_pyarrow_table
 
 logger = logging.getLogger(__name__)
 
