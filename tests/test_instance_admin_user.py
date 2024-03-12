@@ -285,7 +285,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             {"row_id": ["1"], "field1": [1]}, schema=schema
         )
 
-        mock_get_changes.return_value = pexpected_table
+        mock_get_changes.return_value = expected_table
 
         # Mock the return values of other dependencies
         mock_uuid4.return_value = "mocked_uuid"
