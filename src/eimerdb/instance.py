@@ -301,7 +301,7 @@ class EimerDBInstance:
         )
         print("Data successfully inserted!")
 
-    def get_changes(self, table_name: str) -> pa.Table:
+    def get_changes(self, table_name: str) -> DataFrame:
         """Retrieve changes for a given table.
 
         Args:
