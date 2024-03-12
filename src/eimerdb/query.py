@@ -138,9 +138,7 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
 
     df_filtered = pa.compute.filter(df, filter_array)
 
-    column_order = [
-        field.name for field in df_updates.schema
-    ]
+    column_order = [field.name for field in df_updates.schema]
 
     df_filtered = df_filtered.select(column_order).cast(df_updates.schema)
 
