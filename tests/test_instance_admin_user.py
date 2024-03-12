@@ -319,7 +319,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.uuid4")
     @patch("eimerdb.instance.pq.write_to_dataset")
     @patch("eimerdb.instance.EimerDBInstance.get_changes")
-    @parameterized.expand(  # Type: Ignore
+    @parameterized.expand(  # type: ignore
         [
             (True,),
             (False,),
