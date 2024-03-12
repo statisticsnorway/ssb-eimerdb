@@ -25,7 +25,7 @@ from dapla import AuthClient
 from dapla import FileClient
 from gcsfs import GCSFileSystem
 from google.cloud import storage
-from pandas import DataFrame
+from pyarrow import Table
 
 from .functions import APPLICATION_JSON
 from .functions import arrow_schema_from_json
@@ -301,7 +301,7 @@ class EimerDBInstance:
         )
         print("Data successfully inserted!")
 
-    def get_changes(self, table_name: str) -> DataFrame:
+    def get_changes(self, table_name: str) -> Table:
         """Retrieve changes for a given table.
 
         Args:
@@ -322,7 +322,7 @@ class EimerDBInstance:
             filesystem=fs,
         )
 
-        df_changes: DataFrame = dataset.to_table()
+        df_changes: Table = dataset.to_table()
         return df_changes
 
     def get_inserts(self, table_name: str, raw: bool) -> pa.Table:
