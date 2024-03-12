@@ -330,6 +330,7 @@ class EimerDBInstance:
 
         Args:
             table_name (str): The name of the table for which changes are to be retrieved.
+            raw (bool): Indicates whether to retrieve the raw schema.
 
         Returns:
             DataFrame: A pandas DataFrame containing the changes for the specified table.
@@ -386,6 +387,7 @@ class EimerDBInstance:
 
         Args:
             table_name (str): The name of the table.
+            raw (bool): Indicates whether to retrieve the raw schema.
         """
         if raw is True:
             suffix = "/_raw"

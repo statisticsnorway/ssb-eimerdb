@@ -205,8 +205,6 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.ds.dataset")
     def test_get_changes(self, mock_dataset: Mock, _: Mock) -> None:
-        data = [{"row_id": "1", "field1": 1}]
-
         schema = pa.schema([
             ('row_id', pa.string()),
             ('field1', pa.int64())
@@ -233,7 +231,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         )
 
         # Assert that the returned DataFrame is the same as the mock DataFrame
-        self.assertIs(expected_df, changes_df)
+        self.assertIs(expected_table, changes_df)
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.ds.dataset")
@@ -244,8 +242,6 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         ]
     )
     def test_get_inserts(self, mock_dataset: Mock, mock_fs: Mock, raw: bool) -> None:
-        data = [{"row_id": "1", "field1": 1}]
-
         schema = pa.schema([
             ('row_id', pa.string()),
             ('field1', pa.int64())
@@ -288,6 +284,51 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         _: Mock,
         mock_client: Mock,
         mock_fetch_credentials: Mock,
+    ) -> None:
+        # Mock the return value of get_changes
+        mock_get_changes.return_value = pd.DataFrame([{"row_id": "1", "field1": 1}])
+
+        # Mock the return values of other dependencies
+        mock_uuid4.return_value = "mocked_uuid"
+
+        blob_1 = Mock(spec=Blob)
+        blob_2 = Mock(spec=Blob)
+
+        mock_fetch_credentials.return_value = "token"
+        mock_client.return_value.bucket.return_value.list_blobs.return_value = [
+            blob_1,
+            blob_2,
+        ]
+
+        # Call the merge_changes method
+        self.instance.combine_changes("table1")
+
+        # Assert that the dependencies are called with the expected arguments
+        mock_write_to_dataset.assert_called_once_with(
+            table=pa.Table.from_pandas(mock_get_changes.return_value),
+            root_path="gs://test_bucket/path/to/eimer/table1_changes",
+            partition_cols=None,
+            basename_template="merged_commit_mocked_uuid_{i}.parquet",
+            filesystem=ANY,
+        )
+        blob_1.delete.assert_called_once()
+        blob_2.delete.assert_called_once()
+
+    @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
+    @patch("eimerdb.instance.storage.Client")
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    @patch("eimerdb.instance.uuid4")
+    @patch("eimerdb.instance.pq.write_to_dataset")
+    @patch("eimerdb.instance.EimerDBInstance.get_changes")
+    def test_combine_inserts(
+        self,
+        mock_get_changes: Mock,
+        mock_write_to_dataset: Mock,
+        mock_uuid4: Mock,
+        _: Mock,
+        mock_client: Mock,
+        mock_fetch_credentials: Mock,
+        raw: bool,
     ) -> None:
         # Mock the return value of get_changes
         mock_get_changes.return_value = pd.DataFrame([{"row_id": "1", "field1": 1}])
