@@ -206,10 +206,25 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     @patch("eimerdb.instance.ds.dataset")
     def test_get_changes(self, mock_dataset: Mock, _: Mock) -> None:
-        schema = pa.schema([("row_id", pa.string()), ("field1", pa.int64())])
+        schema = pa.schema(
+            [
+                ("row_id", pa.string(), label="Unique row ID"),
+                ("field1", pa.int64(), label="Field 1"),
+                ("user", pa.string()),
+                ("datetime", pa.string()),
+                ("operation", pa.string()),
+            ]
+        )
 
         expected_table = pa.Table.from_pydict(
-            {"row_id": ["1"], "field1": [1]}, schema=schema
+            {
+                "row_id": ["1"],
+                "field1": [1],
+                "user": ["user42"],
+                "datetime": ["2024-03-12T12:00:00"],
+                "operation": ["insert"],
+            },
+            schema=schema,
         )
 
         dataset = Mock(spec=ds.Dataset)
@@ -239,11 +254,33 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         ]
     )
     def test_get_inserts(self, mock_dataset: Mock, raw: bool) -> None:
-        schema = pa.schema([("row_id", pa.string()), ("field1", pa.int64())])
+        schema_fields = [
+            ("row_id", pa.string(), label="Unique row ID"),
+            ("field1", pa.int64(), label="Field 1"),
+        ]
 
-        expected_table = pa.Table.from_pydict(
-            {"row_id": ["1"], "field1": [1]}, schema=schema
-        )
+        if not raw:
+            schema_fields.extend([
+                ("user", pa.string()),
+                ("datetime", pa.string()),
+                ("operation", pa.string()),
+            ])
+
+        schema = pa.schema(schema_fields)
+
+        expected_data = {
+            "row_id": ["1"],
+            "field1": [1],
+        }
+
+        if not raw:
+            expected_data.update({
+                "user": ["user42"],
+                "datetime": ["2024-03-12T12:00:00"],
+                "operation": ["insert"],
+            })
+
+        expected_table = pa.Table.from_pydict(expected_data, schema=schema)
 
         dataset = Mock(spec=ds.Dataset)
         dataset.to_table.return_value = expected_table
@@ -281,8 +318,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
         # Mock the return value of get_changes
         schema = pa.schema(
             [
-                ("row_id", pa.string()),
-                ("field1", pa.int64()),
+                ("row_id", pa.string(), label="Unique row ID"),
+                ("field1", pa.int64(), label="Field 1"),
                 ("user", pa.string()),
                 ("datetime", pa.string()),
                 ("operation", pa.string()),
@@ -353,8 +390,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     ) -> None:
         # Mock the return value of get_changes
         schema_fields = [
-            ("row_id", pa.string()),
-            ("field1", pa.int64()),
+            ("row_id", pa.string(), label="Unique row ID"),
+            ("field1", pa.int64(), label="Field1"),
         ]
 
         if not raw:
