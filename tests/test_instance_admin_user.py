@@ -234,8 +234,8 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.ds.dataset")
     @parameterized.expand(
         [
-            True,
-            False,
+            (True,),
+            (False,),
         ]
     )
     def test_get_inserts(self, mock_dataset: Mock, mock_fs: Mock, raw: bool) -> None:
@@ -319,6 +319,12 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
     @patch("eimerdb.instance.uuid4")
     @patch("eimerdb.instance.pq.write_to_dataset")
     @patch("eimerdb.instance.EimerDBInstance.get_changes")
+    @parameterized.expand(
+        [
+            (True,),
+            (False,),
+        ]
+    )
     def test_combine_inserts(
         self,
         mock_get_changes: Mock,
