@@ -756,6 +756,7 @@ class EimerDBInstance:
             # noinspection PyTypeChecker
             dataset = pq.read_table(
                 source=changes_files_max_depth,
+                schema=self._get_arrow_schema(table_name, True),
                 filesystem=fs,
                 columns=get_columns(local_changes_output),
             )
