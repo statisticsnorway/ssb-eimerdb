@@ -92,6 +92,10 @@ def arrow_schema_from_json(json_schema: list[dict[str, Any]]) -> pa.Schema:
             unit_end = data_type.find(")")
             unit = data_type[unit_start:unit_end]
             field_type = pa.timestamp(unit)
+        elif "dictionary" in data_type:
+            field_type = getattr(pa, data_type)(
+                field_dict["indices"], field_dict["values"]
+            )
         else:
             field_type = getattr(pa, data_type)()
 
