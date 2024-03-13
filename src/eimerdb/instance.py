@@ -25,7 +25,7 @@ from dapla import AuthClient
 from dapla import FileClient
 from gcsfs import GCSFileSystem
 from google.cloud import storage
-from pandas import DataFrame
+from pyarrow import Table
 
 from .eimerdb_constants import APPLICATION_JSON
 from .eimerdb_constants import BUCKET_KEY
@@ -587,7 +587,7 @@ class EimerDBInstance:
             table=deletion_table,
             root_path=f"gs://{self.bucket}/{table_path}",
             partition_cols=partitions,
-            basename_template=filename,
+            basename_template=f"commit_{uuid4()}_{{i}}.parquet",
             filesystem=fs,
         )
         return f"{df_deletions.shape[0]} rows deleted by {get_initials()}"

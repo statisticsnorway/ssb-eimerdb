@@ -244,6 +244,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             "test_bucket/path/to/eimer/table1_changes/",
             format="parquet",
             partitioning="hive",
+            schema=self.instance._get_arrow_schema("table1", True),
             filesystem=ANY,
         )
 
@@ -618,6 +619,7 @@ class TestEimerDBInstanceAdminUser(unittest.TestCase):
             root_path="gs://test_bucket/path/to/eimer/table1_changes",
             partition_cols=None,
             basename_template="commit_mocked_uuid_{i}.parquet",
+            schema=self.instance._get_arrow_schema("table1", True),
             filesystem=ANY,
         )
 
