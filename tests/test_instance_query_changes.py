@@ -1,3 +1,4 @@
+from typing import Union
 from unittest.mock import Mock
 from unittest.mock import patch
 
@@ -100,7 +101,7 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
             ), patch(
                 "eimerdb.instance.duckdb.query", return_value=mock_duckdb_query_result
             ):
-                result = self.instance.query_changes(
+                result: Union[pd.DataFrame, pa.Table] = self.instance.query_changes(
                     sql_query=self.VALID_QUERY,
                     unedited=unedited,
                     output_format=output_format,
