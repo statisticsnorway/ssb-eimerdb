@@ -14,9 +14,16 @@ import pyarrow as pa
 from dapla import AuthClient
 from google.cloud import storage
 
-logger = logging.getLogger(__name__)
+from eimerdb.eimerdb_constants import APPLICATION_JSON
+from eimerdb.eimerdb_constants import BUCKET_KEY
+from eimerdb.eimerdb_constants import COLUMNS_KEY
+from eimerdb.eimerdb_constants import CREATED_BY_KEY
+from eimerdb.eimerdb_constants import OPERATION_KEY
+from eimerdb.eimerdb_constants import SELECT_CLAUSE_KEY
+from eimerdb.eimerdb_constants import TABLE_NAME_KEY
+from eimerdb.eimerdb_constants import WHERE_CLAUSE_KEY
 
-APPLICATION_JSON = "application/json"
+logger = logging.getLogger(__name__)
 
 
 def get_datetime() -> str:
@@ -152,9 +159,9 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
         table_name, where_clause = delete_match.groups()
 
         return {
-            "operation": "DELETE",
-            "table_name": table_name,
-            "where_clause": where_clause.strip() if where_clause else None,
+            OPERATION_KEY: "DELETE",
+            TABLE_NAME_KEY: table_name,
+            WHERE_CLAUSE_KEY: where_clause.strip() if where_clause else None,
         }
 
     if update_match:
@@ -162,19 +169,19 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
         table_name, set_clause, where_clause = groups
 
         return {
-            "operation": "UPDATE",
-            "table_name": table_name,
+            OPERATION_KEY: "UPDATE",
+            TABLE_NAME_KEY: table_name,
             "set_clause": set_clause,
-            "where_clause": where_clause.strip() if where_clause else None,
+            WHERE_CLAUSE_KEY: where_clause.strip() if where_clause else None,
         }
 
     elif select_match:
         result = {
-            "operation": "SELECT",
-            "columns": ["*"],
-            "select_clause": select_clause,
-            "table_name": tables,
-            "where_clause": where_clause,
+            OPERATION_KEY: "SELECT",
+            COLUMNS_KEY: ["*"],
+            SELECT_CLAUSE_KEY: select_clause,
+            TABLE_NAME_KEY: tables,
+            WHERE_CLAUSE_KEY: where_clause,
         }
 
         return result
@@ -202,9 +209,9 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
     json_about = {
         "eimerdb_name": f"{name}",
         "path": f"gs://{bucket_name}/{full_path}",
-        "bucket": bucket_name,
+        BUCKET_KEY: bucket_name,
         "eimer_path": full_path,
-        "created_by": creator,
+        CREATED_BY_KEY: creator,
         "time_created": get_datetime(),
     }
 

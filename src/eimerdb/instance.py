@@ -27,7 +27,17 @@ from gcsfs import GCSFileSystem
 from google.cloud import storage
 from pyarrow import Table
 
-from .functions import APPLICATION_JSON
+from .eimerdb_constants import APPLICATION_JSON
+from .eimerdb_constants import BUCKET_KEY
+from .eimerdb_constants import COLUMNS_KEY
+from .eimerdb_constants import CREATED_BY_KEY
+from .eimerdb_constants import EDITABLE_KEY
+from .eimerdb_constants import OPERATION_KEY
+from .eimerdb_constants import PARTITION_COLUMNS_KEY
+from .eimerdb_constants import SCHEMA_KEY
+from .eimerdb_constants import TABLE_NAME_KEY
+from .eimerdb_constants import TABLE_PATH_KEY
+from .eimerdb_constants import WHERE_CLAUSE_KEY
 from .functions import arrow_schema_from_json
 from .functions import get_datetime
 from .functions import get_initials
@@ -45,10 +55,6 @@ ARROW_OUTPUT_FORMAT = "arrow"
 
 CHANGES_ALL = "all"
 CHANGES_RECENT = "recent"
-
-TABLE_PATH_KEY = "table_path"
-PARTITION_COLUMNS_KEY = "partition_columns"
-SCHEMA_KEY = "schema"
 
 SELECT_STAR_QUERY = "SELECT * FROM"
 
@@ -114,7 +120,7 @@ class EimerDBInstance:
         self.eimerdb_name = json_about["eimerdb_name"]
         self.path = json_about["path"]
         self.eimer_path = json_about["eimer_path"]
-        self.created_by = json_about["created_by"]
+        self.created_by = json_about[CREATED_BY_KEY]
         self.time_created = json_about["time_created"]
 
         initials = get_initials()
@@ -218,10 +224,10 @@ class EimerDBInstance:
 
         new_table = {
             table_name: {
-                "created_by": get_initials(),
+                CREATED_BY_KEY: get_initials(),
                 TABLE_PATH_KEY: f"{self.eimer_path}/{table_name}",
-                "bucket": self.bucket,
-                "editable": editable,
+                BUCKET_KEY: self.bucket,
+                EDITABLE_KEY: editable,
                 SCHEMA_KEY: schema,
                 PARTITION_COLUMNS_KEY: partition_columns,
             }
@@ -259,7 +265,7 @@ class EimerDBInstance:
         df_raw = df.copy()
         df_raw["user"] = get_initials()
         df_raw["datetime"] = get_datetime()
-        df_raw["operation"] = "insert"
+        df_raw[OPERATION_KEY] = "insert"
 
         table_raw = pa.Table.from_pandas(
             df_raw, schema=self._get_arrow_schema(table_name, True)
@@ -449,7 +455,7 @@ class EimerDBInstance:
         output_format: str = PANDAS_OUTPUT_FORMAT,
     ) -> Union[pd.DataFrame, pa.Table]:
         con = duckdb.connect()
-        tables = parsed_query["table_name"]
+        tables = parsed_query[TABLE_NAME_KEY]
 
         for table_name in tables:
             table_config = self.tables[table_name]
@@ -467,7 +473,7 @@ class EimerDBInstance:
             # noinspection PyTypeChecker
             df = pq.read_table(table_files, filesystem=fs)
             df_changes = None
-            editable = table_config["editable"]
+            editable = table_config[EDITABLE_KEY]
 
             if editable is True and unedited is False:
                 select_query = SELECT_STAR_QUERY
@@ -497,13 +503,13 @@ class EimerDBInstance:
         sql_query: str,
         partition_select: Optional[dict[str, Any]] = None,
     ) -> str:
-        table_name = parsed_query["table_name"]
-        where_clause = parsed_query["where_clause"]
+        table_name = parsed_query[TABLE_NAME_KEY]
+        where_clause = parsed_query[WHERE_CLAUSE_KEY]
 
         table_config = self.tables[table_name]
         partitions = table_config[PARTITION_COLUMNS_KEY]
 
-        if table_config["editable"] is not True:
+        if table_config[EDITABLE_KEY] is not True:
             raise ValueError(f"The table {table_name} is not editable!")
 
         df_update_results: pd.DataFrame = self.query(
@@ -521,6 +527,7 @@ class EimerDBInstance:
         con = duckdb.connect()
         con.register("dataset", dataset)
         con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
+
         sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
         con.execute(sql_query)
         df_updates_commits = con.table("updates").df()
@@ -545,22 +552,19 @@ class EimerDBInstance:
         parsed_query: dict[str, Any],
         partition_select: Optional[dict[str, Any]] = None,
     ) -> str:
-        table_name = parsed_query["table_name"]
-        table_config = self.tables[table_name]
-        editable = table_config["editable"]
+        table_name = parsed_query[TABLE_NAME_KEY]
+        where_clause = parsed_query[WHERE_CLAUSE_KEY]
 
-        if editable is False:
+        table_config = self.tables[table_name]
+
+        if table_config[EDITABLE_KEY] is not True:
             raise ValueError(f"The table {table_name} is not editable!")
 
-        table_name = parsed_query["table_name"]
-        where_clause = parsed_query["where_clause"]
-
-        table_config = self.tables[table_name]
         partitions = table_config[PARTITION_COLUMNS_KEY]
 
         df_delete_results: pd.DataFrame = self.query(
-            f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}",
-            partition_select,
+            sql_query=f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}",
+            partition_select=partition_select,
         )
 
         df_delete_results["user"] = get_initials()
@@ -575,24 +579,18 @@ class EimerDBInstance:
         con.execute(f"CREATE TABLE deletes AS FROM dataset WHERE {where_clause}")
 
         df_deletions = con.table("deletes").df()
-        df_deletions_len = len(df_deletions)
-
-        table_path = self.tables[table_name][TABLE_PATH_KEY] + "_changes"
+        table_path = table_config[TABLE_PATH_KEY] + "_changes"
         deletion_table = pa.Table.from_pandas(df_deletions, schema=arrow_schema)
-
-        unique_file_id = uuid4()
-        filename = f"commit_{unique_file_id}_{{i}}.parquet"
 
         # noinspection PyTypeChecker
         pq.write_to_dataset(
-            deletion_table,
+            table=deletion_table,
             root_path=f"gs://{self.bucket}/{table_path}",
             partition_cols=partitions,
-            basename_template=filename,
-            schema=self._get_arrow_schema(table_name, True),
+            basename_template=f"commit_{uuid4()}_{{i}}.parquet",
             filesystem=fs,
         )
-        return f"{df_deletions_len} rows deleted by {get_initials()}"
+        return f"{df_deletions.shape[0]} rows deleted by {get_initials()}"
 
     def query(
         self,
@@ -621,7 +619,7 @@ class EimerDBInstance:
             )
 
         parsed_query: dict[str, Any] = parse_sql_query(sql_query)
-        query_operation = parsed_query["operation"]
+        query_operation = parsed_query[OPERATION_KEY]
         fs = FileClient.get_gcs_file_system()
 
         match query_operation:
@@ -683,118 +681,136 @@ class EimerDBInstance:
         if output_format not in (PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT):
             raise ValueError(f"Invalid output format: {output_format}")
 
+        # Validate changes_output
+        if changes_output not in (CHANGES_ALL, CHANGES_RECENT):
+            raise ValueError(f"Invalid changes output: {changes_output}")
+
         parsed_query = parse_sql_query(sql_query)
-        if parsed_query["operation"] != "SELECT":
-            return None
+        # Check if the operation is SELECT
+        if parsed_query[OPERATION_KEY] != "SELECT":
+            raise ValueError(
+                f"Operation {parsed_query[OPERATION_KEY]} is not supported."
+            )
 
-        table_name = parsed_query["table_name"][0]
-
+        table_name = parsed_query[TABLE_NAME_KEY][0]
         table_config = self.tables[table_name]
-        editable = table_config["editable"]
-        instance_name = self.eimerdb_name
-        table_schema = arrow_schema_from_json(self.tables[table_name][SCHEMA_KEY])
 
-        df: Optional[Any] = None
-        df_changes: Optional[Any] = None
+        def get_partition_levels() -> str:
+            partitions = table_config[PARTITION_COLUMNS_KEY]
+            partitions_len = len(partitions) if partitions is not None else 0
+            return "**/" * partitions_len + "*"
 
-        try:
-            columns = parsed_query["columns"]
-        except ValueError:
-            columns = None
+        def get_columns(_local_changes_output: str) -> Optional[list[str]]:
+            if _local_changes_output == CHANGES_RECENT:
+                return None
 
-        if columns == ["*"]:
-            columns = None
+            columns = parsed_query.get(COLUMNS_KEY)
+            if columns == ["*"]:
+                return None
 
-        partitions = table_config[PARTITION_COLUMNS_KEY]
-        bucket_name = table_config["bucket"]
-        partitions_len = len(partitions) if partitions is not None else 0
-        partition_levels = "**/" * partitions_len + "*"
+            return columns
+
+        def get_duckdb_query(_local_changes_output: str) -> str:
+            modified_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
+
+            if _local_changes_output == CHANGES_RECENT:
+                return modified_query
+
+            if (
+                get_columns(_local_changes_output) is not None
+                and table_config[EDITABLE_KEY] is True
+                and unedited is not True
+            ):
+                # add row_id to the select clause
+                return modified_query.replace(" FROM", ", row_id FROM")
+
+            return modified_query
+
         fs = FileClient.get_gcs_file_system()
-        table_name_changes = table_name + "_changes"
-        table_files_changes = fs.glob(
-            f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes}/{partition_levels}"
-        )
 
-        max_depth = 0
-        try:
-            max_depth = max(obj.count("/") for obj in table_files_changes)
-            no_changes = False
-        except ValueError:
-            no_changes = True
-            if output_format == PANDAS_OUTPUT_FORMAT:
-                df_changes = pd.DataFrame()
-            elif output_format == ARROW_OUTPUT_FORMAT:
-                df_changes = pa.table(pd.DataFrame())
+        def get_change_dataset(local_changes_output: str) -> Optional[Table]:
+            changes_suffix = (
+                "changes_all" if local_changes_output == CHANGES_ALL else "changes"
+            )
 
-        if no_changes is not True:
-            table_files_changes = [
-                obj for obj in table_files_changes if obj.count("/") == max_depth
+            changes_files = fs.glob(
+                f"gs://{table_config[BUCKET_KEY]}/eimerdb/{self.eimerdb_name}/{table_name}_{changes_suffix}/"
+                f"{get_partition_levels()}"
+            )
+
+            try:
+                max_depth = max(obj.count("/") for obj in changes_files)
+            except ValueError:
+                return None
+
+            changes_files_max_depth = [
+                obj for obj in changes_files if obj.count("/") == max_depth
             ]
+
             if partition_select is not None:
-                table_files_changes = filter_partitions(
-                    table_files_changes,
-                    partition_select,
-                )
-
-            # noinspection PyTypeChecker
-            dataset: pa.Table = pq.read_table(table_files_changes, filesystem=fs)
-            sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
-            if dataset.num_rows != 0:
-                con = duckdb.connect()
-                if output_format == PANDAS_OUTPUT_FORMAT:
-                    df_changes = con.execute(sql_query).df()
-                elif output_format == ARROW_OUTPUT_FORMAT:
-                    df_changes = con.execute(sql_query).arrow()
-
-            elif dataset.num_rows == 0:
-                if output_format == PANDAS_OUTPUT_FORMAT:
-                    df_changes = pd.DataFrame()
-                elif output_format == ARROW_OUTPUT_FORMAT:
-                    df_changes = pa.table(pd.DataFrame())
-
-        table_name_changes_all = table_name + "_changes_all"
-        table_files_changes_all = fs.glob(
-            f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_changes_all}/{partition_levels}"
-        )
-        try:
-            max_depth = max(obj.count("/") for obj in table_files_changes_all)
-            no_changes_all = False
-        except ValueError:
-            no_changes_all = True
-
-        if no_changes_all is not True:
-            table_files_changes_all = [
-                obj for obj in table_files_changes_all if obj.count("/") == max_depth
-            ]
-            if partition_select is not None:
-                table_files_changes_all = filter_partitions(
-                    table_files_changes_all, partition_select
+                changes_files_max_depth = filter_partitions(
+                    table_files=changes_files_max_depth,
+                    partition_select=partition_select,
                 )
 
             # noinspection PyTypeChecker
             dataset = pq.read_table(
-                table_files_changes_all, filesystem=fs, columns=columns
+                source=changes_files_max_depth,
+                schema=self._get_arrow_schema(table_name, True),
+                filesystem=fs,
+                columns=get_columns(local_changes_output),
             )
 
-            sql_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
-            if columns is not None and editable is True and unedited is False:
-                sql_query = sql_query.replace(" FROM", ", row_id FROM")
-            if dataset.num_rows != 0:
-                con = duckdb.connect()
-                if output_format == PANDAS_OUTPUT_FORMAT:
-                    df_changes_all = con.execute(sql_query).df()
-                    df = pd.concat([df_changes_all, df_changes])
-                elif output_format == ARROW_OUTPUT_FORMAT:
-                    df_changes_all = con.execute(sql_query).arrow()
-                    df = pa.concat_tables([df_changes_all, df_changes])
-                    df = df.cast(table_schema)
+            return dataset if dataset.num_rows > 0 else None
 
+        def get_changes_query_result(
+            local_changes_output: str,
+        ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+            dataset = get_change_dataset(local_changes_output)
+            if dataset is None:
+                return None
+
+            query_result = duckdb.query(get_duckdb_query(local_changes_output))
+            if output_format == PANDAS_OUTPUT_FORMAT:
+                return query_result.df()
+            else:
+                column_order = [
+                    field.name for field in self._get_arrow_schema(table_name, True)
+                ]
+                return query_result.arrow().select(column_order)
+
+        def cast_if_arrow(
+            table: Optional[Union[pd.DataFrame, pa.Table]]
+        ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+            if table is None or output_format == PANDAS_OUTPUT_FORMAT:
+                return table
+
+            return table.cast(self._get_arrow_schema(table_name, True))
+
+        def concat_changes(
+            first: Optional[Union[pd.DataFrame, pa.Table]],
+            second: Optional[Union[pd.DataFrame, pa.Table]],
+        ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+            if first is None and second is None:
+                return None
+
+            if first is None:
+                return cast_if_arrow(second)
+
+            if second is None:
+                return cast_if_arrow(first)
+
+            if output_format == PANDAS_OUTPUT_FORMAT:
+                return pd.concat([first, second])
+            else:
+                table = pa.concat_tables([first, second])
+                return cast_if_arrow(table)
+
+        # method body
         if changes_output == CHANGES_ALL:
-            if no_changes_all is not True:
-                return df
-            elif no_changes_all is True:
-                return df_changes
-        elif changes_output == CHANGES_RECENT:
-            return df_changes
+            return concat_changes(
+                first=get_changes_query_result(CHANGES_ALL),
+                second=get_changes_query_result(CHANGES_RECENT),
+            )
         else:
-            return None
+            return cast_if_arrow(get_changes_query_result(changes_output))

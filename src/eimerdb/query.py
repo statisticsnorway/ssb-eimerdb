@@ -4,6 +4,9 @@ from typing import Optional
 import pyarrow as pa
 from gcsfs import GCSFileSystem
 
+from eimerdb.eimerdb_constants import BUCKET_KEY
+from eimerdb.eimerdb_constants import PARTITION_COLUMNS_KEY
+
 
 def get_partitioned_files(
     table_name: str,
@@ -31,8 +34,8 @@ def get_partitioned_files(
         list[str]: A list of file paths corresponding to the partitioned files of the table.
 
     """
-    partitions = table_config["partition_columns"]
-    bucket_name = table_config["bucket"]
+    partitions = table_config[PARTITION_COLUMNS_KEY]
+    bucket_name = table_config[BUCKET_KEY]
     partitions_len = len(partitions) if partitions is not None else 0
     partition_levels = "**/" * partitions_len + "*"
 
@@ -135,7 +138,9 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
 
     df_filtered = pa.compute.filter(df, filter_array)
 
-    df_filtered = df_filtered.cast(df_updates.schema)
+    column_order = [field.name for field in df_updates.schema]
+
+    df_filtered = df_filtered.select(column_order).cast(df_updates.schema)
 
     df_updated = pa.concat_tables([df_filtered, df_updates])
 
