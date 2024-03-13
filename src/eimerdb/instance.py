@@ -25,7 +25,7 @@ from dapla import AuthClient
 from dapla import FileClient
 from gcsfs import GCSFileSystem
 from google.cloud import storage
-from pandas import DataFrame
+from pyarrow import Table
 
 from .functions import APPLICATION_JSON
 from .functions import arrow_schema_from_json
@@ -301,14 +301,14 @@ class EimerDBInstance:
         )
         print("Data successfully inserted!")
 
-    def get_changes(self, table_name: str) -> DataFrame:
+    def get_changes(self, table_name: str) -> Table:
         """Retrieve changes for a given table.
 
         Args:
             table_name (str): The name of the table for which changes are to be retrieved.
 
         Returns:
-            DataFrame: A pandas DataFrame containing the changes for the specified table.
+            Table: A pyarrow table containing the changes for the specified table.
         """
         path = self.tables[table_name][TABLE_PATH_KEY]
 
@@ -318,11 +318,42 @@ class EimerDBInstance:
             f"{self.bucket}/{path}_changes/",
             format="parquet",
             partitioning="hive",
+            schema=self._get_arrow_schema(table_name, True),
             filesystem=fs,
         )
 
-        df_changes: DataFrame = dataset.to_table().to_pandas()
+        df_changes: Table = dataset.to_table()
         return df_changes
+
+    def get_inserts(self, table_name: str, raw: bool) -> pa.Table:
+        """Retrieve changes for a given table.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be retrieved.
+            raw (bool): Indicates whether to retrieve the raw schema.
+
+        Returns:
+            DataFrame: A pandas DataFrame containing the changes for the specified table.
+        """
+        if raw is True:
+            suffix = "_raw"
+        else:
+            suffix = ""
+
+        path = self.tables[table_name][TABLE_PATH_KEY] + suffix
+
+        fs = FileClient.get_gcs_file_system()
+        # noinspection PyTypeChecker
+        dataset = ds.dataset(
+            f"{self.bucket}/{path}/",
+            format="parquet",
+            partitioning="hive",
+            schema=self._get_arrow_schema(table_name, raw),
+            filesystem=fs,
+        )
+
+        df_inserts: pa.Table = dataset.to_table()
+        return df_inserts
 
     def combine_changes(self, table_name: str) -> None:
         """Combines the files containing the changes of the table into one file.
@@ -339,16 +370,50 @@ class EimerDBInstance:
 
         # noinspection PyTypeChecker
         pq.write_to_dataset(
-            table=pa.Table.from_pandas(self.get_changes(table_name)),
+            table=self.get_changes(table_name),
             root_path=f"gs://{self.bucket}/{source_folder}",
             partition_cols=partitions,
             basename_template=f"merged_commit_{uuid4()}_{{i}}.parquet",
+            schema=self._get_arrow_schema(table_name, True),
             filesystem=FileClient.get_gcs_file_system(),
         )
         for blob in blobs_to_delete:
             blob.delete()
 
         print("The changes were successfully merged into one file per partition!")
+
+    def combine_inserts(self, table_name: str, raw: bool) -> None:
+        """Combines the files containing the inserts of the table into one file.
+
+        Args:
+            table_name (str): The name of the table.
+            raw (bool): Indicates whether to retrieve the raw schema.
+        """
+        if raw is True:
+            suffix = "/_raw"
+        else:
+            suffix = ""
+
+        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        bucket = client.bucket(self.bucket)
+
+        partitions = self.tables[table_name][PARTITION_COLUMNS_KEY]
+        source_folder = self.tables[table_name][TABLE_PATH_KEY] + suffix
+        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
+
+        # noinspection PyTypeChecker
+        pq.write_to_dataset(
+            table=self.get_inserts(table_name, raw),
+            root_path=f"gs://{self.bucket}/{source_folder}",
+            partition_cols=partitions,
+            basename_template=f"merged_commit_{uuid4()}_{{i}}.parquet",
+            schema=self._get_arrow_schema(table_name, raw),
+            filesystem=FileClient.get_gcs_file_system(),
+        )
+        for blob in blobs_to_delete:
+            blob.delete()
+
+        print("The inserts were successfully merged into one file per partition!")
 
     def _get_arrow_schema(
         self,
@@ -469,6 +534,7 @@ class EimerDBInstance:
             root_path=f"gs://{self.bucket}/{table_path}",
             partition_cols=partitions,
             basename_template=f"commit_{uuid4()}_{{i}}.parquet",
+            schema=self._get_arrow_schema(table_name, True),
             filesystem=fs,
         )
         return f"{df_updates_commits.shape[0]} rows updated by {get_initials()}"
@@ -523,6 +589,7 @@ class EimerDBInstance:
             root_path=f"gs://{self.bucket}/{table_path}",
             partition_cols=partitions,
             basename_template=filename,
+            schema=self._get_arrow_schema(table_name, True),
             filesystem=fs,
         )
         return f"{df_deletions_len} rows deleted by {get_initials()}"
