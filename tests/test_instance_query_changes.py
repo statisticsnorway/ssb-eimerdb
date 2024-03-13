@@ -109,10 +109,5 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
 
             # Assertions
             self.assertIsNotNone(result)
-
-            if isinstance(result, pd.DataFrame):
-                assert result.shape[0] == expected_rows
-            else:
-                assert result.num_rows == expected_rows
-
+            assert len(result) == expected_rows
             assert mock_fs.glob.call_count == expected_rows
