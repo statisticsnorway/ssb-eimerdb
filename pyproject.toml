@@ -73,7 +73,7 @@ show_missing = true
 fail_under = 50
 
 [tool.mypy]
-strict = false
+strict = true
 warn_unreachable = true
 pretty = true
 show_column_numbers = true
@@ -87,7 +87,6 @@ module = [
     "google.cloud.*",
     "pandas.*",
     "pyarrow.*",
-    "parameterized.*",
 ]
 ignore_missing_imports = true
 
