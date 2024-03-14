@@ -20,6 +20,7 @@ from eimerdb.eimerdb_constants import COLUMNS_KEY
 from eimerdb.eimerdb_constants import CREATED_BY_KEY
 from eimerdb.eimerdb_constants import OPERATION_KEY
 from eimerdb.eimerdb_constants import SELECT_CLAUSE_KEY
+from eimerdb.eimerdb_constants import SET_CLAUSE_KEY
 from eimerdb.eimerdb_constants import TABLE_NAME_KEY
 from eimerdb.eimerdb_constants import WHERE_CLAUSE_KEY
 
@@ -72,6 +73,21 @@ def get_json(bucket_name: str, blob_path: str) -> dict[str, Any]:
     return data
 
 
+def _get_timestamp_data_type(data_type: str) -> pa.TimestampType:
+    """A function that returns the timestamp data type.
+
+    Args:
+        data_type (str): The timestamp data type.
+
+    Returns:
+        pa.TimestampType: The PyArrow timestamp data type.
+    """
+    unit_start = data_type.find("(") + 1
+    unit_end = data_type.find(")")
+    unit = data_type[unit_start:unit_end]
+    return pa.timestamp(unit)
+
+
 def arrow_schema_from_json(json_schema: list[dict[str, Any]]) -> pa.Schema:
     """A function that converts a JSON schema to an Arrow schema.
 
@@ -88,10 +104,7 @@ def arrow_schema_from_json(json_schema: list[dict[str, Any]]) -> pa.Schema:
         label = field_dict["label"]
 
         if "timestamp" in data_type:
-            unit_start = data_type.find("(") + 1
-            unit_end = data_type.find(")")
-            unit = data_type[unit_start:unit_end]
-            field_type = pa.timestamp(unit)
+            field_type = _get_timestamp_data_type(data_type)
         elif "dictionary" in data_type:
             field_type = getattr(pa, data_type)(
                 field_dict["indices"], field_dict["values"]
@@ -106,6 +119,25 @@ def arrow_schema_from_json(json_schema: list[dict[str, Any]]) -> pa.Schema:
     return pa.schema(fields)
 
 
+select_pattern = re.compile(r"\bSELECT\b")
+from_pattern = re.compile(r"\bFROM\s+(\w+)")
+join_pattern = re.compile(r"JOIN\s+(\w+)\s+ON")
+where_pattern = re.compile(
+    r"WHERE\s+((?!GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET|FETCH|UNION|INT"
+    r"ERSECT|EXCEPT|INTO|TABLESAMPLE).*?)\s*(?:GROUP\s+BY|HAVING|ORDER\s+BY|"
+    r"LIMIT|OFFSET|FETCH|UNION|INTERSECT|EXCEPT|INTO|TABLESAMPLE|$)",
+)
+
+update_pattern = re.compile(
+    r"^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$",
+    re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE,
+)
+
+delete_pattern = re.compile(
+    r"^DELETE\s+FROM\s+(\w+)\s+(?:WHERE\s+(.*))?$", re.IGNORECASE | re.DOTALL
+)
+
+
 def parse_sql_query(sql_query: str) -> dict[str, Any]:
     """A function that parses the provided SQL query.
 
@@ -118,42 +150,9 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
     Raises:
         ValueError: If there is a syntax error or if the query is not supported.
     """
-    select_pattern = re.compile(r"\bSELECT\b")
-    from_pattern = re.compile(r"\bFROM\s+(\w+)")
-    join_pattern = re.compile(r"JOIN\s+(\w+)\s+ON")
-    where_pattern = re.compile(
-        r"WHERE\s+((?!(?:GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET|FETCH|UNION|"
-        r"INTERSECT|EXCEPT|INTO|TABLESAMPLE)).*?)\s*(?:GROUP\s+BY|HAVING|ORDER\s+BY|"
-        r"LIMIT|OFFSET|FETCH|UNION|INTERSECT|EXCEPT|INTO|TABLESAMPLE|$)",
-    )
-
-    update_pattern = re.compile(
-        r"^UPDATE\s+(\w+)\s+SET\s+(.*?)\s+(?:WHERE\s+(.*))?$",
-        re.IGNORECASE | re.MULTILINE | re.DOTALL | re.VERBOSE,
-    )
-
-    update_match = re.match(update_pattern, sql_query)
-
-    delete_pattern = re.compile(
-        r"^DELETE\s+FROM\s+(\w+)\s+(?:WHERE\s+(.*))?$", re.IGNORECASE | re.DOTALL
-    )
-
-    delete_match = re.match(delete_pattern, sql_query)
-
-    select_clause = ""
-    where_clause = ""
-
     select_match = select_pattern.search(sql_query)
-
-    from_match: list[Any] = from_pattern.findall(sql_query)
-    join_tables: list[Any] = join_pattern.findall(sql_query)
-
-    tables = from_match + join_tables
-
-    where_match = where_pattern.search(sql_query)
-
-    if where_match:
-        where_clause = where_match.group(1).strip()
+    update_match = re.match(update_pattern, sql_query)
+    delete_match = re.match(delete_pattern, sql_query)
 
     if delete_match:
         table_name, where_clause = delete_match.groups()
@@ -161,35 +160,33 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
         return {
             OPERATION_KEY: "DELETE",
             TABLE_NAME_KEY: table_name,
-            WHERE_CLAUSE_KEY: where_clause.strip() if where_clause else None,
+            WHERE_CLAUSE_KEY: where_clause,
         }
 
     if update_match:
-        groups = update_match.groups()
-        table_name, set_clause, where_clause = groups
+        table_name, set_clause, where_clause = update_match.groups()
 
         return {
             OPERATION_KEY: "UPDATE",
             TABLE_NAME_KEY: table_name,
-            "set_clause": set_clause,
-            WHERE_CLAUSE_KEY: where_clause.strip() if where_clause else None,
-        }
-
-    elif select_match:
-        result = {
-            OPERATION_KEY: "SELECT",
-            COLUMNS_KEY: ["*"],
-            SELECT_CLAUSE_KEY: select_clause,
-            TABLE_NAME_KEY: tables,
+            SET_CLAUSE_KEY: set_clause,
             WHERE_CLAUSE_KEY: where_clause,
         }
 
-        return result
+    if select_match:
+        join_tables: list[Any] = join_pattern.findall(sql_query)
+        from_match: list[Any] = from_pattern.findall(sql_query)
+        where_match = where_pattern.search(sql_query)
 
-    else:
-        raise ValueError(
-            "Error parsing sql-query. Syntax error or query not supported."
-        )
+        return {
+            OPERATION_KEY: "SELECT",
+            COLUMNS_KEY: ["*"],
+            SELECT_CLAUSE_KEY: "",
+            TABLE_NAME_KEY: from_match + join_tables,
+            WHERE_CLAUSE_KEY: where_match.group(1) if where_match else None,
+        }
+
+    raise ValueError("Error parsing sql-query. Syntax error or query not supported.")
 
 
 def create_eimerdb(bucket_name: str, db_name: str) -> None:
