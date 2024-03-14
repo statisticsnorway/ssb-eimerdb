@@ -127,12 +127,13 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
         join_type="inner"
     ).combine_chunks()
 
-    # Separate updates and deletions
-    df_updates = df_changes.filter(pa.compute.field("operation") == "update")
-    df_updates = df_updates.drop(["datetime", "operation", "user"])
+    def filter_on_operation_and_drop_columns(operation: str) -> pa.Table:
+        _df = df_changes.filter(pa.compute.field("operation") == operation)
+        return _df.drop(["datetime", "operation", "user"])
 
-    df_deletes = df_changes.filter(pa.compute.field("operation") == "delete")
-    df_deletes = df_deletes.drop(["datetime", "operation", "user"])
+    # Separate updates and deletions
+    df_updates = filter_on_operation_and_drop_columns("update")
+    df_deletes = filter_on_operation_and_drop_columns("delete")
 
     # Filter out rows to be deleted
     filter_array = pa.compute.invert(pa.compute.is_in(df["row_id"], df_changes["row_id"]))
