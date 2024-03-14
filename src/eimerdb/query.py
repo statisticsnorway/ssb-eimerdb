@@ -116,15 +116,15 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
     )
 
     # Aggregate max datetime per row_id
-    row_id_max: pa.Table = df_changes.group_by("row_id").aggregate([("datetime", "max")])
+    row_id_max: pa.Table = df_changes.group_by("row_id").aggregate(
+        [("datetime", "max")]
+    )
     row_id_max = row_id_max.select(["row_id", "datetime_max"])
     row_id_max = row_id_max.rename_columns(["row_id", "datetime"])
 
     # Join df_changes with row_id_max to get the latest changes
     df_changes = df_changes.join(
-        row_id_max,
-        ["row_id", "datetime"],
-        join_type="inner"
+        row_id_max, ["row_id", "datetime"], join_type="inner"
     ).combine_chunks()
 
     def filter_on_operation_and_drop_columns(operation: str) -> pa.Table:
@@ -136,7 +136,9 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
     df_deletes = filter_on_operation_and_drop_columns("delete")
 
     # Filter out rows to be deleted
-    filter_array = pa.compute.invert(pa.compute.is_in(df["row_id"], df_changes["row_id"]))
+    filter_array = pa.compute.invert(
+        pa.compute.is_in(df["row_id"], df_changes["row_id"])
+    )
     df_filtered = pa.compute.filter(df, filter_array)
     column_order = [field.name for field in df_updates.schema]
 
