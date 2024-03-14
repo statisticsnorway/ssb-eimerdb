@@ -107,7 +107,6 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
 
     """
     timestamp_column = df_changes["datetime"].cast(pa.timestamp("ns"))
-
     df_changes = df_changes.drop(["datetime"])
 
     df_changes = df_changes.add_column(
@@ -116,37 +115,43 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
         timestamp_column,
     )
 
-    row_id_max = df_changes.group_by("row_id").aggregate([("datetime", "max")])
-    new_names = ["row_id", "datetime"]
+    # Aggregate max datetime per row_id
+    row_id_max: pa.Table = df_changes.group_by("row_id").aggregate(
+        [("datetime", "max")]
+    )
     row_id_max = row_id_max.select(["row_id", "datetime_max"])
+    row_id_max = row_id_max.rename_columns(["row_id", "datetime"])
 
-    row_id_max = row_id_max.rename_columns(new_names)
-
+    # Join df_changes with row_id_max to get the latest changes
     df_changes = df_changes.join(
         row_id_max, ["row_id", "datetime"], join_type="inner"
     ).combine_chunks()
 
-    df_updates = df_changes.filter(pa.compute.field("operation") == "update")
+    def filter_on_operation_and_drop_columns(operation: str) -> pa.Table:
+        _df = df_changes.filter(pa.compute.field("operation") == operation)
+        return _df.drop(["datetime", "operation", "user"])
 
-    df_deletes = df_changes.filter(pa.compute.field("operation") == "delete")
+    # Separate updates and deletions
+    df_updates = filter_on_operation_and_drop_columns("update")
+    df_deletes = filter_on_operation_and_drop_columns("delete")
 
-    df_updates = df_updates.drop(["datetime", "operation", "user"])
-    df_deletes = df_deletes.drop(["datetime", "operation", "user"])
-
-    row_id_updates = df_changes["row_id"]
-    filter_array = pa.compute.invert(pa.compute.is_in(df["row_id"], row_id_updates))
-
+    # Filter out rows to be deleted
+    filter_array = pa.compute.invert(
+        pa.compute.is_in(df["row_id"], df_changes["row_id"])
+    )
     df_filtered = pa.compute.filter(df, filter_array)
-
     column_order = [field.name for field in df_updates.schema]
 
+    # Select relevant columns and update schema
     df_filtered = df_filtered.select(column_order).cast(df_updates.schema)
 
+    # Combine filtered data with updates
     df_updated = pa.concat_tables([df_filtered, df_updates])
 
-    row_id_deletes = df_deletes["row_id"]
+    # Filter out rows marked for deletion
     filter_array_deletes = pa.compute.invert(
-        pa.compute.is_in(df_updated["row_id"], row_id_deletes)
+        pa.compute.is_in(df_updated["row_id"], df_deletes["row_id"])
     )
     df_output: pa.Table = pa.compute.filter(df_updated, filter_array_deletes)
+
     return df_output

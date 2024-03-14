@@ -10,14 +10,14 @@ from tests.test_instance_base import TestEimerDBInstanceBase
 
 
 class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
-
-    VALID_QUERY = "SELECT * FROM table1 WHERE row_id='1'"
+    VALID_STAR_QUERY = "SELECT * FROM table1 WHERE row_id='1'"
+    VALID_SELECT_QUERY = "SELECT field1 FROM table1 WHERE row_id='1'"
 
     def test_query_changes_invalid_output_format_expect_exception(self):
         # Test & Assertion
         with self.assertRaises(ValueError) as context:
             self.instance.query_changes(
-                sql_query=self.VALID_QUERY, output_format="invalid"
+                sql_query=self.VALID_STAR_QUERY, output_format="invalid"
             )
         self.assertEqual("Invalid output format: invalid", str(context.exception))
 
@@ -25,7 +25,7 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
         # Test & Assertion
         with self.assertRaises(ValueError) as context:
             self.instance.query_changes(
-                sql_query=self.VALID_QUERY, changes_output="invalid"
+                sql_query=self.VALID_STAR_QUERY, changes_output="invalid"
             )
         self.assertEqual("Invalid changes output: invalid", str(context.exception))
 
@@ -39,16 +39,17 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
 
     @parameterized.expand(
         [
-            (True, "pandas", "all", 2),
-            (False, "pandas", "all", 2),
-            (False, "pandas", "recent", 1),
-            (True, "arrow", "all", 2),
-            (False, "arrow", "all", 2),
-            (False, "arrow", "recent", 1),
+            (VALID_STAR_QUERY, True, "pandas", "all", 2),
+            (VALID_SELECT_QUERY, False, "pandas", "all", 2),
+            (VALID_STAR_QUERY, False, "pandas", "recent", 1),
+            (VALID_SELECT_QUERY, True, "pandas", "all", 2),
+            (VALID_STAR_QUERY, False, "arrow", "all", 2),
+            (VALID_STAR_QUERY, False, "arrow", "recent", 1),
         ]
     )
     def test_query_changes_pandas_all(
         self,
+        sql_query: str,
         unedited: bool,
         output_format: str,
         changes_output: str,
@@ -57,58 +58,51 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
         # Mock the file system
         mock_fs = Mock()
 
-        with patch(
-            "eimerdb.instance.FileClient.get_gcs_file_system"
-        ) as mock_get_gcs_file_system:
-            mock_get_gcs_file_system.return_value = mock_fs
+        mock_fs.glob.return_value = [
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1"
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes_all/part1"
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1",
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part2",
+        ]
 
-            mock_fs.glob.return_value = [
-                "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1"
-                "gs://bucket/eimerdb/eimerdb_name/table1_changes_all/part1"
-                "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1",
-                "gs://bucket/eimerdb/eimerdb_name/table1_changes/part2",
+        # Mock the table data
+        mock_table_data = Mock()
+        mock_table_data.num_rows = 2  # Mocking non-empty table
+
+        mock_table_data_df = Mock()
+        mock_table_data_df.return_value = mock_table_data
+
+        expected_df = pd.DataFrame.from_records(
+            [
+                {
+                    "row_id": "1",
+                    "field1": 1,
+                    "user": "user1",
+                    "datetime": "2021-01-01T00:00:00Z",
+                    "operation": "INSERT",
+                }
             ]
+        )
 
-            # Mock the table data
-            mock_table_data = Mock()
-            mock_table_data.num_rows = 2  # Mocking non-empty table
+        # Mock the duckdb query result
+        mock_duckdb_query_result = Mock()
+        mock_duckdb_query_result.df.return_value = expected_df
+        mock_duckdb_query_result.arrow.return_value = pa.Table.from_pandas(expected_df)
 
-            mock_table_data_df = Mock()
-            mock_table_data_df.return_value = mock_table_data
-
-            expected_df = pd.DataFrame.from_records(
-                [
-                    {
-                        "row_id": "1",
-                        "field1": 1,
-                        "user": "user1",
-                        "datetime": "2021-01-01T00:00:00Z",
-                        "operation": "INSERT",
-                    }
-                ]
+        # Patching methods with mocks
+        with patch(
+            "eimerdb.instance.FileClient.get_gcs_file_system", return_value=mock_fs
+        ), patch("eimerdb.instance.pq.read_table", return_value=mock_table_data), patch(
+            "eimerdb.instance.duckdb.query", return_value=mock_duckdb_query_result
+        ):
+            result: Union[pd.DataFrame, pa.Table] = self.instance.query_changes(
+                sql_query=sql_query,
+                unedited=unedited,
+                output_format=output_format,
+                changes_output=changes_output,
             )
 
-            # Mock the duckdb query result
-            mock_duckdb_query_result = Mock()
-            mock_duckdb_query_result.df.return_value = expected_df
-            mock_duckdb_query_result.arrow.return_value = pa.Table.from_pandas(
-                expected_df
-            )
-
-            # Patching methods with mocks
-            with patch(
-                "eimerdb.instance.pq.read_table", return_value=mock_table_data
-            ), patch(
-                "eimerdb.instance.duckdb.query", return_value=mock_duckdb_query_result
-            ):
-                result: Union[pd.DataFrame, pa.Table] = self.instance.query_changes(
-                    sql_query=self.VALID_QUERY,
-                    unedited=unedited,
-                    output_format=output_format,
-                    changes_output=changes_output,
-                )
-
-            # Assertions
-            self.assertIsNotNone(result)
-            assert len(result) == expected_rows
-            assert mock_fs.glob.call_count == expected_rows
+        # Assertions
+        self.assertIsNotNone(result)
+        assert len(result) == expected_rows
+        assert mock_fs.glob.call_count == expected_rows
