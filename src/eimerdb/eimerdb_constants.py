@@ -6,6 +6,7 @@ COLUMNS_KEY = "columns"
 OPERATION_KEY = "operation"
 SELECT_CLAUSE_KEY = "select_clause"
 WHERE_CLAUSE_KEY = "where_clause"
+SET_CLAUSE_KEY = "set_clause"
 
 # table config keys
 CREATED_BY_KEY = "created_by"

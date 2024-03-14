@@ -21,6 +21,10 @@ class TestFunctions(unittest.TestCase):
         # Check if the string matches the expected format
         self.assertRegex(result, r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d+")
 
+    #
+    # get_initials
+    #
+
     @patch("eimerdb.functions.AuthClient.fetch_local_user_from_jupyter")
     def test_get_initials_with_mock(self, mock_fetch: Mock) -> None:
         mock_fetch.return_value = {"username": "john.doe@example.com"}
@@ -52,7 +56,15 @@ class TestFunctions(unittest.TestCase):
             {"name": "field1", "type": "int8", "label": "Field 1"},
             {"name": "field2", "type": "string", "label": "Field 2"},
             {"name": "field3", "type": "timestamp(us)", "label": "Field 3"},
+            {
+                "name": "field4",
+                "type": "dictionary",
+                "indices": pa.int32(),
+                "values": pa.string(),
+                "label": "Field 4",
+            },
         ]
+
         result = arrow_schema_from_json(json_schema)
 
         assert result == pa.schema(
@@ -60,13 +72,26 @@ class TestFunctions(unittest.TestCase):
                 pa.field("field1", pa.int8(), metadata={"label": "Field 1"}),
                 pa.field("field2", pa.string(), metadata={"label": "Field 2"}),
                 pa.field("field3", pa.timestamp("us"), metadata={"label": "Field 3"}),
+                pa.field(
+                    "field4",
+                    pa.dictionary(pa.int32(), pa.string()),
+                    metadata={"label": "Field 4"},
+                ),
             ]
+        )
+
+    def test_parse_sql_query_invalid_operation_expect_exception(self) -> None:
+        sql_query = "INVALID OPERATION"
+        with self.assertRaises(ValueError) as context:
+            parse_sql_query(sql_query)
+        self.assertEqual(
+            "Error parsing sql-query. Syntax error or query not supported.",
+            str(context.exception),
         )
 
     def test_parse_sql_query_select(self) -> None:
         sql_query = "SELECT * FROM table WHERE condition"
-        result = parse_sql_query(sql_query)
-        assert result == {
+        assert parse_sql_query(sql_query) == {
             "columns": ["*"],
             "operation": "SELECT",
             "select_clause": "",
@@ -76,8 +101,7 @@ class TestFunctions(unittest.TestCase):
 
     def test_parse_sql_query_update(self) -> None:
         sql_query = "UPDATE table1 SET field1='1' WHERE row_id=1"
-        result = parse_sql_query(sql_query)
-        assert result == {
+        assert parse_sql_query(sql_query) == {
             "operation": "UPDATE",
             "set_clause": "field1='1'",
             "table_name": "table1",
@@ -86,8 +110,7 @@ class TestFunctions(unittest.TestCase):
 
     def test_parse_sql_query_delete(self) -> None:
         sql_query = "DELETE FROM table1 WHERE row_id=1"
-        result = parse_sql_query(sql_query)
-        assert result == {
+        assert parse_sql_query(sql_query) == {
             "operation": "DELETE",
             "table_name": "table1",
             "where_clause": "row_id=1",
