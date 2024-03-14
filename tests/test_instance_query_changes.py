@@ -57,58 +57,51 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
         # Mock the file system
         mock_fs = Mock()
 
-        with patch(
-            "eimerdb.instance.FileClient.get_gcs_file_system"
-        ) as mock_get_gcs_file_system:
-            mock_get_gcs_file_system.return_value = mock_fs
+        mock_fs.glob.return_value = [
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1"
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes_all/part1"
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1",
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part2",
+        ]
 
-            mock_fs.glob.return_value = [
-                "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1"
-                "gs://bucket/eimerdb/eimerdb_name/table1_changes_all/part1"
-                "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1",
-                "gs://bucket/eimerdb/eimerdb_name/table1_changes/part2",
+        # Mock the table data
+        mock_table_data = Mock()
+        mock_table_data.num_rows = 2  # Mocking non-empty table
+
+        mock_table_data_df = Mock()
+        mock_table_data_df.return_value = mock_table_data
+
+        expected_df = pd.DataFrame.from_records(
+            [
+                {
+                    "row_id": "1",
+                    "field1": 1,
+                    "user": "user1",
+                    "datetime": "2021-01-01T00:00:00Z",
+                    "operation": "INSERT",
+                }
             ]
+        )
 
-            # Mock the table data
-            mock_table_data = Mock()
-            mock_table_data.num_rows = 2  # Mocking non-empty table
+        # Mock the duckdb query result
+        mock_duckdb_query_result = Mock()
+        mock_duckdb_query_result.df.return_value = expected_df
+        mock_duckdb_query_result.arrow.return_value = pa.Table.from_pandas(expected_df)
 
-            mock_table_data_df = Mock()
-            mock_table_data_df.return_value = mock_table_data
-
-            expected_df = pd.DataFrame.from_records(
-                [
-                    {
-                        "row_id": "1",
-                        "field1": 1,
-                        "user": "user1",
-                        "datetime": "2021-01-01T00:00:00Z",
-                        "operation": "INSERT",
-                    }
-                ]
+        # Patching methods with mocks
+        with patch(
+            "eimerdb.instance.FileClient.get_gcs_file_system", return_value=mock_fs
+        ), patch("eimerdb.instance.pq.read_table", return_value=mock_table_data), patch(
+            "eimerdb.instance.duckdb.query", return_value=mock_duckdb_query_result
+        ):
+            result: Union[pd.DataFrame, pa.Table] = self.instance.query_changes(
+                sql_query=self.VALID_QUERY,
+                unedited=unedited,
+                output_format=output_format,
+                changes_output=changes_output,
             )
 
-            # Mock the duckdb query result
-            mock_duckdb_query_result = Mock()
-            mock_duckdb_query_result.df.return_value = expected_df
-            mock_duckdb_query_result.arrow.return_value = pa.Table.from_pandas(
-                expected_df
-            )
-
-            # Patching methods with mocks
-            with patch(
-                "eimerdb.instance.pq.read_table", return_value=mock_table_data
-            ), patch(
-                "eimerdb.instance.duckdb.query", return_value=mock_duckdb_query_result
-            ):
-                result: Union[pd.DataFrame, pa.Table] = self.instance.query_changes(
-                    sql_query=self.VALID_QUERY,
-                    unedited=unedited,
-                    output_format=output_format,
-                    changes_output=changes_output,
-                )
-
-            # Assertions
-            self.assertIsNotNone(result)
-            assert len(result) == expected_rows
-            assert mock_fs.glob.call_count == expected_rows
+        # Assertions
+        self.assertIsNotNone(result)
+        assert len(result) == expected_rows
+        assert mock_fs.glob.call_count == expected_rows
