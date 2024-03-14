@@ -10,7 +10,6 @@ from tests.test_instance_base import TestEimerDBInstanceBase
 
 
 class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
-
     VALID_STAR_QUERY = "SELECT * FROM table1 WHERE row_id='1'"
     VALID_SELECT_QUERY = "SELECT field1 FROM table1 WHERE row_id='1'"
 
@@ -43,7 +42,7 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
             (VALID_STAR_QUERY, True, "pandas", "all", 2),
             (VALID_SELECT_QUERY, False, "pandas", "all", 2),
             (VALID_STAR_QUERY, False, "pandas", "recent", 1),
-            (VALID_SELECT_QUERY, "arrow", "pandas", "all", 2),
+            (VALID_SELECT_QUERY, True, "pandas", "all", 2),
             (VALID_STAR_QUERY, False, "arrow", "all", 2),
             (VALID_STAR_QUERY, False, "arrow", "recent", 1),
         ]
