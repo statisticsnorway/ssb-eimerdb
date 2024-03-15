@@ -182,7 +182,7 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
             OPERATION_KEY: "SELECT",
             COLUMNS_KEY: ["*"],
             SELECT_CLAUSE_KEY: "",
-            TABLE_NAME_KEY: list(set(from_match + join_tables)),
+            TABLE_NAME_KEY: sorted(list(set(from_match + join_tables))),
             WHERE_CLAUSE_KEY: where_match.group(1) if where_match else None,
         }
 

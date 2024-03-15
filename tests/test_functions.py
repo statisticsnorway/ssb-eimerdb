@@ -151,7 +151,7 @@ class TestFunctions(unittest.TestCase):
             "columns": ["*"],
             "operation": "SELECT",
             "select_clause": "",
-            "table_name": ["resultatregnskap", "aarsak_endring"],
+            "table_name": ["aarsak_endring", "resultatregnskap"],
             "where_clause": None,
         }
 
