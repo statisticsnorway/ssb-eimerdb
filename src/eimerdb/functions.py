@@ -174,15 +174,15 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
         }
 
     if select_match:
-        join_tables: list[Any] = join_pattern.findall(sql_query)
-        from_match: list[Any] = from_pattern.findall(sql_query)
+        join_tables: list[str] = join_pattern.findall(sql_query)
+        from_match: list[str] = from_pattern.findall(sql_query)
         where_match = where_pattern.search(sql_query)
 
         return {
             OPERATION_KEY: "SELECT",
             COLUMNS_KEY: ["*"],
             SELECT_CLAUSE_KEY: "",
-            TABLE_NAME_KEY: from_match + join_tables,
+            TABLE_NAME_KEY: list(set(from_match + join_tables)),
             WHERE_CLAUSE_KEY: where_match.group(1) if where_match else None,
         }
 

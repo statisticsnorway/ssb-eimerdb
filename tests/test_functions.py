@@ -80,6 +80,10 @@ class TestFunctions(unittest.TestCase):
             ]
         )
 
+    #
+    # parse_sql_query
+    #
+
     def test_parse_sql_query_invalid_operation_expect_exception(self) -> None:
         sql_query = "INVALID OPERATION"
         with self.assertRaises(ValueError) as context:
@@ -115,6 +119,45 @@ class TestFunctions(unittest.TestCase):
             "table_name": "table1",
             "where_clause": "row_id=1",
         }
+
+    def test_parse_sql_query_select_complex_query(self) -> None:
+        sql_query = """
+            SELECT
+                current_year.inntektsaar,
+                current_year.id,
+                current_year.felt,
+                previous_year.beloep as forrige_aar,
+                current_year.beloep as dette_aar,
+                current_year.endret_dato,
+                current_year.endret_bruker,
+                aarsak_endring.beskrivelse AS aarsak_editering
+            FROM
+                (
+                    SELECT *
+                    FROM resultatregnskap
+                    WHERE inntektsaar = 2022 AND id = '123'
+                    QUALIFY ROW_NUMBER() OVER (PARTITION BY felt ORDER BY endret_dato DESC) = 1
+                ) AS current_year
+                LEFT JOIN (
+                    SELECT id, felt, beloep
+                    FROM resultatregnskap
+                    WHERE inntektsaar = 2021 AND id = '123'
+                    QUALIFY ROW_NUMBER() OVER (PARTITION BY felt ORDER BY endret_dato DESC) = 1
+                ) AS previous_year ON current_year.felt = previous_year.felt
+                JOIN aarsak_endring ON current_year.aarsak_kode = aarsak_endring.id
+            ORDER BY current_year.felt
+        """
+        assert parse_sql_query(sql_query) == {
+            "columns": ["*"],
+            "operation": "SELECT",
+            "select_clause": "",
+            "table_name": ["aarsak_endring", "resultatregnskap"],
+            "where_clause": None,
+        }
+
+    #
+    # create_eimerdb
+    #
 
     @patch("eimerdb.functions.AuthClient.fetch_google_credentials")
     @patch("google.cloud.storage.Client")
