@@ -31,6 +31,7 @@ from .eimerdb_constants import APPLICATION_JSON
 from .eimerdb_constants import BUCKET_KEY
 from .eimerdb_constants import COLUMNS_KEY
 from .eimerdb_constants import CREATED_BY_KEY
+from .eimerdb_constants import DUCKDB_DEFAULT_CONFIG
 from .eimerdb_constants import EDITABLE_KEY
 from .eimerdb_constants import OPERATION_KEY
 from .eimerdb_constants import PARTITION_COLUMNS_KEY
@@ -454,7 +455,7 @@ class EimerDBInstance:
         unedited: bool = False,
         output_format: str = PANDAS_OUTPUT_FORMAT,
     ) -> Union[pd.DataFrame, pa.Table]:
-        con = duckdb.connect()
+        con = duckdb.connect(config=DUCKDB_DEFAULT_CONFIG)
         tables = parsed_query[TABLE_NAME_KEY]
 
         for table_name in tables:
@@ -770,7 +771,8 @@ class EimerDBInstance:
             if dataset is None:
                 return None
 
-            query_result = duckdb.query(get_duckdb_query(local_changes_output))
+            conn = duckdb.connect(config=DUCKDB_DEFAULT_CONFIG)
+            query_result = conn.query(get_duckdb_query(local_changes_output))
             if output_format == PANDAS_OUTPUT_FORMAT:
                 return query_result.df()
             else:

@@ -15,3 +15,5 @@ EDITABLE_KEY = "editable"
 TABLE_PATH_KEY = "table_path"
 PARTITION_COLUMNS_KEY = "partition_columns"
 SCHEMA_KEY = "schema"
+
+DUCKDB_DEFAULT_CONFIG = {"preserve_insertion_order": False}

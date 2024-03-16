@@ -93,7 +93,8 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
         with patch(
             "eimerdb.instance.FileClient.get_gcs_file_system", return_value=mock_fs
         ), patch("eimerdb.instance.pq.read_table", return_value=mock_table_data), patch(
-            "eimerdb.instance.duckdb.query", return_value=mock_duckdb_query_result
+            "eimerdb.instance.duckdb.DuckDBPyConnection.query",
+            return_value=mock_duckdb_query_result,
         ):
             result: Union[pd.DataFrame, pa.Table] = self.instance.query_changes(
                 sql_query=sql_query,
