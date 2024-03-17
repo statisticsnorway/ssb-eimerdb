@@ -111,11 +111,11 @@ class EimerDBInstance(AbstractDbInstance):
             role_groups: Optional[dict[str, Any]] = get_json(
                 bucket_name, f"{eimer_path}/config/role_groups.json"
             )
-            is_admin = True
+            is_admin: bool = True
         else:
             users = {initials: ""}
-            role_groups: Optional[dict[str, Any]] = None
-            is_admin: bool = False
+            role_groups = None
+            is_admin = False
 
         super().__init__(
             bucket_name=bucket_name,

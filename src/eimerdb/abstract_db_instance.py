@@ -26,7 +26,7 @@ class AbstractDbInstance(ABC):
         time_created: str,
         tables: dict[str, Any],
         users: dict[str, Any],
-        role_groups: dict[str, Any],
+        role_groups: Optional[dict[str, Any]],
         is_admin: bool,
     ) -> None:
         """Initialize AbstractDbInstance.
@@ -40,7 +40,7 @@ class AbstractDbInstance(ABC):
             time_created (str): Time when the EimerDB was created.
             tables (dict): Dictionary containing the tables in the EimerDB.
             users (dict): Dictionary containing the users in the EimerDB.
-            role_groups (dict): Dictionary containing the role groups in the EimerDB.
+            role_groups (dict, optional): Dictionary containing the role groups in the EimerDB.
             is_admin (bool): Indicates whether the current user is an admin.
         """
         self.bucket_name = bucket_name
