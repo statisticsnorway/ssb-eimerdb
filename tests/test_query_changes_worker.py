@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional
 from unittest.mock import Mock
 from unittest.mock import patch
 
@@ -9,13 +9,12 @@ from parameterized import parameterized
 from eimerdb.instance_query_changes_worker import QueryChangesWorker
 from tests.test_instance_base import TestEimerDBInstanceBase
 
+VALID_STAR_QUERY = "SELECT * FROM table1 WHERE row_id='1'"
+PARTITION_SELECT = {"field1": [1]}
+
 
 class TestQueryChangesWorker(TestEimerDBInstanceBase):
-
     worker_instance: QueryChangesWorker
-
-    VALID_STAR_QUERY = "SELECT * FROM table1 WHERE row_id='1'"
-    VALID_SELECT_QUERY = "SELECT field1 FROM table1 WHERE row_id='1'"
 
     def setUp(self) -> None:
         super().setUp()
@@ -31,12 +30,13 @@ class TestQueryChangesWorker(TestEimerDBInstanceBase):
 
     @parameterized.expand(
         [
-            (VALID_STAR_QUERY, 1),
+            (None, 1),
+            (PARTITION_SELECT, 1),
         ]
     )
     def test_query_changes_pandas_all(
         self,
-        sql_query: str,
+        partition_select: Optional[dict[str, list]],
         expected_rows: int,
     ) -> None:
         # Mock the file system
@@ -84,8 +84,8 @@ class TestQueryChangesWorker(TestEimerDBInstanceBase):
             "eimerdb.instance_query_changes_worker.duckdb.DuckDBPyConnection.query",
             return_value=mock_duckdb_query_result,
         ):
-            result: Union[pd.DataFrame, pa.Table] = self.worker_instance.query_changes(
-                sql_query=sql_query
+            result: pa.Table = self.worker_instance.query_changes(
+                sql_query=VALID_STAR_QUERY, partition_select=partition_select
             )
 
         # Assertions

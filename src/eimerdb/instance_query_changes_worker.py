@@ -38,7 +38,7 @@ class QueryChangesWorker:
 
     def query_changes(
         self, sql_query: str, partition_select: Optional[dict[str, Any]] = None
-    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+    ) -> Optional[pa.Table]:
         """Query changes made in the database table.
 
         Args:
@@ -47,13 +47,11 @@ class QueryChangesWorker:
                 Dictionary containing partition selection criteria. Defaults to None.
 
         Returns:
-            Optional[pd.DataFrame, pa.Table]:
-                Returns a pandas DataFrame if 'pandas' output format is specified,
-                an arrow Table if 'arrow' output format is specified,
-                or None if operation is different from SELECT.
+            Optional[pa.Table]:
+                Returns an arrow Table or None
 
         Raises:
-            ValueError: If the output format is invalid.
+            ValueError: If the operation is not supported.
         """
         parsed_query = parse_sql_query(sql_query)
         # Check if the operation is SELECT
