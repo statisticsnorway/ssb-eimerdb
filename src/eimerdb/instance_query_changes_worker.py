@@ -1,7 +1,6 @@
 import logging
 from typing import Any
 from typing import Optional
-from typing import Union
 
 import duckdb
 import pandas as pd
@@ -104,7 +103,7 @@ class QueryChangesWorker:
 
             return dataset if dataset.num_rows > 0 else None
 
-        def get_changes_query_result() -> Optional[Union[pd.DataFrame, pa.Table]]:
+        def get_changes_query_result() -> Optional[pa.Table]:
             dataset = get_change_dataset()
             if dataset is None:
                 return None
@@ -117,9 +116,7 @@ class QueryChangesWorker:
             ]
             return query_result.arrow().select(column_order)
 
-        def cast_arrow(
-            table: Optional[Union[pd.DataFrame, pa.Table]]
-        ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+        def cast_arrow(table: Optional[pd.DataFrame]) -> Optional[pa.Table]:
             return (
                 table.cast(self.db_instance.get_arrow_schema(table_name, True))
                 if table is not None
