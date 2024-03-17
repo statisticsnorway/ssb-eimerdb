@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional
 from unittest.mock import Mock
 from unittest.mock import patch
 
@@ -6,53 +6,37 @@ import pandas as pd
 import pyarrow as pa
 from parameterized import parameterized
 
+from eimerdb.instance_query_changes_worker import QueryChangesWorker
 from tests.test_instance_base import TestEimerDBInstanceBase
 
+VALID_STAR_QUERY = "SELECT * FROM table1 WHERE row_id='1'"
+PARTITION_SELECT = {"field1": [1]}
 
-class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
-    VALID_STAR_QUERY = "SELECT * FROM table1 WHERE row_id='1'"
-    VALID_SELECT_QUERY = "SELECT field1 FROM table1 WHERE row_id='1'"
 
-    def test_query_changes_invalid_output_format_expect_exception(self):
-        # Test & Assertion
-        with self.assertRaises(ValueError) as context:
-            self.instance.query_changes(
-                sql_query=self.VALID_STAR_QUERY, output_format="invalid"
-            )
-        self.assertEqual("Invalid output format: invalid", str(context.exception))
+class TestQueryChangesWorker(TestEimerDBInstanceBase):
+    worker_instance: QueryChangesWorker
 
-    def test_query_changes_invalid_changes_output_expect_exception(self):
-        # Test & Assertion
-        with self.assertRaises(ValueError) as context:
-            self.instance.query_changes(
-                sql_query=self.VALID_STAR_QUERY, changes_output="invalid"
-            )
-        self.assertEqual("Invalid changes output: invalid", str(context.exception))
+    def setUp(self) -> None:
+        super().setUp()
+        self.worker_instance = QueryChangesWorker(self.instance)
 
     def test_query_changes_sql_with_update_expect_exception(self):
         # Test & Assertion
         with self.assertRaises(ValueError) as context:
-            self.instance.query_changes(
+            self.worker_instance.query_changes(
                 sql_query="UPDATE table1 SET col1=2 WHERE row_id='1'",
             )
         self.assertEqual("Operation UPDATE is not supported.", str(context.exception))
 
     @parameterized.expand(
         [
-            (VALID_STAR_QUERY, True, "pandas", "all", 2),
-            (VALID_SELECT_QUERY, False, "pandas", "all", 2),
-            (VALID_STAR_QUERY, False, "pandas", "recent", 1),
-            (VALID_SELECT_QUERY, True, "pandas", "all", 2),
-            (VALID_STAR_QUERY, False, "arrow", "all", 2),
-            (VALID_STAR_QUERY, False, "arrow", "recent", 1),
+            (None, 1),
+            (PARTITION_SELECT, 1),
         ]
     )
     def test_query_changes_pandas_all(
         self,
-        sql_query: str,
-        unedited: bool,
-        output_format: str,
-        changes_output: str,
+        partition_select: Optional[dict[str, list]],
         expected_rows: int,
     ) -> None:
         # Mock the file system
@@ -91,16 +75,17 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
 
         # Patching methods with mocks
         with patch(
-            "eimerdb.instance.FileClient.get_gcs_file_system", return_value=mock_fs
-        ), patch("eimerdb.instance.pq.read_table", return_value=mock_table_data), patch(
-            "eimerdb.instance.duckdb.DuckDBPyConnection.query",
+            "eimerdb.instance_query_changes_worker.FileClient.get_gcs_file_system",
+            return_value=mock_fs,
+        ), patch(
+            "eimerdb.instance_query_changes_worker.pq.read_table",
+            return_value=mock_table_data,
+        ), patch(
+            "eimerdb.instance_query_changes_worker.duckdb.DuckDBPyConnection.query",
             return_value=mock_duckdb_query_result,
         ):
-            result: Union[pd.DataFrame, pa.Table] = self.instance.query_changes(
-                sql_query=sql_query,
-                unedited=unedited,
-                output_format=output_format,
-                changes_output=changes_output,
+            result: pa.Table = self.worker_instance.query_changes(
+                sql_query=VALID_STAR_QUERY, partition_select=partition_select
             )
 
         # Assertions

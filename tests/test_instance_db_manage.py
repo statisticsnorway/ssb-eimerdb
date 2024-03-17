@@ -8,7 +8,7 @@ class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
 
     # verify that instance is set up correctly
     def test_init_admin(self) -> None:
-        self.assertEqual(self.instance.bucket, "test_bucket")
+        self.assertEqual(self.instance.bucket_name, "test_bucket")
         self.assertEqual(self.instance.eimerdb_name, "test_eimerdb")
         self.assertEqual(self.instance.path, "path/to/config")
         self.assertEqual(self.instance.eimer_path, "path/to/eimer")

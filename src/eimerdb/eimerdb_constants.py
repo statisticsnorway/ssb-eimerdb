@@ -17,3 +17,12 @@ PARTITION_COLUMNS_KEY = "partition_columns"
 SCHEMA_KEY = "schema"
 
 DUCKDB_DEFAULT_CONFIG = {"preserve_insertion_order": False}
+
+ROW_ID_DEF = {"name": "row_id", "type": "string", "label": "Unique row ID"}
+PANDAS_OUTPUT_FORMAT = "pandas"
+ARROW_OUTPUT_FORMAT = "arrow"
+
+CHANGES_ALL = "all"
+CHANGES_RECENT = "recent"
+
+SELECT_STAR_QUERY = "SELECT * FROM"
