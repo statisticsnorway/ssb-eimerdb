@@ -11,8 +11,6 @@ import pyarrow.parquet as pq
 from gcsfs import GCSFileSystem
 
 from .abstract_db_instance import AbstractDbInstance
-from .eimerdb_constants import ARROW_OUTPUT_FORMAT
-from .eimerdb_constants import CHANGES_RECENT
 from .eimerdb_constants import DUCKDB_DEFAULT_CONFIG
 from .eimerdb_constants import EDITABLE_KEY
 from .eimerdb_constants import PANDAS_OUTPUT_FORMAT
@@ -92,10 +90,7 @@ class QueryWorker:
             if editable is True and unedited is False:
                 select_query = SELECT_STAR_QUERY
                 df_changes = self.query_changes_worker.query_changes(
-                    f"{select_query} {table_name}",
-                    partition_select,
-                    output_format=ARROW_OUTPUT_FORMAT,
-                    changes_output=CHANGES_RECENT,
+                    f"{select_query} {table_name}", partition_select
                 )
 
             if editable is True and unedited is False and df_changes is not None:
