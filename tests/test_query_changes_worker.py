@@ -6,17 +6,25 @@ import pandas as pd
 import pyarrow as pa
 from parameterized import parameterized
 
+from eimerdb.instance_query_changes_worker import QueryChangesWorker
 from tests.test_instance_base import TestEimerDBInstanceBase
 
 
-class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
+class TestQueryChangesWorker(TestEimerDBInstanceBase):
+
+    worker_instance: QueryChangesWorker
+
     VALID_STAR_QUERY = "SELECT * FROM table1 WHERE row_id='1'"
     VALID_SELECT_QUERY = "SELECT field1 FROM table1 WHERE row_id='1'"
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.worker_instance = QueryChangesWorker(self.instance)
 
     def test_query_changes_invalid_output_format_expect_exception(self):
         # Test & Assertion
         with self.assertRaises(ValueError) as context:
-            self.instance.query_changes(
+            self.worker_instance.query_changes(
                 sql_query=self.VALID_STAR_QUERY, output_format="invalid"
             )
         self.assertEqual("Invalid output format: invalid", str(context.exception))
@@ -24,7 +32,7 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
     def test_query_changes_invalid_changes_output_expect_exception(self):
         # Test & Assertion
         with self.assertRaises(ValueError) as context:
-            self.instance.query_changes(
+            self.worker_instance.query_changes(
                 sql_query=self.VALID_STAR_QUERY, changes_output="invalid"
             )
         self.assertEqual("Invalid changes output: invalid", str(context.exception))
@@ -32,7 +40,7 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
     def test_query_changes_sql_with_update_expect_exception(self):
         # Test & Assertion
         with self.assertRaises(ValueError) as context:
-            self.instance.query_changes(
+            self.worker_instance.query_changes(
                 sql_query="UPDATE table1 SET col1=2 WHERE row_id='1'",
             )
         self.assertEqual("Operation UPDATE is not supported.", str(context.exception))
@@ -91,12 +99,16 @@ class TestEimerDBInstanceQueryChanges(TestEimerDBInstanceBase):
 
         # Patching methods with mocks
         with patch(
-            "eimerdb.instance.FileClient.get_gcs_file_system", return_value=mock_fs
-        ), patch("eimerdb.instance.pq.read_table", return_value=mock_table_data), patch(
-            "eimerdb.instance.duckdb.DuckDBPyConnection.query",
+            "eimerdb.instance_query_changes_worker.FileClient.get_gcs_file_system",
+            return_value=mock_fs,
+        ), patch(
+            "eimerdb.instance_query_changes_worker.pq.read_table",
+            return_value=mock_table_data,
+        ), patch(
+            "eimerdb.instance_query_changes_worker.duckdb.DuckDBPyConnection.query",
             return_value=mock_duckdb_query_result,
         ):
-            result: Union[pd.DataFrame, pa.Table] = self.instance.query_changes(
+            result: Union[pd.DataFrame, pa.Table] = self.worker_instance.query_changes(
                 sql_query=sql_query,
                 unedited=unedited,
                 output_format=output_format,
