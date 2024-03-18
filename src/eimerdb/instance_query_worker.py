@@ -171,9 +171,12 @@ class QueryWorker:
         con.register("dataset", dataset)
 
         if is_update:
+            local_sql_query: str = sql_query
             con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
-            sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
-            con.execute(sql_query)
+            local_sql_query = local_sql_query.replace(
+                f"UPDATE {table_name}", "UPDATE updates"
+            )
+            con.execute(local_sql_query)
             changes_df: pd.DataFrame = con.table("updates").df()
         else:
             con.execute(f"CREATE TABLE deletes AS FROM dataset WHERE {where_clause}")
