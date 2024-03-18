@@ -11,6 +11,9 @@ from parameterized import parameterized
 from eimerdb.instance_query_worker import QueryWorker
 from tests.test_instance_base import TestEimerDBInstanceBase
 
+VALID_STAR_QUERY = "SELECT * FROM table1 WHERE row_id='1'"
+PARTITION_SELECT = {"field1": [1]}
+
 
 class TestQueryWorker(TestEimerDBInstanceBase):
     worker_instance: QueryWorker
@@ -53,7 +56,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         ) as mock_get_partitioned_files, patch(
             "eimerdb.instance_query_worker.pq.read_table"
         ) as mock_pq_read_table, patch(
-            "eimerdb.instance_query_worker.QueryChangesWorker.query_changes"
+            "eimerdb.instance_query_worker.QueryWorker.query_changes"
         ) as mock_query_changes, patch(
             "eimerdb.instance_query_worker.update_pyarrow_table"
         ) as mock_update_pyarrow_table:
@@ -232,3 +235,91 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             filesystem=ANY,
             schema=None,
         )
+
+    @parameterized.expand(
+        [
+            ("table2", None, True, "pandas", "all", 2),
+            ("table1", None, True, "pandas", "all", 2),
+            ("table1", None, False, "pandas", "all", 2),
+            ("table1", None, False, "pandas", "all", 0),
+            ("table1", None, False, "pandas", "recent", 1),
+            ("table1", None, False, "pandas", "all", 2),
+            ("table1", PARTITION_SELECT, False, "pandas", "recent", 1),
+            ("table1", None, False, "arrow", "recent", 1),
+            ("table1", None, False, "arrow", "all", 2),
+            ("table1", PARTITION_SELECT, False, "arrow", "recent", 1),
+        ]
+    )
+    def test_query_changes(
+        self,
+        table_name: str,
+        partition_select: Optional[dict[str, list]],
+        unedited: bool,
+        output_format: str,
+        changes_output: str,
+        expected_rows: int,
+    ) -> None:
+        # Mock the file system
+        mock_fs = Mock()
+
+        mock_fs.glob.return_value = [
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1"
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes_all/part1"
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1",
+            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part2",
+        ]
+
+        # Mock the table data
+        mock_table_data = Mock()
+        mock_table_data.num_rows = expected_rows
+
+        mock_table_data_df = Mock()
+        mock_table_data_df.return_value = mock_table_data
+
+        expected_df = pd.DataFrame.from_records(
+            [
+                {
+                    "row_id": "1",
+                    "field1": 1,
+                    "user": "user1",
+                    "datetime": "2021-01-01T00:00:00Z",
+                    "operation": "INSERT",
+                }
+            ]
+        )
+
+        # Mock the duckdb query result
+        mock_duckdb_query_result = Mock()
+        mock_duckdb_query_result.df.return_value = (
+            expected_df if expected_rows > 0 else pd.DataFrame()
+        )
+        mock_duckdb_query_result.arrow.return_value = (
+            pa.Table.from_pandas(expected_df)
+            if expected_rows > 0
+            else pa.Table.from_pandas(pd.DataFrame())
+        )
+
+        # Patching methods with mocks
+        with patch(
+            "eimerdb.instance_query_worker.FileClient.get_gcs_file_system",
+            return_value=mock_fs,
+        ), patch(
+            "eimerdb.instance_query_worker.pq.read_table",
+            return_value=mock_table_data,
+        ), patch(
+            "eimerdb.instance_query_worker.duckdb.DuckDBPyConnection.query",
+            return_value=mock_duckdb_query_result,
+        ):
+            result: pa.Table = self.worker_instance.query_changes(
+                sql_query=f"SELECT * FROM {table_name}",
+                partition_select=partition_select,
+                unedited=unedited,
+                output_format=output_format,
+                changes_output=changes_output,
+            )
+
+        # Assertions
+        if expected_rows > 0:
+            assert len(result) == expected_rows
+        else:
+            self.assertIsNone(result)

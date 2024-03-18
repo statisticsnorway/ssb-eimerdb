@@ -2,6 +2,7 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 import pandas as pd
+import pyarrow as pa
 
 from tests.test_instance_base import TestEimerDBInstanceBase
 
@@ -77,3 +78,53 @@ class TestEimerDBInstanceQuery(TestEimerDBInstanceBase):
             "Error parsing sql-query. Syntax error or query not supported.",
             str(context.exception),
         )
+
+    #
+    # query_changes
+    #
+
+    def test_query_changes_with_invalid_output_format_expect_exception(self) -> None:
+        with self.assertRaises(ValueError) as context:
+            self.instance.query_changes(
+                sql_query="SELECT * FROM table1",
+                output_format="invalid",
+            )
+        self.assertEqual(
+            "Invalid output format: invalid",
+            str(context.exception),
+        )
+
+    def test_query_changes_with_invalid_changes_output_format_expect_exception(
+        self,
+    ) -> None:
+        with self.assertRaises(ValueError) as context:
+            self.instance.query_changes(
+                sql_query="SELECT * FROM table1",
+                changes_output="invalid",
+            )
+        self.assertEqual(
+            "Invalid changes output: invalid",
+            str(context.exception),
+        )
+
+    def test_query_changes_with_update_expect_exception(self) -> None:
+        with self.assertRaises(ValueError) as context:
+            self.instance.query_changes(
+                sql_query="UPDATE table1 SET col1='value' WHERE row_id='1'",
+            )
+
+        self.assertEqual(
+            "Operation UPDATE is not supported.",
+            str(context.exception),
+        )
+
+    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
+    @patch("eimerdb.instance_query_worker.QueryWorker.query_changes")
+    def test_query_changes_expect_result(
+        self, mock_query_changes: Mock, _: Mock
+    ) -> None:
+        mock_query_changes.return_value = pa.Table
+
+        result = self.instance.query_changes(sql_query="SELECT * FROM table1")
+
+        assert result is not None

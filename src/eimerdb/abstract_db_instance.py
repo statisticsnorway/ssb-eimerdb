@@ -7,6 +7,7 @@ from typing import Union
 import pandas as pd
 import pyarrow as pa
 
+from eimerdb.eimerdb_constants import CHANGES_ALL
 from eimerdb.eimerdb_constants import PANDAS_OUTPUT_FORMAT
 
 
@@ -188,4 +189,36 @@ class AbstractDbInstance(ABC):
 
         Raises:
             ValueError: If the output format is invalid, table is not editable, or invalid query.
+        """
+
+    @abstractmethod
+    def query_changes(
+        self,
+        sql_query: str,
+        partition_select: Optional[dict[str, Any]] = None,
+        unedited: bool = False,
+        output_format: str = PANDAS_OUTPUT_FORMAT,
+        changes_output: str = CHANGES_ALL,
+    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+        """Query changes made in the database table.
+
+        Args:
+            sql_query (str): The SQL query to execute.
+            partition_select (Dict, optional):
+                Dictionary containing partition selection criteria. Defaults to None.
+            unedited (bool):
+                Flag indicating whether to retrieve unedited changes. Defaults to False.
+            output_format (str):
+                The desired output format ('pandas' or 'arrow'). Defaults to 'pandas'.
+            changes_output (str):
+                The changes that are to be retrieved ('recent' or 'all'). Defaults to 'all'.
+
+        Returns:
+            Optional[pd.DataFrame, pa.Table]:
+                Returns a pandas DataFrame if 'pandas' output format is specified,
+                an arrow Table if 'arrow' output format is specified,
+                or None if operation is different from SELECT.
+
+        Raises:
+            ValueError: If the output format is invalid.
         """
