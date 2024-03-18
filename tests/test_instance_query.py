@@ -83,6 +83,30 @@ class TestEimerDBInstanceQuery(TestEimerDBInstanceBase):
     # query_changes
     #
 
+    def test_query_changes_with_invalid_output_format_expect_exception(self) -> None:
+        with self.assertRaises(ValueError) as context:
+            self.instance.query_changes(
+                sql_query="SELECT * FROM table1",
+                output_format="invalid",
+            )
+        self.assertEqual(
+            "Invalid output format: invalid",
+            str(context.exception),
+        )
+
+    def test_query_changes_with_invalid_changes_output_format_expect_exception(
+        self,
+    ) -> None:
+        with self.assertRaises(ValueError) as context:
+            self.instance.query_changes(
+                sql_query="SELECT * FROM table1",
+                changes_output="invalid",
+            )
+        self.assertEqual(
+            "Invalid changes output: invalid",
+            str(context.exception),
+        )
+
     def test_query_changes_with_update_expect_exception(self) -> None:
         with self.assertRaises(ValueError) as context:
             self.instance.query_changes(
