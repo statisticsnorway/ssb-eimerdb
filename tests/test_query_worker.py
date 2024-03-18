@@ -79,9 +79,8 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         with self.assertRaises(ValueError) as context:
             self.worker_instance.query_update_or_delete(
                 parsed_query=parsed_query,
-                sql_query="UPDATE table2 SET field1='1' WHERE row_id=1",
+                update_sql_query="UPDATE table2 SET field1='1' WHERE row_id=1",
                 partition_select=None,
-                is_update=True,
                 fs=MagicMock(),
             )
         self.assertEqual(
@@ -112,9 +111,8 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         # Call the method
         result = self.worker_instance.query_update_or_delete(
             parsed_query=parsed_query,
-            sql_query="UPDATE table1 SET field1=4 WHERE row_id='1'",
+            update_sql_query="UPDATE table1 SET field1=4 WHERE row_id='1'",
             partition_select=None,
-            is_update=True,
             fs=MagicMock(),
         )
 
@@ -145,9 +143,8 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         with self.assertRaises(ValueError) as context:
             self.worker_instance.query_update_or_delete(
                 parsed_query=parsed_query,
-                sql_query=None,
+                update_sql_query=None,
                 partition_select=None,
-                is_update=False,
                 fs=MagicMock(),
             )
         self.assertEqual(
@@ -177,9 +174,8 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         # Call the method
         result = self.worker_instance.query_update_or_delete(
             parsed_query=parsed_query,
-            sql_query=None,
+            update_sql_query=None,
             partition_select=None,
-            is_update=False,
             fs=MagicMock(),
         )
 

@@ -123,18 +123,16 @@ class QueryWorker:
     def query_update_or_delete(
         self,
         parsed_query: dict[str, Any],
-        sql_query: Optional[str],
+        update_sql_query: Optional[str],
         partition_select: Optional[dict[str, Any]],
-        is_update: bool,
         fs: GCSFileSystem,
     ) -> str:
         """Query the database to update or delete records.
 
         Args:
             parsed_query (dict): The parsed query.
-            sql_query (str): The SQL query to execute. Only required for update operations.
+            update_sql_query (str): The SQL query to execute. When defines, assumes update operation.
             partition_select (Dict, optional): Dictionary containing partition selection criteria.
-            is_update (bool): Flag indicating whether to update or delete records.
             fs (GCSFileSystem): The GCSFileSystem instance.
 
         Returns:
@@ -162,6 +160,7 @@ class QueryWorker:
             fs=fs,
         )
 
+        is_update = update_sql_query is not None
         df_change_results = self._add_meta_data(
             target_df=df_change_results, operation="update" if is_update else "delete"
         )
@@ -170,10 +169,9 @@ class QueryWorker:
         con = duckdb.connect()
         con.register("dataset", dataset)
 
-        if is_update:
-            local_sql_query: str = sql_query
+        if update_sql_query is not None:
             con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
-            local_sql_query = local_sql_query.replace(
+            local_sql_query = update_sql_query.replace(
                 f"UPDATE {table_name}", "UPDATE updates"
             )
             con.execute(local_sql_query)

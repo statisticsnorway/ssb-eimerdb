@@ -475,17 +475,15 @@ class EimerDBInstance(AbstractDbInstance):
             case DbOperation.UPDATE_QUERY_OPERATION:
                 return self.query_worker.query_update_or_delete(
                     parsed_query=parsed_query,
-                    sql_query=sql_query,
+                    update_sql_query=sql_query,
                     partition_select=partition_select,
-                    is_update=True,
                     fs=fs,
                 )
             case DbOperation.DELETE_QUERY_OPERATION:
                 return self.query_worker.query_update_or_delete(
                     parsed_query=parsed_query,
-                    sql_query=None,
+                    update_sql_query=None,
                     partition_select=partition_select,
-                    is_update=False,
                     fs=fs,
                 )
             case _:
