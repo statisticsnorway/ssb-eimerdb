@@ -86,13 +86,13 @@ class QueryWorker:
             df = pq.read_table(table_files, filesystem=fs)
 
             if table_config[EDITABLE_KEY] is True and unedited is False:
-                df_changes = self.query_changes_worker.query_changes(
+                changes_table = self.query_changes_worker.query_changes(
                     sql_query=f"{SELECT_STAR_QUERY} {table_name}",
                     partition_select=partition_select,
                 )
 
-                if df_changes is not None and df_changes.num_rows > 0:
-                    df = update_pyarrow_table(df, df_changes)
+                if changes_table is not None and changes_table.num_rows > 0:
+                    df = update_pyarrow_table(df, changes_table)
 
             con.register(table_name, df)
             del df

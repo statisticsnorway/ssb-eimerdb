@@ -4,6 +4,8 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 import pandas as pd
+import pyarrow as pa
+from parameterized import parameterized
 
 from eimerdb.instance_query_worker import QueryWorker
 from tests.test_instance_base import TestEimerDBInstanceBase
@@ -20,48 +22,71 @@ class TestQueryWorker(TestEimerDBInstanceBase):
     # query_select
     #
 
-    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance_query_worker.get_partitioned_files")
-    @patch("eimerdb.instance_query_worker.pq.read_table")
+    @parameterized.expand(
+        [
+            ("table2", False, "pandas"),
+            ("table1", False, "pandas"),
+            ("table1", True, "arrow"),
+        ]
+    )
     def test_query_select_success(
-        self,
-        mock_pq_read_table: Mock,
-        mock_get_partitioned_files: Mock,
-        mock_gcs_filesystem: Mock,
+        self, table_name: str, unedited: bool, output_format
     ) -> None:
         # Mock input parameters
-        parsed_query = {"table_name": ["table1"]}
-        sql_query = "SELECT * FROM table1"
-        fs_mock = mock_gcs_filesystem.return_value
+        parsed_query = {"table_name": [table_name]}
+        sql_query = f"SELECT * FROM {table_name}"
         partition_select = None
-        unedited = False
-        output_format = "pandas"
+        unedited = unedited
+        output_format = output_format
 
-        # Mock return values
-        mock_pq_read_table.return_value = pd.DataFrame({"row_id": [1, 2, 3]})
+        with patch(
+            "eimerdb.instance.FileClient.get_gcs_file_system"
+        ) as mock_gcs_filesystem, patch(
+            "eimerdb.instance_query_worker.get_partitioned_files"
+        ) as mock_get_partitioned_files, patch(
+            "eimerdb.instance_query_worker.pq.read_table"
+        ) as mock_pq_read_table, patch(
+            "eimerdb.instance_query_worker.QueryChangesWorker.query_changes"
+        ) as mock_query_changes, patch(
+            "eimerdb.instance_query_worker.update_pyarrow_table"
+        ) as mock_update_pyarrow_table:
+            fs_mock = mock_gcs_filesystem.return_value
 
-        # Call the method
-        result = self.worker_instance.query_select(
-            parsed_query=parsed_query,
-            sql_query=sql_query,
-            partition_select=partition_select,
-            unedited=unedited,
-            output_format=output_format,
-            fs=fs_mock,
-        )
+            mock_table = MagicMock()
+            mock_table.num_rows = 1
+            mock_query_changes.return_value = mock_table
 
-        assert result.equals(pd.DataFrame({"row_id": [1, 2, 3]}))
+            expected_df = pd.DataFrame({"row_id": [1, 2, 3]})
+            mock_update_pyarrow_table.return_value = expected_df
 
-        mock_get_partitioned_files.assert_called_once_with(
-            table_name="table1",
-            instance_name="test_eimerdb",
-            table_config=self.instance.tables["table1"],
-            suffix="_raw",
-            fs=fs_mock,
-            partition_select=partition_select,
-            unedited=unedited,
-        )
-        mock_pq_read_table.assert_called_once()
+            # Mock return values
+            mock_pq_read_table.return_value = pd.DataFrame({"row_id": [1, 2, 3]})
+
+            # Call the method
+            result = self.worker_instance.query_select(
+                parsed_query=parsed_query,
+                sql_query=sql_query,
+                partition_select=partition_select,
+                unedited=unedited,
+                output_format=output_format,
+                fs=fs_mock,
+            )
+
+            if output_format == "pandas":
+                assert result.equals(expected_df)
+            else:
+                assert result.equals(pa.Table.from_pandas(expected_df))
+
+            mock_get_partitioned_files.assert_called_once_with(
+                table_name=table_name,
+                instance_name="test_eimerdb",
+                table_config=self.instance.tables[table_name],
+                suffix="_raw",
+                fs=fs_mock,
+                partition_select=partition_select,
+                unedited=unedited,
+            )
+            mock_pq_read_table.assert_called_once()
 
     #
     # query_update
