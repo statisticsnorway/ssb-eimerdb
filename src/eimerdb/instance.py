@@ -465,25 +465,26 @@ class EimerDBInstance(AbstractDbInstance):
         match query_operation:
             case DbOperation.SELECT_QUERY_OPERATION:
                 return self.query_worker.query_select(
-                    fs=fs,
                     parsed_query=parsed_query,
                     sql_query=sql_query,
                     partition_select=partition_select,
                     unedited=unedited,
                     output_format=output_format,
+                    fs=fs,
                 )
             case DbOperation.UPDATE_QUERY_OPERATION:
-                return self.query_worker.query_update(
-                    fs=fs,
+                return self.query_worker.query_update_or_delete(
                     parsed_query=parsed_query,
-                    sql_query=sql_query,
+                    update_sql_query=sql_query,
                     partition_select=partition_select,
+                    fs=fs,
                 )
             case DbOperation.DELETE_QUERY_OPERATION:
-                return self.query_worker.query_delete(
-                    fs=fs,
+                return self.query_worker.query_update_or_delete(
                     parsed_query=parsed_query,
+                    update_sql_query=None,
                     partition_select=partition_select,
+                    fs=fs,
                 )
             case _:
                 raise ValueError(f"Unsupported SQL operation: {query_operation}.")

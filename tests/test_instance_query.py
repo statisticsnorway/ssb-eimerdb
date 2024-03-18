@@ -43,26 +43,30 @@ class TestEimerDBInstanceQuery(TestEimerDBInstanceBase):
         mock_query_select.assert_called_once()
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance_query_worker.QueryWorker.query_update")
-    def test_query_update_expect_result(self, mock_query_update: Mock, _: Mock) -> None:
-        mock_query_update.return_value = "1 rows updated by user"
+    @patch("eimerdb.instance_query_worker.QueryWorker.query_update_or_delete")
+    def test_query_update_expect_result(
+        self, mock_query_update_or_delete: Mock, _: Mock
+    ) -> None:
+        mock_query_update_or_delete.return_value = "1 rows updated by user"
 
         result = self.instance.query(
             "UPDATE table1 SET col1='value' WHERE col2='value'"
         )
 
         assert result == "1 rows updated by user"
-        mock_query_update.assert_called_once()
+        mock_query_update_or_delete.assert_called_once()
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance_query_worker.QueryWorker.query_delete")
-    def test_query_delete_expect_result(self, mock_query_delete: Mock, _: Mock) -> None:
-        mock_query_delete.return_value = "1 rows deleted by user"
+    @patch("eimerdb.instance_query_worker.QueryWorker.query_update_or_delete")
+    def test_query_delete_expect_result(
+        self, mock_query_update_or_delete: Mock, _: Mock
+    ) -> None:
+        mock_query_update_or_delete.return_value = "1 rows deleted by user"
 
         result = self.instance.query("DELETE FROM table1 WHERE col='value'")
 
         assert result == "1 rows deleted by user"
-        mock_query_delete.assert_called_once()
+        mock_query_update_or_delete.assert_called_once()
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
     def test_query_drop_table_expect_exception(self, _: Mock) -> None:
