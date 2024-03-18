@@ -16,7 +16,6 @@ from .eimerdb_constants import ARROW_OUTPUT_FORMAT
 from .eimerdb_constants import BUCKET_KEY
 from .eimerdb_constants import CHANGES_ALL
 from .eimerdb_constants import CHANGES_RECENT
-from .eimerdb_constants import COLUMNS_KEY
 from .eimerdb_constants import DUCKDB_DEFAULT_CONFIG
 from .eimerdb_constants import EDITABLE_KEY
 from .eimerdb_constants import PANDAS_OUTPUT_FORMAT
@@ -239,16 +238,6 @@ class QueryWorker:
             partitions_len = len(partitions) if partitions is not None else 0
             return "**/" * partitions_len + "*"
 
-        def get_columns(_local_changes_output: str) -> Optional[list[str]]:
-            if _local_changes_output == CHANGES_RECENT:
-                return None
-
-            columns = parsed_query.get(COLUMNS_KEY)
-            if columns == ["*"]:
-                return None
-
-            return columns
-
         def get_duckdb_query(_local_changes_output: str) -> str:
             modified_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
 
@@ -256,8 +245,7 @@ class QueryWorker:
                 return modified_query
 
             if (
-                get_columns(_local_changes_output) is not None
-                and table_config[EDITABLE_KEY] is True
+                table_config[EDITABLE_KEY] is True
                 and unedited is not True
             ):
                 # add row_id to the select clause
@@ -297,7 +285,7 @@ class QueryWorker:
                 source=changes_files_max_depth,
                 schema=self.db_instance.get_arrow_schema(table_name, True),
                 filesystem=fs,
-                columns=get_columns(local_changes_output),
+                columns=None
             )
 
             return dataset if dataset.num_rows > 0 else None

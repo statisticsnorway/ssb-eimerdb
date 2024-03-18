@@ -238,13 +238,20 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
     @parameterized.expand(
         [
-            (None, 1),
-            (PARTITION_SELECT, 1),
+            (None, False, "pandas", "recent", 1),
+            (None, False, "pandas", "all", 2),
+            (PARTITION_SELECT, False, "pandas", "recent", 1),
+            (None, False, "arrow", "recent", 1),
+            (None, False, "arrow", "all", 2),
+            (PARTITION_SELECT, False, "arrow", "recent", 1),
         ]
     )
-    def test_query_changes_pandas_all(
+    def test_query_changes(
         self,
         partition_select: Optional[dict[str, list]],
+        unedited: bool,
+        output_format: str,
+        changes_output: str,
         expected_rows: int,
     ) -> None:
         # Mock the file system
@@ -295,9 +302,9 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             result: pa.Table = self.worker_instance.query_changes(
                 sql_query=VALID_STAR_QUERY,
                 partition_select=partition_select,
-                unedited=True,
-                output_format="pandas",
-                changes_output="recent",
+                unedited=unedited,
+                output_format=output_format,
+                changes_output=changes_output,
             )
 
         # Assertions
