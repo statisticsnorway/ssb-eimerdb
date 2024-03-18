@@ -1,3 +1,4 @@
+from typing import Optional
 from unittest.mock import ANY
 from unittest.mock import MagicMock
 from unittest.mock import Mock
@@ -24,13 +25,19 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
     @parameterized.expand(
         [
-            ("table2", False, "pandas"),
-            ("table1", False, "pandas"),
-            ("table1", True, "arrow"),
+            ("table2", False, "pandas", None),
+            ("table1", False, "pandas", None),
+            ("table1", False, "pandas", 0),
+            ("table1", False, "pandas", 1),
+            ("table1", True, "arrow", None),
         ]
     )
     def test_query_select_success(
-        self, table_name: str, unedited: bool, output_format
+        self,
+        table_name: str,
+        unedited: bool,
+        output_format,
+        changes_count: Optional[int],
     ) -> None:
         # Mock input parameters
         parsed_query = {"table_name": [table_name]}
@@ -52,9 +59,12 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         ) as mock_update_pyarrow_table:
             fs_mock = mock_gcs_filesystem.return_value
 
-            mock_table = MagicMock()
-            mock_table.num_rows = 1
-            mock_query_changes.return_value = mock_table
+            if changes_count is None:
+                mock_query_changes.return_value = None
+            else:
+                mock_table = MagicMock()
+                mock_table.num_rows = changes_count
+                mock_query_changes.return_value = mock_table
 
             expected_df = pd.DataFrame({"row_id": [1, 2, 3]})
             mock_update_pyarrow_table.return_value = expected_df
