@@ -293,9 +293,11 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             return_value=mock_duckdb_query_result,
         ):
             result: pa.Table = self.worker_instance.query_changes(
-                table_name="table1",
                 sql_query=VALID_STAR_QUERY,
                 partition_select=partition_select,
+                unedited=True,
+                output_format="pandas",
+                changes_output="recent",
             )
 
         # Assertions

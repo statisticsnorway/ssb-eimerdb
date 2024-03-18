@@ -29,6 +29,8 @@ from .abstract_db_instance import AbstractDbInstance
 from .eimerdb_constants import APPLICATION_JSON
 from .eimerdb_constants import ARROW_OUTPUT_FORMAT
 from .eimerdb_constants import BUCKET_KEY
+from .eimerdb_constants import CHANGES_ALL
+from .eimerdb_constants import CHANGES_RECENT
 from .eimerdb_constants import CREATED_BY_KEY
 from .eimerdb_constants import EDITABLE_KEY
 from .eimerdb_constants import OPERATION_KEY
@@ -36,7 +38,6 @@ from .eimerdb_constants import PANDAS_OUTPUT_FORMAT
 from .eimerdb_constants import PARTITION_COLUMNS_KEY
 from .eimerdb_constants import ROW_ID_DEF
 from .eimerdb_constants import SCHEMA_KEY
-from .eimerdb_constants import TABLE_NAME_KEY
 from .eimerdb_constants import TABLE_PATH_KEY
 from .functions import arrow_schema_from_json
 from .functions import get_datetime
@@ -491,23 +492,43 @@ class EimerDBInstance(AbstractDbInstance):
                 raise ValueError(f"Unsupported SQL operation: {query_operation}.")
 
     def query_changes(
-        self, sql_query: str, partition_select: Optional[dict[str, Any]] = None
-    ) -> Optional[pa.Table]:
+        self,
+        sql_query: str,
+        partition_select: Optional[dict[str, Any]] = None,
+        unedited: bool = False,
+        output_format: str = PANDAS_OUTPUT_FORMAT,
+        changes_output: str = CHANGES_ALL,
+    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
         """Query changes made in the database table.
 
         Args:
             sql_query (str): The SQL query to execute.
             partition_select (Dict, optional):
                 Dictionary containing partition selection criteria. Defaults to None.
+            unedited (bool):
+                Flag indicating whether to retrieve unedited changes. Defaults to False.
+            output_format (str):
+                The desired output format ('pandas' or 'arrow'). Defaults to 'pandas'.
+            changes_output (str):
+                The changes that are to be retrieved ('recent' or 'all'). Defaults to 'all'.
 
         Returns:
-            Optional[pa.Table]: Returns an arrow Table or None
+            Optional[pd.DataFrame, pa.Table]:
+                Returns a pandas DataFrame if 'pandas' output format is specified,
+                an arrow Table if 'arrow' output format is specified,
+                or None if operation is different from SELECT.
 
         Raises:
-            ValueError: If the operation is not supported.
+            ValueError: If the output format is invalid.
         """
-        parsed_query = parse_sql_query(sql_query)
+        if output_format not in (PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT):
+            raise ValueError(f"Invalid output format: {output_format}")
 
+        # Validate changes_output
+        if changes_output not in (CHANGES_ALL, CHANGES_RECENT):
+            raise ValueError(f"Invalid changes output: {changes_output}")
+
+        parsed_query = parse_sql_query(sql_query)
         # Check if the operation is SELECT
         if parsed_query[OPERATION_KEY] != "SELECT":
             raise ValueError(
@@ -515,7 +536,9 @@ class EimerDBInstance(AbstractDbInstance):
             )
 
         return self.query_worker.query_changes(
-            table_name=parsed_query[TABLE_NAME_KEY],
             sql_query=sql_query,
             partition_select=partition_select,
+            unedited=unedited,
+            output_format=output_format,
+            changes_output=changes_output,
         )

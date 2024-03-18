@@ -86,7 +86,7 @@ class TestEimerDBInstanceQuery(TestEimerDBInstanceBase):
     def test_query_changes_with_update_expect_exception(self) -> None:
         with self.assertRaises(ValueError) as context:
             self.instance.query_changes(
-                sql_query="UPDATE table1 SET col1='value' WHERE row_id='1'"
+                sql_query="UPDATE table1 SET col1='value' WHERE row_id='1'",
             )
 
         self.assertEqual(
