@@ -59,6 +59,10 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         ) as mock_update_pyarrow_table:
             fs_mock = mock_gcs_filesystem.return_value
 
+            expected_df = pd.DataFrame({"row_id": [1, 2, 3]})
+            expected_table = pa.Table.from_pandas(expected_df)
+
+            # Mock query_changes
             if changes_count is None:
                 mock_query_changes.return_value = None
             else:
@@ -66,11 +70,11 @@ class TestQueryWorker(TestEimerDBInstanceBase):
                 mock_table.num_rows = changes_count
                 mock_query_changes.return_value = mock_table
 
-            expected_df = pd.DataFrame({"row_id": [1, 2, 3]})
-            mock_update_pyarrow_table.return_value = expected_df
+            # Mock update_pyarrow_table
+            mock_update_pyarrow_table.return_value = expected_table
 
-            # Mock return values
-            mock_pq_read_table.return_value = pd.DataFrame({"row_id": [1, 2, 3]})
+            # Mock pq_read_table
+            mock_pq_read_table.return_value = expected_df
 
             # Call the method
             result = self.worker_instance.query_select(
@@ -85,7 +89,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             if output_format == "pandas":
                 assert result.equals(expected_df)
             else:
-                assert result.equals(pa.Table.from_pandas(expected_df))
+                assert result.equals(expected_table)
 
             mock_get_partitioned_files.assert_called_once_with(
                 table_name=table_name,
@@ -97,6 +101,9 @@ class TestQueryWorker(TestEimerDBInstanceBase):
                 unedited=unedited,
             )
             mock_pq_read_table.assert_called_once()
+
+            if table_name == "table1" and unedited is False:
+                mock_query_changes.assert_called_once()
 
     #
     # query_update
