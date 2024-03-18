@@ -244,10 +244,7 @@ class QueryWorker:
             if _local_changes_output == CHANGES_RECENT:
                 return modified_query
 
-            if (
-                table_config[EDITABLE_KEY] is True
-                and unedited is not True
-            ):
+            if table_config[EDITABLE_KEY] is True and unedited is not True:
                 # add row_id to the select clause
                 return modified_query.replace(" FROM", ", row_id FROM")
 
@@ -285,7 +282,7 @@ class QueryWorker:
                 source=changes_files_max_depth,
                 schema=self.db_instance.get_arrow_schema(table_name, True),
                 filesystem=fs,
-                columns=None
+                columns=None,
             )
 
             return dataset if dataset.num_rows > 0 else None
