@@ -161,7 +161,7 @@ class QueryWorker:
         )
 
         is_update = update_sql_query is not None
-        df_change_results = self._add_meta_data(
+        df_change_results = QueryWorker._add_meta_data(
             target_df=df_change_results, operation="update" if is_update else "delete"
         )
         dataset = pa.Table.from_pandas(df_change_results, schema=arrow_schema)
