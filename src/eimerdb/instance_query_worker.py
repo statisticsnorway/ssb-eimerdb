@@ -46,22 +46,22 @@ class QueryWorker:
 
     def query_select(
         self,
-        fs: GCSFileSystem,
         parsed_query: dict[str, Any],
         sql_query: str,
-        partition_select: Optional[dict[str, Any]] = None,
-        unedited: bool = False,
-        output_format: str = PANDAS_OUTPUT_FORMAT,
+        partition_select: Optional[dict[str, Any]],
+        unedited: bool,
+        output_format: str,
+        fs: GCSFileSystem,
     ) -> Union[pd.DataFrame, pa.Table]:
         """Query the database.
 
         Args:
-            fs (GCSFileSystem): The GCSFileSystem instance.
             parsed_query (dict): The parsed query.
             sql_query (str): The SQL query to execute.
             partition_select (dict, optional): Dictionary containing partition selection criteria. Defaults to None.
             unedited (bool): Flag indicating whether to retrieve unedited data. Defaults to False.
             output_format (str): Desired output format ('pandas' or 'arrow'). Defaults to PANDAS_OUTPUT_FORMAT.
+            fs (GCSFileSystem): The GCSFileSystem instance.
 
         Returns:
             Union[pd.DataFrame, pa.Table]: Returns a pandas DataFrame if 'pandas' output format is specified,
@@ -84,41 +84,58 @@ class QueryWorker:
 
             # noinspection PyTypeChecker
             df = pq.read_table(table_files, filesystem=fs)
-            df_changes = None
-            editable = table_config[EDITABLE_KEY]
 
-            if editable is True and unedited is False:
-                select_query = SELECT_STAR_QUERY
+            if table_config[EDITABLE_KEY] is True and unedited is False:
                 df_changes = self.query_changes_worker.query_changes(
-                    f"{select_query} {table_name}", partition_select
+                    sql_query=f"{SELECT_STAR_QUERY} {table_name}",
+                    partition_select=partition_select,
                 )
 
-            if editable is True and unedited is False and df_changes is not None:
-                if df_changes is not None and df_changes.num_rows != 0:
+                if df_changes is not None and df_changes.num_rows > 0:
                     df = update_pyarrow_table(df, df_changes)
 
             con.register(table_name, df)
             del df
 
-        if output_format == PANDAS_OUTPUT_FORMAT:
-            return con.execute(sql_query).df()
-        else:
-            return con.execute(sql_query).arrow()
+        query_result = con.execute(sql_query)
+        return (
+            query_result.df()
+            if output_format == PANDAS_OUTPUT_FORMAT
+            else query_result.arrow()
+        )
 
-    def query_update(
-        self,
-        fs: GCSFileSystem,
-        parsed_query: dict[str, Any],
-        sql_query: str,
-        partition_select: Optional[dict[str, Any]] = None,
-    ) -> str:
-        """Query the database to update records.
+    @staticmethod
+    def _add_meta_data(target_df: pd.DataFrame, operation: str) -> pd.DataFrame:
+        """Add metadata to the DataFrame.
 
         Args:
-            fs (GCSFileSystem): The GCSFileSystem instance.
+            target_df (pd.DataFrame): The target DataFrame.
+            operation (str): The operation.
+
+        Returns:
+            pd.DataFrame: The DataFrame with added metadata.
+        """
+        target_df["user"] = get_initials()
+        target_df["datetime"] = get_datetime()
+        target_df["operation"] = operation
+        return target_df
+
+    def query_update_or_delete(
+        self,
+        parsed_query: dict[str, Any],
+        sql_query: Optional[str],
+        partition_select: Optional[dict[str, Any]],
+        is_update: bool,
+        fs: GCSFileSystem,
+    ) -> str:
+        """Query the database to update or delete records.
+
+        Args:
             parsed_query (dict): The parsed query.
-            sql_query (str): The SQL query to execute.
-            partition_select (Dict, optional): Dictionary containing partition selection criteria. Defaults to None.
+            sql_query (str): The SQL query to execute. Only required for update operations.
+            partition_select (Dict, optional): Dictionary containing partition selection criteria.
+            is_update (bool): Flag indicating whether to update or delete records.
+            fs (GCSFileSystem): The GCSFileSystem instance.
 
         Returns:
             str: String containing number of rows updated.
@@ -128,108 +145,51 @@ class QueryWorker:
         """
         table_name = parsed_query[TABLE_NAME_KEY]
         where_clause = parsed_query[WHERE_CLAUSE_KEY]
-
         table_config = self.db_instance.tables[table_name]
-        partitions = table_config[PARTITION_COLUMNS_KEY]
 
         if table_config[EDITABLE_KEY] is not True:
             raise ValueError(f"The table {table_name} is not editable!")
 
+        arrow_schema = self.db_instance.get_arrow_schema(table_name, True)
+
         select_query = f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}"
-        df_update_results: pd.DataFrame = self.query_select(
-            fs=fs,
+        df_change_results: pd.DataFrame = self.query_select(
             parsed_query=parse_sql_query(select_query),
             sql_query=select_query,
             partition_select=partition_select,
+            unedited=False,
+            output_format=PANDAS_OUTPUT_FORMAT,
+            fs=fs,
         )
 
-        df_update_results["user"] = get_initials()
-        df_update_results["datetime"] = get_datetime()
-        df_update_results["operation"] = "update"
+        df_change_results = self._add_meta_data(
+            target_df=df_change_results, operation="update" if is_update else "delete"
+        )
+        dataset = pa.Table.from_pandas(df_change_results, schema=arrow_schema)
 
-        arrow_schema = self.db_instance.get_arrow_schema(table_name, True)
-
-        dataset = pa.Table.from_pandas(df_update_results, schema=arrow_schema)
         con = duckdb.connect()
         con.register("dataset", dataset)
-        con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
 
-        sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
-        con.execute(sql_query)
-        df_updates_commits = con.table("updates").df()
+        if is_update:
+            con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
+            sql_query = sql_query.replace(f"UPDATE {table_name}", "UPDATE updates")
+            con.execute(sql_query)
+            changes_df: pd.DataFrame = con.table("updates").df()
+        else:
+            con.execute(f"CREATE TABLE deletes AS FROM dataset WHERE {where_clause}")
+            changes_df = con.table("deletes").df()
 
+        changes_table = pa.Table.from_pandas(changes_df, schema=arrow_schema)
         table_path = self.db_instance.tables[table_name][TABLE_PATH_KEY] + "_changes"
-        update_table = pa.Table.from_pandas(df_updates_commits, schema=arrow_schema)
 
         # noinspection PyTypeChecker
         pq.write_to_dataset(
-            table=update_table,
+            table=changes_table,
             root_path=f"gs://{self.db_instance.bucket_name}/{table_path}",
-            partition_cols=partitions,
+            partition_cols=table_config[PARTITION_COLUMNS_KEY],
             basename_template=f"commit_{uuid4()}_{{i}}.parquet",
-            schema=self.db_instance.get_arrow_schema(table_name, True),
+            schema=arrow_schema if is_update else None,
             filesystem=fs,
         )
-        return f"{df_updates_commits.shape[0]} rows updated by {get_initials()}"
-
-    def query_delete(
-        self,
-        fs: GCSFileSystem,
-        parsed_query: dict[str, Any],
-        partition_select: Optional[dict[str, Any]] = None,
-    ) -> str:
-        """Query the database to delete records.
-
-        Args:
-            fs (GCSFileSystem): The GCSFileSystem instance.
-            parsed_query (dict): The parsed query.
-            partition_select (dict, optional): Dictionary containing partition selection criteria. Defaults to None.
-
-        Returns:
-            str: String containing number of rows deleted.
-
-        Raises:
-            ValueError: If the table is not editable.
-        """
-        table_name = parsed_query[TABLE_NAME_KEY]
-        where_clause = parsed_query[WHERE_CLAUSE_KEY]
-
-        table_config = self.db_instance.tables[table_name]
-
-        if table_config[EDITABLE_KEY] is not True:
-            raise ValueError(f"The table {table_name} is not editable!")
-
-        partitions = table_config[PARTITION_COLUMNS_KEY]
-
-        select_query = f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}"
-        df_delete_results: pd.DataFrame = self.query_select(
-            fs=fs,
-            parsed_query=parse_sql_query(select_query),
-            sql_query=select_query,
-            partition_select=partition_select,
-        )
-
-        df_delete_results["user"] = get_initials()
-        df_delete_results["datetime"] = get_datetime()
-        df_delete_results["operation"] = "delete"
-
-        arrow_schema = self.db_instance.get_arrow_schema(table_name, True)
-
-        dataset = pa.Table.from_pandas(df_delete_results, schema=arrow_schema)
-        con = duckdb.connect()
-        con.register("dataset", dataset)
-        con.execute(f"CREATE TABLE deletes AS FROM dataset WHERE {where_clause}")
-
-        df_deletions = con.table("deletes").df()
-        table_path = table_config[TABLE_PATH_KEY] + "_changes"
-        deletion_table = pa.Table.from_pandas(df_deletions, schema=arrow_schema)
-
-        # noinspection PyTypeChecker
-        pq.write_to_dataset(
-            table=deletion_table,
-            root_path=f"gs://{self.db_instance.bucket_name}/{table_path}",
-            partition_cols=partitions,
-            basename_template=f"commit_{uuid4()}_{{i}}.parquet",
-            filesystem=fs,
-        )
-        return f"{df_deletions.shape[0]} rows deleted by {get_initials()}"
+        operation = "updated" if is_update else "deleted"
+        return f"{changes_df.shape[0]} rows {operation} by {get_initials()}"

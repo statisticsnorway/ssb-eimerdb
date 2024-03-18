@@ -10,7 +10,6 @@ from tests.test_instance_base import TestEimerDBInstanceBase
 
 
 class TestQueryWorker(TestEimerDBInstanceBase):
-
     worker_instance: QueryWorker
 
     def setUp(self) -> None:
@@ -43,12 +42,12 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
         # Call the method
         result = self.worker_instance.query_select(
-            fs=fs_mock,
             parsed_query=parsed_query,
             sql_query=sql_query,
             partition_select=partition_select,
             unedited=unedited,
             output_format=output_format,
+            fs=fs_mock,
         )
 
         assert result.equals(pd.DataFrame({"row_id": [1, 2, 3]}))
@@ -78,8 +77,12 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
         # Test & Assertion
         with self.assertRaises(ValueError) as context:
-            self.worker_instance.query_update(
-                MagicMock(), parsed_query, "UPDATE table2 SET field1='1' WHERE row_id=1"
+            self.worker_instance.query_update_or_delete(
+                parsed_query=parsed_query,
+                sql_query="UPDATE table2 SET field1='1' WHERE row_id=1",
+                partition_select=None,
+                is_update=True,
+                fs=MagicMock(),
             )
         self.assertEqual(
             "The table table2 is not editable!",
@@ -107,8 +110,12 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         }
 
         # Call the method
-        result = self.worker_instance.query_update(
-            MagicMock(), parsed_query, "UPDATE table1 SET field1=4 WHERE row_id='1'"
+        result = self.worker_instance.query_update_or_delete(
+            parsed_query=parsed_query,
+            sql_query="UPDATE table1 SET field1=4 WHERE row_id='1'",
+            partition_select=None,
+            is_update=True,
+            fs=MagicMock(),
         )
 
         # Assertions
@@ -136,7 +143,13 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
         # Test & Assertion
         with self.assertRaises(ValueError) as context:
-            self.worker_instance.query_delete(fs=MagicMock(), parsed_query=parsed_query)
+            self.worker_instance.query_update_or_delete(
+                parsed_query=parsed_query,
+                sql_query=None,
+                partition_select=None,
+                is_update=False,
+                fs=MagicMock(),
+            )
         self.assertEqual(
             "The table table2 is not editable!",
             str(context.exception),
@@ -162,8 +175,12 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         }
 
         # Call the method
-        result = self.worker_instance.query_delete(
-            fs=MagicMock(), parsed_query=parsed_query
+        result = self.worker_instance.query_update_or_delete(
+            parsed_query=parsed_query,
+            sql_query=None,
+            partition_select=None,
+            is_update=False,
+            fs=MagicMock(),
         )
 
         # Assertions
@@ -175,4 +192,5 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             partition_cols=None,
             basename_template="commit_mocked_uuid_{i}.parquet",
             filesystem=ANY,
+            schema=None,
         )
