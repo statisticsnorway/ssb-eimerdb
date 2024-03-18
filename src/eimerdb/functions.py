@@ -150,9 +150,10 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
     Raises:
         ValueError: If there is a syntax error or if the query is not supported.
     """
+    stripped_query = " ".join(sql_query.split())
     select_match = select_pattern.search(sql_query)
-    update_match = re.match(update_pattern, sql_query)
-    delete_match = re.match(delete_pattern, sql_query)
+    update_match = re.match(update_pattern, stripped_query)
+    delete_match = re.match(delete_pattern, stripped_query)
 
     if delete_match:
         table_name, where_clause = delete_match.groups()

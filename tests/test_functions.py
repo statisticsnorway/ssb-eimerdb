@@ -155,6 +155,37 @@ class TestFunctions(unittest.TestCase):
             "where_clause": None,
         }
 
+    def test_update_query_multiline(self) -> None:
+        sql_query = """
+            UPDATE resultatregnskap_less
+            SET beloep = 42.0
+            WHERE
+                inntektsaar = 2022
+                AND id = '1234'
+                AND versjon = '1'
+                AND felt = '3600'
+            """
+
+        assert parse_sql_query(sql_query) == {
+            "operation": "UPDATE",
+            "set_clause": "beloep = 42.0",
+            "table_name": "resultatregnskap_less",
+            "where_clause": "inntektsaar = 2022 AND id = '1234' AND versjon = '1' AND "
+            "felt = '3600'",
+        }
+
+    def test_delete_query_multiline(self) -> None:
+        sql_query = """
+            DELETE FROM table1
+            WHERE row_id=1
+            """
+
+        assert parse_sql_query(sql_query) == {
+            "operation": "DELETE",
+            "table_name": "table1",
+            "where_clause": "row_id=1",
+        }
+
     #
     # create_eimerdb
     #
