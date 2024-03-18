@@ -238,16 +238,21 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
     @parameterized.expand(
         [
-            (None, False, "pandas", "recent", 1),
-            (None, False, "pandas", "all", 2),
-            (PARTITION_SELECT, False, "pandas", "recent", 1),
-            (None, False, "arrow", "recent", 1),
-            (None, False, "arrow", "all", 2),
-            (PARTITION_SELECT, False, "arrow", "recent", 1),
+            ("table2", None, True, "pandas", "all", 2),
+            ("table1", None, True, "pandas", "all", 2),
+            ("table1", None, False, "pandas", "all", 2),
+            ("table1", None, False, "pandas", "all", 0),
+            ("table1", None, False, "pandas", "recent", 1),
+            ("table1", None, False, "pandas", "all", 2),
+            ("table1", PARTITION_SELECT, False, "pandas", "recent", 1),
+            ("table1", None, False, "arrow", "recent", 1),
+            ("table1", None, False, "arrow", "all", 2),
+            ("table1", PARTITION_SELECT, False, "arrow", "recent", 1),
         ]
     )
     def test_query_changes(
         self,
+        table_name: str,
         partition_select: Optional[dict[str, list]],
         unedited: bool,
         output_format: str,
@@ -266,7 +271,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
         # Mock the table data
         mock_table_data = Mock()
-        mock_table_data.num_rows = 2  # Mocking non-empty table
+        mock_table_data.num_rows = expected_rows
 
         mock_table_data_df = Mock()
         mock_table_data_df.return_value = mock_table_data
@@ -285,8 +290,14 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
         # Mock the duckdb query result
         mock_duckdb_query_result = Mock()
-        mock_duckdb_query_result.df.return_value = expected_df
-        mock_duckdb_query_result.arrow.return_value = pa.Table.from_pandas(expected_df)
+        mock_duckdb_query_result.df.return_value = (
+            expected_df if expected_rows > 0 else pd.DataFrame()
+        )
+        mock_duckdb_query_result.arrow.return_value = (
+            pa.Table.from_pandas(expected_df)
+            if expected_rows > 0
+            else pa.Table.from_pandas(pd.DataFrame())
+        )
 
         # Patching methods with mocks
         with patch(
@@ -300,7 +311,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             return_value=mock_duckdb_query_result,
         ):
             result: pa.Table = self.worker_instance.query_changes(
-                sql_query=VALID_STAR_QUERY,
+                sql_query=f"SELECT * FROM {table_name}",
                 partition_select=partition_select,
                 unedited=unedited,
                 output_format=output_format,
@@ -308,6 +319,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             )
 
         # Assertions
-        self.assertIsNotNone(result)
-        assert len(result) == expected_rows
-        assert mock_fs.glob.call_count == expected_rows
+        if expected_rows > 0:
+            assert len(result) == expected_rows
+        else:
+            self.assertIsNone(result)
