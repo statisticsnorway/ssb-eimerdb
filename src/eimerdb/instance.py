@@ -36,6 +36,7 @@ from .eimerdb_constants import PANDAS_OUTPUT_FORMAT
 from .eimerdb_constants import PARTITION_COLUMNS_KEY
 from .eimerdb_constants import ROW_ID_DEF
 from .eimerdb_constants import SCHEMA_KEY
+from .eimerdb_constants import TABLE_NAME_KEY
 from .eimerdb_constants import TABLE_PATH_KEY
 from .functions import arrow_schema_from_json
 from .functions import get_datetime
@@ -488,3 +489,33 @@ class EimerDBInstance(AbstractDbInstance):
                 )
             case _:
                 raise ValueError(f"Unsupported SQL operation: {query_operation}.")
+
+    def query_changes(
+        self, sql_query: str, partition_select: Optional[dict[str, Any]] = None
+    ) -> Optional[pa.Table]:
+        """Query changes made in the database table.
+
+        Args:
+            sql_query (str): The SQL query to execute.
+            partition_select (Dict, optional):
+                Dictionary containing partition selection criteria. Defaults to None.
+
+        Returns:
+            Optional[pa.Table]: Returns an arrow Table or None
+
+        Raises:
+            ValueError: If the operation is not supported.
+        """
+        parsed_query = parse_sql_query(sql_query)
+
+        # Check if the operation is SELECT
+        if parsed_query[OPERATION_KEY] != "SELECT":
+            raise ValueError(
+                f"Operation {parsed_query[OPERATION_KEY]} is not supported."
+            )
+
+        return self.query_worker.query_changes(
+            table_name=parsed_query[TABLE_NAME_KEY],
+            sql_query=sql_query,
+            partition_select=partition_select,
+        )

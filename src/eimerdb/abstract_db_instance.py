@@ -189,3 +189,21 @@ class AbstractDbInstance(ABC):
         Raises:
             ValueError: If the output format is invalid, table is not editable, or invalid query.
         """
+
+    @abstractmethod
+    def query_changes(
+        self, sql_query: str, partition_select: Optional[dict[str, Any]] = None
+    ) -> Optional[pa.Table]:
+        """Query changes made in the database table.
+
+        Args:
+            sql_query (str): The SQL query to execute.
+            partition_select (Dict, optional):
+                Dictionary containing partition selection criteria. Defaults to None.
+
+        Returns:
+            Optional[pa.Table]: Returns an arrow Table or None
+
+        Raises:
+            ValueError: If the operation is not supported.
+        """
