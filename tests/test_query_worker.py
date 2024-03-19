@@ -264,9 +264,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
         glob_files = []
         if expected_rows == 1:
-            glob_files = [
-                "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1"
-            ]
+            glob_files = ["gs://bucket/eimerdb/eimerdb_name/table1_changes/part1"]
         elif expected_rows == 2:
             glob_files = [
                 "gs://bucket/eimerdb/eimerdb_name/table1_changes_all/part1",
