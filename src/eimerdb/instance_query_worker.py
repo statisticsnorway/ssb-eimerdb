@@ -300,24 +300,24 @@ class QueryWorker:
                 f"{get_partition_levels()}"
             )
 
-            try:
-                max_depth = max(obj.count("/") for obj in changes_files)
-            except ValueError:
+            if len(changes_files) < 1:
                 return None
 
-            changes_files_max_depth = [
+            max_depth = max(obj.count("/") for obj in changes_files)
+
+            changes_files_at_max_depth = [
                 obj for obj in changes_files if obj.count("/") == max_depth
             ]
 
             if partition_select is not None:
-                changes_files_max_depth = filter_partitions(
-                    table_files=changes_files_max_depth,
+                changes_files_at_max_depth = filter_partitions(
+                    table_files=changes_files_at_max_depth,
                     partition_select=partition_select,
                 )
 
             # noinspection PyTypeChecker
             dataset = pq.read_table(
-                source=changes_files_max_depth,
+                source=changes_files_at_max_depth,
                 schema=self.db_instance.get_arrow_schema(table_name, True),
                 filesystem=fs,
                 columns=None,
