@@ -262,12 +262,18 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         # Mock the file system
         mock_fs = Mock()
 
-        mock_fs.glob.return_value = [
-            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1"
-            "gs://bucket/eimerdb/eimerdb_name/table1_changes_all/part1"
-            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1",
-            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part2",
-        ]
+        glob_files = []
+        if expected_rows == 1:
+            glob_files = [
+                "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1"
+            ]
+        elif expected_rows == 2:
+            glob_files = [
+                "gs://bucket/eimerdb/eimerdb_name/table1_changes_all/part1",
+                "gs://bucket/eimerdb/eimerdb_name/table1_changes/part2",
+            ]
+
+        mock_fs.glob.return_value = glob_files
 
         # Mock the table data
         mock_table_data = Mock()
