@@ -202,6 +202,43 @@ class QueryWorker:
         operation = "updated" if is_update else "deleted"
         return f"{changes_df.shape[0]} rows {operation} by {get_initials()}"
 
+    def _cast_if_arrow(
+        self,
+        table: Optional[Union[pd.DataFrame, pa.Table]],
+        table_name: str,
+        output_format: str,
+    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+        if table is None or output_format == PANDAS_OUTPUT_FORMAT:
+            return table
+
+        return table.cast(self.db_instance.get_arrow_schema(table_name, True))
+
+    def _concat_changes(
+        self,
+        first: Optional[Union[pd.DataFrame, pa.Table]],
+        second: Optional[Union[pd.DataFrame, pa.Table]],
+        table_name: str,
+        output_format: str,
+    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+        if first is None and second is None:
+            return None
+
+        if first is None or second is None:
+            return self._cast_if_arrow(
+                table=first if first is not None else second,
+                table_name=table_name,
+                output_format=output_format,
+            )
+
+        if output_format == PANDAS_OUTPUT_FORMAT:
+            return pd.concat([first, second])
+
+        return self._cast_if_arrow(
+            table=pa.concat_tables([first, second]),
+            table_name=table_name,
+            output_format=output_format,
+        )
+
     def query_changes(
         self,
         sql_query: str,
@@ -258,7 +295,8 @@ class QueryWorker:
             )
 
             changes_files = fs.glob(
-                f"gs://{table_config[BUCKET_KEY]}/eimerdb/{self.db_instance.eimerdb_name}/{table_name}_{changes_suffix}/"
+                f"gs://{table_config[BUCKET_KEY]}/eimerdb/{self.db_instance.eimerdb_name}/"
+                f"{table_name}_{changes_suffix}/"
                 f"{get_partition_levels()}"
             )
 
@@ -305,38 +343,17 @@ class QueryWorker:
                 ]
                 return query_result.arrow().select(column_order)
 
-        def cast_if_arrow(
-            table: Optional[Union[pd.DataFrame, pa.Table]]
-        ) -> Optional[Union[pd.DataFrame, pa.Table]]:
-            if table is None or output_format == PANDAS_OUTPUT_FORMAT:
-                return table
-
-            return table.cast(self.db_instance.get_arrow_schema(table_name, True))
-
-        def concat_changes(
-            first: Optional[Union[pd.DataFrame, pa.Table]],
-            second: Optional[Union[pd.DataFrame, pa.Table]],
-        ) -> Optional[Union[pd.DataFrame, pa.Table]]:
-            if first is None and second is None:
-                return None
-
-            if first is None:
-                return cast_if_arrow(second)
-
-            if second is None:
-                return cast_if_arrow(first)
-
-            if output_format == PANDAS_OUTPUT_FORMAT:
-                return pd.concat([first, second])
-            else:
-                table = pa.concat_tables([first, second])
-                return cast_if_arrow(table)
-
         # method body
         if changes_output == CHANGES_ALL:
-            return concat_changes(
+            return self._concat_changes(
                 first=get_changes_query_result(CHANGES_ALL),
                 second=get_changes_query_result(CHANGES_RECENT),
+                table_name=table_name,
+                output_format=output_format,
             )
-        else:
-            return cast_if_arrow(get_changes_query_result(changes_output))
+
+        return self._cast_if_arrow(
+            table=get_changes_query_result(changes_output),
+            table_name=table_name,
+            output_format=output_format,
+        )
