@@ -262,12 +262,16 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         # Mock the file system
         mock_fs = Mock()
 
-        mock_fs.glob.return_value = [
-            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1"
-            "gs://bucket/eimerdb/eimerdb_name/table1_changes_all/part1"
-            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part1",
-            "gs://bucket/eimerdb/eimerdb_name/table1_changes/part2",
-        ]
+        glob_files = []
+        if expected_rows == 1:
+            glob_files = ["gs://bucket/eimerdb/eimerdb_name/table1_changes/part1"]
+        elif expected_rows == 2:
+            glob_files = [
+                "gs://bucket/eimerdb/eimerdb_name/table1_changes_all/part1",
+                "gs://bucket/eimerdb/eimerdb_name/table1_changes/part2",
+            ]
+
+        mock_fs.glob.return_value = glob_files
 
         # Mock the table data
         mock_table_data = Mock()
@@ -321,5 +325,54 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         # Assertions
         if expected_rows > 0:
             assert len(result) == expected_rows
+        else:
+            self.assertIsNone(result)
+
+    @parameterized.expand(
+        [
+            ("pandas", False, False),
+            ("pandas", True, False),
+            ("pandas", False, True),
+            ("pandas", True, True),
+            ("arrow", False, False),
+            ("arrow", True, False),
+            ("arrow", False, True),
+            ("arrow", True, True),
+        ]
+    )
+    def test_concat_changes(
+        self,
+        output_format: str,
+        use_first: bool,
+        use_second: bool,
+    ) -> None:
+        expected_df = pd.DataFrame.from_records(
+            [
+                {
+                    "row_id": "1",
+                    "field1": 1,
+                    "user": "user1",
+                    "datetime": "2021-01-01T00:00:00Z",
+                    "operation": "INSERT",
+                }
+            ]
+        )
+
+        if output_format == "pandas":
+            first = expected_df if use_first else None
+            second = expected_df if use_second else None
+        else:
+            first = pa.Table.from_pandas(expected_df) if use_first else None
+            second = pa.Table.from_pandas(expected_df) if use_second else None
+
+        result: pa.Table = self.worker_instance._concat_changes(
+            first=first, second=second, table_name="table1", output_format=output_format
+        )
+
+        # Assertions
+        if use_first and use_second:
+            assert len(result) == 2
+        elif use_first or use_second:
+            assert len(result) == 1
         else:
             self.assertIsNone(result)
