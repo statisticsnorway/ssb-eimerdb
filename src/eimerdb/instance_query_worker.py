@@ -314,12 +314,13 @@ class QueryWorker:
                 obj for obj in changes_files if obj.count("/") == max_depth
             ]
 
-            if partition_select is not None:
+            table_level_partition_select = filter_partition_select_on_table(
+                table_name=table_name, partition_select=partition_select
+            )
+            if table_level_partition_select is not None:
                 changes_files_at_max_depth = filter_partitions(
                     table_files=changes_files_at_max_depth,
-                    partition_select=filter_partition_select_on_table(
-                        table_name=table_name, partition_select=partition_select
-                    ),
+                    partition_select=table_level_partition_select,
                 )
 
             # noinspection PyTypeChecker
