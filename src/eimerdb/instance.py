@@ -134,17 +134,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         self.query_worker = QueryWorker(self)
 
-    def add_user(self, username: str, role: Any) -> None:
-        """Add a user with a specified role.
-
-        Args:
-            username (str): Name of the user to add.
-            role (Any): Role to assign (admin or user).
-
-        Raises:
-            PermissionError: If the user is not an admin.
-            ValueError: If the user already exists.
-        """
+    def add_user(self, username: str, role: Any) -> None:  # noqa: D102
         if self.is_admin is not True:
             raise PermissionError("Cannot add user. You are not an admin!")
 
@@ -162,16 +152,7 @@ class EimerDBInstance(AbstractDbInstance):
         )
         print(f"User {username} added with the role {role}!")
 
-    def remove_user(self, username: str) -> None:
-        """Remove a users access to the database.
-
-        Args:
-            username (str): Name of the user to remove.
-
-        Raises:
-            PermissionError: If the user is not an admin.
-            ValueError: If the user does not exist.
-        """
+    def remove_user(self, username: str) -> None:  # noqa: D102
         if self.is_admin is not True:
             raise PermissionError("Cannot remove user. You are not an admin!")
 
@@ -188,24 +169,13 @@ class EimerDBInstance(AbstractDbInstance):
         )
         print(f"User {username} successfully removed!")
 
-    def create_table(
+    def create_table(  # noqa: D102
         self,
         table_name: str,
         schema: list[dict[str, Any]],
         partition_columns: Optional[list[str]] = None,
         editable: Optional[bool] = True,
     ) -> None:
-        """Create a new table in EimerDB.
-
-        Args:
-            table_name (str): Name of the new table.
-            schema (str): JSON schema for the table.
-            partition_columns (list, optional): List of partition columns.
-            editable (bool, optional): Indicates if the table is editable.
-
-        Raises:
-            PermissionError: If the current user is not an admin.
-        """
         if self.is_admin is not True:
             raise PermissionError("Cannot create table. You are not an admin!")
 
@@ -231,19 +201,7 @@ class EimerDBInstance(AbstractDbInstance):
             data=json.dumps(self.tables), content_type=APPLICATION_JSON
         )
 
-    def insert(self, table_name: str, df: pd.DataFrame) -> list[str]:
-        """Insert unedited data into a main table.
-
-        Args:
-            table_name (str): Name of the table to insert data into.
-            df (pandas.DataFrame): DataFrame containing the data to insert
-
-        Returns:
-            list[str]: A list of row IDs for the inserted data.
-
-        Raises:
-            PermissionError: If the current user is not an admin.
-        """
+    def insert(self, table_name: str, df: pd.DataFrame) -> list[str]:  # noqa: D102
         if self.is_admin is not True:
             raise PermissionError(
                 "Cannot insert into main table. You are not an admin!"
@@ -301,15 +259,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         return uuid_list
 
-    def get_changes(self, table_name: str) -> Table:
-        """Retrieve changes for a given table.
-
-        Args:
-            table_name (str): The name of the table for which changes are to be retrieved.
-
-        Returns:
-            Table: A pyarrow table containing the changes for the specified table.
-        """
+    def get_changes(self, table_name: str) -> Table:  # noqa: D102
         path = self.tables[table_name][TABLE_PATH_KEY]
 
         fs = FileClient.get_gcs_file_system()
@@ -325,16 +275,7 @@ class EimerDBInstance(AbstractDbInstance):
         df_changes: Table = dataset.to_table()
         return df_changes
 
-    def get_inserts(self, table_name: str, raw: bool) -> pa.Table:
-        """Retrieve changes for a given table.
-
-        Args:
-            table_name (str): The name of the table for which changes are to be retrieved.
-            raw (bool): Indicates whether to retrieve the raw schema.
-
-        Returns:
-            DataFrame: A pandas DataFrame containing the changes for the specified table.
-        """
+    def get_inserts(self, table_name: str, raw: bool) -> pa.Table:  # noqa: D102
         if raw is True:
             suffix = "_raw"
         else:
@@ -355,12 +296,7 @@ class EimerDBInstance(AbstractDbInstance):
         df_inserts: pa.Table = dataset.to_table()
         return df_inserts
 
-    def combine_changes(self, table_name: str) -> None:
-        """Combines the files containing the changes of the table into one file.
-
-        Args:
-            table_name (str): The name of the table for which changes are to be merged.
-        """
+    def combine_changes(self, table_name: str) -> None:  # noqa: D102
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
         bucket = client.bucket(self.bucket_name)
 
@@ -382,13 +318,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         print("The changes were successfully merged into one file per partition!")
 
-    def combine_inserts(self, table_name: str, raw: bool) -> None:
-        """Combines the files containing the inserts of the table into one file.
-
-        Args:
-            table_name (str): The name of the table.
-            raw (bool): Indicates whether to retrieve the raw schema.
-        """
+    def combine_inserts(self, table_name: str, raw: bool) -> None:  # noqa: D102
         if raw is True:
             suffix = "/_raw"
         else:
@@ -415,20 +345,11 @@ class EimerDBInstance(AbstractDbInstance):
 
         print("The inserts were successfully merged into one file per partition!")
 
-    def get_arrow_schema(
+    def get_arrow_schema(  # noqa: D102
         self,
         table_name: str,
         raw: bool,
     ) -> pa.Schema:
-        """Get the arrow schema for a specified table.
-
-        Args:
-            table_name (str): The name of the table.
-            raw (bool): Indicates whether to retrieve the raw schema.
-
-        Returns:
-            pa.Schema: The arrow schema for the specified table.
-        """
         json_data = self.tables[table_name]
         arrow_schema = arrow_schema_from_json(json_data[SCHEMA_KEY])
 
@@ -439,27 +360,13 @@ class EimerDBInstance(AbstractDbInstance):
 
         return arrow_schema
 
-    def query(
+    def query(  # noqa: D102
         self,
         sql_query: str,
         partition_select: Optional[dict[str, Any]] = None,
         unedited: bool = False,
         output_format: str = PANDAS_OUTPUT_FORMAT,
     ) -> Union[pd.DataFrame, pa.Table, str]:
-        """Execute an SQL query on an EimerDB table.
-
-        Args:
-            sql_query (str): SQL query to execute.
-            partition_select (dict, optional): Dictionary specifying partition filters.
-            unedited (bool): Indicates whether to include unedited data.
-            output_format (str): Desired output format ('pandas' or 'arrow').
-
-        Returns:
-            pandas.DataFrame, pyarrow.Table, str: The result of the SQL query.
-
-        Raises:
-            ValueError: If the output format is invalid, table is not editable, or invalid query.
-        """
         if output_format not in [PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT]:
             raise ValueError(
                 f"Invalid output format: {output_format}. Supported formats: pandas, arrow."
@@ -496,7 +403,7 @@ class EimerDBInstance(AbstractDbInstance):
             case _:
                 raise ValueError(f"Unsupported SQL operation: {query_operation}.")
 
-    def query_changes(
+    def query_changes(  # noqa: D102
         self,
         sql_query: str,
         partition_select: Optional[dict[str, Any]] = None,
@@ -504,28 +411,6 @@ class EimerDBInstance(AbstractDbInstance):
         output_format: str = PANDAS_OUTPUT_FORMAT,
         changes_output: str = CHANGES_ALL,
     ) -> Optional[Union[pd.DataFrame, pa.Table]]:
-        """Query changes made in the database table.
-
-        Args:
-            sql_query (str): The SQL query to execute.
-            partition_select (Dict, optional):
-                Dictionary containing partition selection criteria. Defaults to None.
-            unedited (bool):
-                Flag indicating whether to retrieve unedited changes. Defaults to False.
-            output_format (str):
-                The desired output format ('pandas' or 'arrow'). Defaults to 'pandas'.
-            changes_output (str):
-                The changes that are to be retrieved ('recent' or 'all'). Defaults to 'all'.
-
-        Returns:
-            Optional[pd.DataFrame, pa.Table]:
-                Returns a pandas DataFrame if 'pandas' output format is specified,
-                an arrow Table if 'arrow' output format is specified,
-                or None if operation is different from SELECT.
-
-        Raises:
-            ValueError: If the output format is invalid.
-        """
         if output_format not in (PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT):
             raise ValueError(f"Invalid output format: {output_format}")
 
