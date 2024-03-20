@@ -231,12 +231,15 @@ class EimerDBInstance(AbstractDbInstance):
             data=json.dumps(self.tables), content_type=APPLICATION_JSON
         )
 
-    def insert(self, table_name: str, df: pd.DataFrame) -> None:
+    def insert(self, table_name: str, df: pd.DataFrame) -> list[str]:
         """Insert unedited data into a main table.
 
         Args:
             table_name (str): Name of the table to insert data into.
             df (pandas.DataFrame): DataFrame containing the data to insert
+
+        Returns:
+            list[str]: A list of row IDs for the inserted data.
 
         Raises:
             PermissionError: If the current user is not an admin.
@@ -246,7 +249,8 @@ class EimerDBInstance(AbstractDbInstance):
                 "Cannot insert into main table. You are not an admin!"
             )
 
-        df["row_id"] = df.apply(lambda row: str(uuid4()), axis=1)
+        uuid_list = [str(uuid4()) for _ in range(len(df))]
+        df["row_id"] = uuid_list
 
         arrow_schema = self.get_arrow_schema(table_name, False)
         table = pa.Table.from_pandas(df, schema=arrow_schema)
@@ -294,7 +298,8 @@ class EimerDBInstance(AbstractDbInstance):
             basename_template=filename,
             filesystem=fs,
         )
-        print("Data successfully inserted!")
+
+        return uuid_list
 
     def get_changes(self, table_name: str) -> Table:
         """Retrieve changes for a given table.

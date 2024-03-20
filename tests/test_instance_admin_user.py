@@ -14,33 +14,45 @@ from tests.test_instance_base import TestEimerDBInstanceBase
 
 class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
 
-    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    def test_insert(self, mock_get_gcs_file_system: Mock) -> None:
-        mock_fs = mock_get_gcs_file_system.return_value
-
+    def test_insert_given_valid_data_expect_list_of_row_ids(self) -> None:
         # Sample DataFrame for testing
-        df = pd.DataFrame({"row_id": ["1", "2", "2"], "field1": [1, 2, 3]})
+        df = pd.DataFrame({"row_id": ["1", "2"], "field1": [1, 2]})
 
-        expected_calls = [
-            call(
-                table=ANY,
-                root_path="gs://test_bucket/path/to/eimer/table1",
-                partition_cols=None,
-                basename_template=ANY,
-                filesystem=mock_fs,
-                schema=ANY,
-            ),
-            call(
-                table=ANY,
-                root_path="gs://test_bucket/path/to/eimer/table1_raw",
-                partition_cols=None,
-                basename_template=ANY,
-                filesystem=mock_fs,
-            ),
-        ]
-        with patch("eimerdb.instance.pq.write_to_dataset") as mock_write_to_dataset:
+        with patch(
+            "eimerdb.instance.pq.write_to_dataset"
+        ) as mock_write_to_dataset, patch(
+            "eimerdb.instance.FileClient.get_gcs_file_system"
+        ) as mock_get_gcs_file_system, patch(
+            "eimerdb.instance.uuid4"
+        ) as mock_uuid4:
+            mock_fs = mock_get_gcs_file_system.return_value
+            mock_uuid4.return_value = "mocked_uuid"
+
+            expected_calls = [
+                call(
+                    table=ANY,
+                    root_path="gs://test_bucket/path/to/eimer/table1",
+                    partition_cols=None,
+                    basename_template=ANY,
+                    filesystem=mock_fs,
+                    schema=ANY,
+                ),
+                call(
+                    table=ANY,
+                    root_path="gs://test_bucket/path/to/eimer/table1_raw",
+                    partition_cols=None,
+                    basename_template=ANY,
+                    filesystem=mock_fs,
+                ),
+            ]
+
             # Call the method under test
-            self.instance.insert(table_name="table1", df=df)
+            row_ids = self.instance.insert(table_name="table1", df=df)
+
+            # Assert the return value
+            assert row_ids == ["mocked_uuid", "mocked_uuid"]
+
+            # Assert that the dependencies are called with the expected arguments
             mock_write_to_dataset.assert_has_calls(expected_calls)
 
     @patch("eimerdb.instance.FileClient.get_gcs_file_system")
