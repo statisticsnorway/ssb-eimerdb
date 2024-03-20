@@ -16,7 +16,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
 
     def test_insert_given_valid_data_expect_list_of_row_ids(self) -> None:
         # Sample DataFrame for testing
-        df = pd.DataFrame({"row_id": ["1", "2"], "field1": [1, 2]})
+        df = pd.DataFrame({"field1": [1, 2]})
 
         with patch(
             "eimerdb.instance.pq.write_to_dataset"
