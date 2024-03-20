@@ -7,13 +7,13 @@ from typing import Union
 
 import pandas as pd
 import pyarrow as pa
-from docstring_inheritance import NumpyDocstringInheritanceMeta
+from docstring_inheritance import GoogleDocstringInheritanceMeta
 
 from eimerdb.eimerdb_constants import CHANGES_ALL
 from eimerdb.eimerdb_constants import PANDAS_OUTPUT_FORMAT
 
 
-class Meta(ABCMeta, NumpyDocstringInheritanceMeta):
+class Meta(ABCMeta, GoogleDocstringInheritanceMeta):
     """Metaclass for AbstractDbInstance."""
 
     pass
