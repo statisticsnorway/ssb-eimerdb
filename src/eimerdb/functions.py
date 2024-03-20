@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 def filter_partition_select_on_table(
     table_name: str, partition_select: Optional[dict[str, Any]]
-) -> Optional[dict[str, Any]]:
+) -> Optional[dict[str, list[str]]]:
     """A function that gets the partition select for a table.
 
     Supports both:
