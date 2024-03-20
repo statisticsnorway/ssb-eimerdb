@@ -101,12 +101,15 @@ class AbstractDbInstance(ABC):
         """
 
     @abstractmethod
-    def insert(self, table_name: str, df: pd.DataFrame) -> None:
+    def insert(self, table_name: str, df: pd.DataFrame) -> list[str]:
         """Insert unedited data into a main table.
 
         Args:
             table_name (str): Name of the table to insert data into.
             df (pandas.DataFrame): DataFrame containing the data to insert
+
+        Returns:
+            list[str]: A list of row IDs for the inserted data.
 
         Raises:
             PermissionError: If the current user is not an admin.
