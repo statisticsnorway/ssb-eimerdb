@@ -164,9 +164,7 @@ class QueryWorker:
         df_change_results: pd.DataFrame = self.query_select(
             parsed_query=parse_sql_query(select_query),
             sql_query=select_query,
-            partition_select=filter_partition_select_on_table(
-                table_name=table_name, partition_select=partition_select
-            ),
+            partition_select=partition_select,
             unedited=False,
             output_format=PANDAS_OUTPUT_FORMAT,
             fs=fs,
