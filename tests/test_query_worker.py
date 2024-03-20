@@ -12,7 +12,7 @@ from eimerdb.instance_query_worker import QueryWorker
 from tests.test_instance_base import TestEimerDBInstanceBase
 
 VALID_STAR_QUERY = "SELECT * FROM table1 WHERE row_id='1'"
-PARTITION_SELECT = {"field1": [1]}
+PARTITION_SELECT = {"table1": {"field1": [1]}}
 
 
 class TestQueryWorker(TestEimerDBInstanceBase):

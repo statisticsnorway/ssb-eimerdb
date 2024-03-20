@@ -1,12 +1,16 @@
 import unittest
+from typing import Any
+from typing import Optional
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 from unittest.mock import patch
 
 import pyarrow as pa
+from parameterized import parameterized
 
 from eimerdb.functions import arrow_schema_from_json
 from eimerdb.functions import create_eimerdb
+from eimerdb.functions import filter_partition_select_on_table
 from eimerdb.functions import get_datetime
 from eimerdb.functions import get_initials
 from eimerdb.functions import get_json
@@ -14,6 +18,27 @@ from eimerdb.functions import parse_sql_query
 
 
 class TestFunctions(unittest.TestCase):
+
+    @parameterized.expand(
+        [
+            ("table1", None, None),
+            ("table1", {"col1": ["value1", "value2"]}, {"col1": ["value1", "value2"]}),
+            (
+                "table1",
+                {"table1": {"col1": ["value1", "value2"]}},
+                {"col1": ["value1", "value2"]},
+            ),
+            ("table2", {"table1": {"col1": ["value1", "value2"]}}, None),
+        ]
+    )
+    def test_filter_partition_select_on_table(
+        self,
+        table_name: str,
+        partition_select: dict[str, Any],
+        expected: Optional[dict[str, Any]],
+    ) -> None:
+        result = filter_partition_select_on_table(table_name, partition_select)
+        self.assertEqual(expected, result)
 
     def test_get_datetime(self) -> None:
         result = get_datetime()
