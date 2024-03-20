@@ -9,6 +9,7 @@ import logging
 import re
 from datetime import datetime
 from typing import Any
+from typing import Optional
 
 import pyarrow as pa
 from dapla import AuthClient
@@ -25,6 +26,40 @@ from eimerdb.eimerdb_constants import TABLE_NAME_KEY
 from eimerdb.eimerdb_constants import WHERE_CLAUSE_KEY
 
 logger = logging.getLogger(__name__)
+
+
+def filter_partition_select_on_table(
+    table_name: str, partition_select: Optional[dict[str, Any]]
+) -> Optional[dict[str, Any]]:
+    """A function that gets the partition select for a table.
+
+    Supports both:
+        {
+            "table1": {
+                "col1": ["value1", "value2"]
+            }
+        }
+        and:
+        {
+            "col1": ["value1", "value2"]
+        }
+
+    Args:
+        table_name (str): The name of the table.
+        partition_select (dict): The partition select.
+
+    Returns:
+        dict: The partition select for the table, or None.
+    """
+    if partition_select is None:
+        return partition_select
+
+    # if partition_select is a dictionary with table names as keys
+    if all(isinstance(v, dict) for v in partition_select.values()):
+        return partition_select.get(table_name)
+
+    # if partition_select is a dictionary with partition column names as keys
+    return partition_select
 
 
 def get_datetime() -> str:

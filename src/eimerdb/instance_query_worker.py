@@ -24,6 +24,7 @@ from .eimerdb_constants import SELECT_STAR_QUERY
 from .eimerdb_constants import TABLE_NAME_KEY
 from .eimerdb_constants import TABLE_PATH_KEY
 from .eimerdb_constants import WHERE_CLAUSE_KEY
+from .functions import filter_partition_select_on_table
 from .functions import get_datetime
 from .functions import get_initials
 from .functions import parse_sql_query
@@ -75,14 +76,16 @@ class QueryWorker:
 
         for table_name in tables:
             table_config = self.db_instance.tables[table_name]
-
+            current_partition_select = filter_partition_select_on_table(
+                table_name=table_name, partition_select=partition_select
+            )
             table_files = get_partitioned_files(
                 table_name=table_name,
                 instance_name=self.db_instance.eimerdb_name,
                 table_config=table_config,
                 suffix="_raw",
                 fs=fs,
-                partition_select=partition_select,
+                partition_select=current_partition_select,
                 unedited=unedited,
             )
 
@@ -92,7 +95,7 @@ class QueryWorker:
             if table_config[EDITABLE_KEY] is True and unedited is False:
                 changes_table = self.query_changes(
                     sql_query=f"{SELECT_STAR_QUERY} {table_name}",
-                    partition_select=partition_select,
+                    partition_select=current_partition_select,
                     output_format=ARROW_OUTPUT_FORMAT,
                     changes_output=CHANGES_RECENT,
                     unedited=False,
@@ -161,7 +164,9 @@ class QueryWorker:
         df_change_results: pd.DataFrame = self.query_select(
             parsed_query=parse_sql_query(select_query),
             sql_query=select_query,
-            partition_select=partition_select,
+            partition_select=filter_partition_select_on_table(
+                table_name=table_name, partition_select=partition_select
+            ),
             unedited=False,
             output_format=PANDAS_OUTPUT_FORMAT,
             fs=fs,
@@ -312,7 +317,9 @@ class QueryWorker:
             if partition_select is not None:
                 changes_files_at_max_depth = filter_partitions(
                     table_files=changes_files_at_max_depth,
-                    partition_select=partition_select,
+                    partition_select=filter_partition_select_on_table(
+                        table_name=table_name, partition_select=partition_select
+                    ),
                 )
 
             # noinspection PyTypeChecker
