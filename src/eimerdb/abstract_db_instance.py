@@ -1,4 +1,5 @@
 from abc import ABC
+from abc import ABCMeta
 from abc import abstractmethod
 from typing import Any
 from typing import Optional
@@ -6,12 +7,19 @@ from typing import Union
 
 import pandas as pd
 import pyarrow as pa
+from docstring_inheritance import GoogleDocstringInheritanceMeta
 
 from eimerdb.eimerdb_constants import CHANGES_ALL
 from eimerdb.eimerdb_constants import PANDAS_OUTPUT_FORMAT
 
 
-class AbstractDbInstance(ABC):
+class Meta(ABCMeta, GoogleDocstringInheritanceMeta):
+    """Metaclass for AbstractDbInstance."""
+
+    pass
+
+
+class AbstractDbInstance(ABC, metaclass=Meta):
     """Abstract class for database instance.
 
     All database instance classes must inherit from this class.
