@@ -47,7 +47,7 @@ class QueryWorker:
         Args:
             db_instance: The AbstractDbInstance instance.
         """
-        self.db_instance = db_instance
+        self._db_instance = db_instance
 
     def query_select(
         self,
@@ -75,13 +75,13 @@ class QueryWorker:
         tables = parsed_query[TABLE_NAME_KEY]
 
         for table_name in tables:
-            table_config = self.db_instance.tables[table_name]
+            table_config = self._db_instance.tables[table_name]
             current_partition_select = filter_partition_select_on_table(
                 table_name=table_name, partition_select=partition_select
             )
             table_files = get_partitioned_files(
                 table_name=table_name,
-                instance_name=self.db_instance.eimerdb_name,
+                instance_name=self._db_instance.eimerdb_name,
                 table_config=table_config,
                 suffix="_raw",
                 fs=fs,
@@ -153,12 +153,12 @@ class QueryWorker:
         """
         table_name = parsed_query[TABLE_NAME_KEY]
         where_clause = parsed_query[WHERE_CLAUSE_KEY]
-        table_config = self.db_instance.tables[table_name]
+        table_config = self._db_instance.tables[table_name]
 
         if table_config[EDITABLE_KEY] is not True:
             raise ValueError(f"The table {table_name} is not editable!")
 
-        arrow_schema = self.db_instance.get_arrow_schema(table_name, True)
+        arrow_schema = self._db_instance.get_arrow_schema(table_name, True)
 
         select_query = f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}"
         df_change_results: pd.DataFrame = self.query_select(
@@ -191,12 +191,12 @@ class QueryWorker:
             changes_df = con.table("deletes").df()
 
         changes_table = pa.Table.from_pandas(changes_df, schema=arrow_schema)
-        table_path = self.db_instance.tables[table_name][TABLE_PATH_KEY] + "_changes"
+        table_path = self._db_instance.tables[table_name][TABLE_PATH_KEY] + "_changes"
 
         # noinspection PyTypeChecker
         pq.write_to_dataset(
             table=changes_table,
-            root_path=f"gs://{self.db_instance.bucket_name}/{table_path}",
+            root_path=f"gs://{self._db_instance.bucket_name}/{table_path}",
             partition_cols=table_config[PARTITION_COLUMNS_KEY],
             basename_template=f"commit_{uuid4()}_{{i}}.parquet",
             schema=arrow_schema if is_update else None,
@@ -214,7 +214,7 @@ class QueryWorker:
         if table is None or output_format == PANDAS_OUTPUT_FORMAT:
             return table
 
-        return table.cast(self.db_instance.get_arrow_schema(table_name, True))
+        return table.cast(self._db_instance.get_arrow_schema(table_name, True))
 
     def _concat_changes(
         self,
@@ -271,7 +271,7 @@ class QueryWorker:
         """
         parsed_query = parse_sql_query(sql_query)
         table_name = parsed_query[TABLE_NAME_KEY][0]
-        table_config = self.db_instance.tables[table_name]
+        table_config = self._db_instance.tables[table_name]
 
         def get_partition_levels() -> str:
             partitions = table_config[PARTITION_COLUMNS_KEY]
@@ -298,7 +298,7 @@ class QueryWorker:
             )
 
             changes_files = fs.glob(
-                f"gs://{table_config[BUCKET_KEY]}/eimerdb/{self.db_instance.eimerdb_name}/"
+                f"gs://{table_config[BUCKET_KEY]}/eimerdb/{self._db_instance.eimerdb_name}/"
                 f"{table_name}_{changes_suffix}/"
                 f"{get_partition_levels()}"
             )
@@ -324,7 +324,7 @@ class QueryWorker:
             # noinspection PyTypeChecker
             dataset = pq.read_table(
                 source=changes_files_at_max_depth,
-                schema=self.db_instance.get_arrow_schema(table_name, True),
+                schema=self._db_instance.get_arrow_schema(table_name, True),
                 filesystem=fs,
                 columns=None,
             )
@@ -345,7 +345,7 @@ class QueryWorker:
             else:
                 column_order = [
                     field.name
-                    for field in self.db_instance.get_arrow_schema(table_name, True)
+                    for field in self._db_instance.get_arrow_schema(table_name, True)
                 ]
                 return query_result.arrow().select(column_order)
 
