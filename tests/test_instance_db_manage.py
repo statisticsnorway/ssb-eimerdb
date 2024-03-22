@@ -36,11 +36,12 @@ class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
 
         role_groups = self.instance.role_groups
         self.assertIsNotNone(role_groups)
-        role_groups.update({"new_group": "group"})
-        self.assertEqual(
-            {"admin_user": {"admin_group": ["admin_user"]}, "new_group": "group"},
-            role_groups,
-        )
+        if role_groups is not None:  # required for mypy
+            role_groups.update({"new_group": "group"})
+            self.assertEqual(
+                {"admin_user": {"admin_group": ["admin_user"]}, "new_group": "group"},
+                role_groups,
+            )
 
         # Assertions
         self.assertNotEqual(users, self.instance.users)
