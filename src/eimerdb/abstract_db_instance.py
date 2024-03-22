@@ -1,6 +1,7 @@
 from abc import ABC
 from abc import ABCMeta
 from abc import abstractmethod
+from copy import copy
 from typing import Any
 from typing import Optional
 from typing import Union
@@ -52,16 +53,66 @@ class AbstractDbInstance(ABC, metaclass=Meta):
             role_groups (dict, optional): Dictionary containing the role groups in the EimerDB.
             is_admin (bool): Indicates whether the current user is an admin.
         """
-        self.bucket_name = bucket_name
-        self.eimerdb_name = eimerdb_name
-        self.path = path
-        self.eimer_path = eimer_path
-        self.created_by = created_by
-        self.time_created = time_created
-        self.tables = tables
-        self.users = users
-        self.role_groups = role_groups
-        self.is_admin = is_admin
+        self._bucket_name: str = bucket_name
+        self._eimerdb_name: str = eimerdb_name
+        self._path: str = path
+        self._eimer_path: str = eimer_path
+        self._created_by: str = created_by
+        self._time_created: str = time_created
+        self._tables: dict[str, Any] = tables
+        self._users: dict[str, Any] = users
+        self._role_groups: Optional[dict[str, Any]] = role_groups
+        self._is_admin: bool = is_admin
+
+    @property
+    def bucket_name(self) -> str:
+        """Get the bucket name."""
+        return self._bucket_name
+
+    @property
+    def eimerdb_name(self) -> str:
+        """Get the EimerDB name."""
+        return self._eimerdb_name
+
+    @property
+    def path(self) -> str:
+        """Get the path to the EimerDB configuration file."""
+        return self._path
+
+    @property
+    def eimer_path(self) -> str:
+        """Get the path to the EimerDB."""
+        return self._eimer_path
+
+    @property
+    def created_by(self) -> str:
+        """Get the name of the user who created the EimerDB."""
+        return self._created_by
+
+    @property
+    def time_created(self) -> str:
+        """Get the time when the EimerDB was created."""
+        return self._time_created
+
+    @property
+    def tables(self) -> dict[str, Any]:
+        """Get the tables in the EimerDB."""
+        return copy(self._tables)
+
+    @property
+    def users(self) -> dict[str, Any]:
+        """Get the users in the EimerDB."""
+        return copy(self._users)
+
+    @property
+    def role_groups(self) -> Optional[dict[str, Any]]:
+        """Get the role groups in the EimerDB."""
+        return copy(self._role_groups) if self._role_groups is not None else None
+
+    @property
+    def is_admin(self) -> bool:
+        """Get whether the current user is an admin."""
+        return self._is_admin
 
     @abstractmethod
     def add_user(self, username: str, role: Any) -> None:

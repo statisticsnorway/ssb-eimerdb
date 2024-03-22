@@ -68,18 +68,6 @@ class EimerDBInstance(AbstractDbInstance):
             where the EimerDB database is hosted.
         eimer_name (str): The name of the EimerDB instance.
 
-    Attributes:
-        bucket_name (str): The name of the Google Cloud Storage bucket.
-        eimerdb_name (str): The name of the EimerDB instance.
-        path (str): The path to the EimerDB configuration.
-        eimer_path (str): The path to the EimerDB instance.
-        created_by (str): The name of the user who created the EimerDB instance.
-        time_created (str): The timestamp when the EimerDB instance
-            was created.
-        users (dict): A dictionary of EimerDB users and their roles (admin, user).
-        role_groups (dict): A dictionary of role groups and their members.
-        is_admin (bool): Indicates whether the current user is an admin.
-
     Methods:
         add_user(username, role): Add a user to EimerDB with a specified role.
         remove_user(username): Remove a user from EimerDB.
@@ -138,17 +126,17 @@ class EimerDBInstance(AbstractDbInstance):
         if self.is_admin is not True:
             raise PermissionError("Cannot add user. You are not an admin!")
 
-        if username in self.users:
+        if username in self._users:
             raise ValueError(f"User {username} already exists!")
 
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
         bucket = client.bucket(self.bucket_name)
 
-        self.users.update({username: role})
+        self._users.update({username: role})
         user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
 
         user_roles_blob.upload_from_string(
-            data=json.dumps(self.users), content_type=APPLICATION_JSON
+            data=json.dumps(self._users), content_type=APPLICATION_JSON
         )
         print(f"User {username} added with the role {role}!")
 
@@ -156,16 +144,16 @@ class EimerDBInstance(AbstractDbInstance):
         if self.is_admin is not True:
             raise PermissionError("Cannot remove user. You are not an admin!")
 
-        if username not in self.users:
+        if username not in self._users:
             raise ValueError(f"User {username} does not exist.")
 
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
         bucket = client.bucket(self.bucket_name)
 
-        del self.users[username]
+        del self._users[username]
         user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
         user_roles_blob.upload_from_string(
-            data=json.dumps(self.users), content_type=APPLICATION_JSON
+            data=json.dumps(self._users), content_type=APPLICATION_JSON
         )
         print(f"User {username} successfully removed!")
 
@@ -191,14 +179,14 @@ class EimerDBInstance(AbstractDbInstance):
                 PARTITION_COLUMNS_KEY: partition_columns,
             }
         }
-        self.tables.update(new_table)
+        self._tables.update(new_table)
 
         token = AuthClient.fetch_google_credentials()
         bucket = storage.Client(credentials=token).bucket(self.bucket_name)
 
         tables_blob = bucket.blob(f"{self.eimer_path}/config/tables.json")
         tables_blob.upload_from_string(
-            data=json.dumps(self.tables), content_type=APPLICATION_JSON
+            data=json.dumps(self._tables), content_type=APPLICATION_JSON
         )
 
     def insert(self, table_name: str, df: pd.DataFrame) -> list[str]:  # noqa: D102
@@ -232,7 +220,7 @@ class EimerDBInstance(AbstractDbInstance):
         )
 
         insert_id = uuid4()
-        json_data = self.tables[table_name]
+        json_data = self._tables[table_name]
         table_path = json_data[TABLE_PATH_KEY]
         partitions = json_data[PARTITION_COLUMNS_KEY]
         filename = f"insert_{insert_id}_{{i}}.parquet"
@@ -260,7 +248,7 @@ class EimerDBInstance(AbstractDbInstance):
         return uuid_list
 
     def get_changes(self, table_name: str) -> Table:  # noqa: D102
-        path = self.tables[table_name][TABLE_PATH_KEY]
+        path = self._tables[table_name][TABLE_PATH_KEY]
 
         fs = FileClient.get_gcs_file_system()
         # noinspection PyTypeChecker
@@ -281,7 +269,7 @@ class EimerDBInstance(AbstractDbInstance):
         else:
             suffix = ""
 
-        path = self.tables[table_name][TABLE_PATH_KEY] + suffix
+        path = self._tables[table_name][TABLE_PATH_KEY] + suffix
 
         fs = FileClient.get_gcs_file_system()
         # noinspection PyTypeChecker
@@ -300,8 +288,8 @@ class EimerDBInstance(AbstractDbInstance):
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
         bucket = client.bucket(self.bucket_name)
 
-        partitions = self.tables[table_name][PARTITION_COLUMNS_KEY]
-        source_folder = self.tables[table_name][TABLE_PATH_KEY] + "_changes"
+        partitions = self._tables[table_name][PARTITION_COLUMNS_KEY]
+        source_folder = self._tables[table_name][TABLE_PATH_KEY] + "_changes"
         blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
 
         # noinspection PyTypeChecker
@@ -327,8 +315,8 @@ class EimerDBInstance(AbstractDbInstance):
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
         bucket = client.bucket(self.bucket_name)
 
-        partitions = self.tables[table_name][PARTITION_COLUMNS_KEY]
-        source_folder = self.tables[table_name][TABLE_PATH_KEY] + suffix
+        partitions = self._tables[table_name][PARTITION_COLUMNS_KEY]
+        source_folder = self._tables[table_name][TABLE_PATH_KEY] + suffix
         blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
 
         # noinspection PyTypeChecker
@@ -350,7 +338,7 @@ class EimerDBInstance(AbstractDbInstance):
         table_name: str,
         raw: bool,
     ) -> pa.Schema:
-        json_data = self.tables[table_name]
+        json_data = self._tables[table_name]
         arrow_schema = arrow_schema_from_json(json_data[SCHEMA_KEY])
 
         if raw is True:
