@@ -20,6 +20,22 @@ class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
         )
         self.assertEqual(True, self.instance.is_admin)
 
+    def test_that_getters_returns_immutable_copies_of_dicts(self) -> None:
+        # Setup
+        users = self.instance.users
+        tables = self.instance.tables
+        role_groups = self.instance.role_groups
+
+        # Test
+        users["new_user"] = "user"
+        tables["new_table"] = "table"
+        role_groups["new_group"] = "group"
+
+        # Assertions
+        self.assertNotEqual(users, self.instance.users)
+        self.assertNotEqual(tables, self.instance.tables)
+        self.assertNotEqual(role_groups, self.instance.role_groups)
+
     @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
     @patch("eimerdb.instance.storage.Client")
     def test_add_user_expect_added_user(
