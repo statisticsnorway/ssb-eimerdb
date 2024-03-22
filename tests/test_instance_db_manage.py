@@ -1,6 +1,8 @@
+from copy import copy
 from unittest.mock import Mock
 from unittest.mock import patch
 
+from tests.test_instance_base import DEFAULT_TABLES_IN_TEST
 from tests.test_instance_base import TestEimerDBInstanceBase
 
 
@@ -27,9 +29,19 @@ class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
         role_groups = self.instance.role_groups
 
         # Test
-        users["new_user"] = "user"
-        tables["new_table"] = "table"
-        role_groups["new_group"] = "group"
+        users.update({"new_user": "user"})
+        self.assertEqual({"admin_user": "admin", "new_user": "user"}, users)
+
+        tables.update({"new_table": {}})
+        expected_tables = copy(DEFAULT_TABLES_IN_TEST)
+        expected_tables.update({"new_table": {}})
+        self.assertEqual(expected_tables, tables)
+
+        role_groups.update({"new_group": "group"})
+        self.assertEqual(
+            {"admin_user": {"admin_group": ["admin_user"]}, "new_group": "group"},
+            role_groups,
+        )
 
         # Assertions
         self.assertNotEqual(users, self.instance.users)
@@ -118,35 +130,9 @@ class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
         # Test
         self.instance.create_table(table_name, schema)
 
-        # Assertions
-        self.assertEqual(
+        expected = copy(DEFAULT_TABLES_IN_TEST)
+        expected.update(
             {
-                "table1": {
-                    "bucket": "test_bucket",
-                    "created_by": "admin_user",
-                    "editable": True,
-                    "partition_columns": None,
-                    "schema": [
-                        {"label": "Unique row ID", "name": "row_id", "type": "string"},
-                        {"label": "Field 1", "name": "field1", "type": "int8"},
-                    ],
-                    "table_path": "path/to/eimer/table1",
-                },
-                "table2": {
-                    "bucket": "test_bucket",
-                    "created_by": "admin_user",
-                    "editable": False,
-                    "partition_columns": None,
-                    "schema": [
-                        {
-                            "label": "Unique row ID",
-                            "name": "row_id",
-                            "type": "string",
-                        },
-                        {"label": "Field 1", "name": "field1", "type": "int8"},
-                    ],
-                    "table_path": "path/to/eimer/table2",
-                },
                 table_name: {
                     "bucket": "test_bucket",
                     "created_by": "user",
@@ -157,8 +143,12 @@ class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
                         {"label": "Field 1", "name": "field1", "type": "int8"},
                     ],
                     "table_path": "path/to/eimer/table3",
-                },
-            },
+                }
+            }
+        )
+
+        self.assertEqual(
+            expected,
             self.instance.tables,
         )
 
