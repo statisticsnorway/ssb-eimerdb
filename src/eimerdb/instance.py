@@ -123,17 +123,17 @@ class EimerDBInstance(AbstractDbInstance):
         self.query_worker = QueryWorker(self)
 
     def add_user(self, username: str, role: Any) -> None:  # noqa: D102
-        if self.is_admin is not True:
+        if self._is_admin is not True:
             raise PermissionError("Cannot add user. You are not an admin!")
 
         if username in self._users:
             raise ValueError(f"User {username} already exists!")
 
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
-        bucket = client.bucket(self.bucket_name)
+        bucket = client.bucket(self._bucket_name)
 
         self._users.update({username: role})
-        user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
+        user_roles_blob = bucket.blob(f"{self._eimer_path}/config/users.json")
 
         user_roles_blob.upload_from_string(
             data=json.dumps(self._users), content_type=APPLICATION_JSON
@@ -141,17 +141,17 @@ class EimerDBInstance(AbstractDbInstance):
         print(f"User {username} added with the role {role}!")
 
     def remove_user(self, username: str) -> None:  # noqa: D102
-        if self.is_admin is not True:
+        if self._is_admin is not True:
             raise PermissionError("Cannot remove user. You are not an admin!")
 
         if username not in self._users:
             raise ValueError(f"User {username} does not exist.")
 
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
-        bucket = client.bucket(self.bucket_name)
+        bucket = client.bucket(self._bucket_name)
 
         del self._users[username]
-        user_roles_blob = bucket.blob(f"{self.eimer_path}/config/users.json")
+        user_roles_blob = bucket.blob(f"{self._eimer_path}/config/users.json")
         user_roles_blob.upload_from_string(
             data=json.dumps(self._users), content_type=APPLICATION_JSON
         )
@@ -164,7 +164,7 @@ class EimerDBInstance(AbstractDbInstance):
         partition_columns: Optional[list[str]] = None,
         editable: Optional[bool] = True,
     ) -> None:
-        if self.is_admin is not True:
+        if self._is_admin is not True:
             raise PermissionError("Cannot create table. You are not an admin!")
 
         schema.insert(0, ROW_ID_DEF)
@@ -172,8 +172,8 @@ class EimerDBInstance(AbstractDbInstance):
         new_table = {
             table_name: {
                 CREATED_BY_KEY: get_initials(),
-                TABLE_PATH_KEY: f"{self.eimer_path}/{table_name}",
-                BUCKET_KEY: self.bucket_name,
+                TABLE_PATH_KEY: f"{self._eimer_path}/{table_name}",
+                BUCKET_KEY: self._bucket_name,
                 EDITABLE_KEY: editable,
                 SCHEMA_KEY: schema,
                 PARTITION_COLUMNS_KEY: partition_columns,
@@ -182,15 +182,15 @@ class EimerDBInstance(AbstractDbInstance):
         self._tables.update(new_table)
 
         token = AuthClient.fetch_google_credentials()
-        bucket = storage.Client(credentials=token).bucket(self.bucket_name)
+        bucket = storage.Client(credentials=token).bucket(self._bucket_name)
 
-        tables_blob = bucket.blob(f"{self.eimer_path}/config/tables.json")
+        tables_blob = bucket.blob(f"{self._eimer_path}/config/tables.json")
         tables_blob.upload_from_string(
             data=json.dumps(self._tables), content_type=APPLICATION_JSON
         )
 
     def insert(self, table_name: str, df: pd.DataFrame) -> list[str]:  # noqa: D102
-        if self.is_admin is not True:
+        if self._is_admin is not True:
             raise PermissionError(
                 "Cannot insert into main table. You are not an admin!"
             )
@@ -230,7 +230,7 @@ class EimerDBInstance(AbstractDbInstance):
         # noinspection PyTypeChecker
         pq.write_to_dataset(
             table=table,
-            root_path=f"gs://{self.bucket_name}/{table_path}",
+            root_path=f"gs://{self._bucket_name}/{table_path}",
             partition_cols=partitions,
             basename_template=filename,
             filesystem=fs,
@@ -239,7 +239,7 @@ class EimerDBInstance(AbstractDbInstance):
         # noinspection PyTypeChecker
         pq.write_to_dataset(
             table=table_raw,
-            root_path=f"gs://{self.bucket_name}/{table_path}_raw",
+            root_path=f"gs://{self._bucket_name}/{table_path}_raw",
             partition_cols=partitions,
             basename_template=filename,
             filesystem=fs,
@@ -253,7 +253,7 @@ class EimerDBInstance(AbstractDbInstance):
         fs = FileClient.get_gcs_file_system()
         # noinspection PyTypeChecker
         dataset = ds.dataset(
-            f"{self.bucket_name}/{path}_changes/",
+            f"{self._bucket_name}/{path}_changes/",
             format="parquet",
             partitioning="hive",
             schema=self.get_arrow_schema(table_name, True),
@@ -274,7 +274,7 @@ class EimerDBInstance(AbstractDbInstance):
         fs = FileClient.get_gcs_file_system()
         # noinspection PyTypeChecker
         dataset = ds.dataset(
-            f"{self.bucket_name}/{path}/",
+            f"{self._bucket_name}/{path}/",
             format="parquet",
             partitioning="hive",
             schema=self.get_arrow_schema(table_name, raw),
@@ -286,7 +286,7 @@ class EimerDBInstance(AbstractDbInstance):
 
     def combine_changes(self, table_name: str) -> None:  # noqa: D102
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
-        bucket = client.bucket(self.bucket_name)
+        bucket = client.bucket(self._bucket_name)
 
         partitions = self._tables[table_name][PARTITION_COLUMNS_KEY]
         source_folder = self._tables[table_name][TABLE_PATH_KEY] + "_changes"
@@ -295,7 +295,7 @@ class EimerDBInstance(AbstractDbInstance):
         # noinspection PyTypeChecker
         pq.write_to_dataset(
             table=self.get_changes(table_name),
-            root_path=f"gs://{self.bucket_name}/{source_folder}",
+            root_path=f"gs://{self._bucket_name}/{source_folder}",
             partition_cols=partitions,
             basename_template=f"merged_commit_{uuid4()}_{{i}}.parquet",
             schema=self.get_arrow_schema(table_name, True),
@@ -313,7 +313,7 @@ class EimerDBInstance(AbstractDbInstance):
             suffix = ""
 
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
-        bucket = client.bucket(self.bucket_name)
+        bucket = client.bucket(self._bucket_name)
 
         partitions = self._tables[table_name][PARTITION_COLUMNS_KEY]
         source_folder = self._tables[table_name][TABLE_PATH_KEY] + suffix
@@ -322,7 +322,7 @@ class EimerDBInstance(AbstractDbInstance):
         # noinspection PyTypeChecker
         pq.write_to_dataset(
             table=self.get_inserts(table_name, raw),
-            root_path=f"gs://{self.bucket_name}/{source_folder}",
+            root_path=f"gs://{self._bucket_name}/{source_folder}",
             partition_cols=partitions,
             basename_template=f"merged_commit_{uuid4()}_{{i}}.parquet",
             schema=self.get_arrow_schema(table_name, raw),
