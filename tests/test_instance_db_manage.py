@@ -25,18 +25,17 @@ class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
     def test_that_getters_returns_immutable_copies_of_dicts(self) -> None:
         # Setup
         users = self.instance.users
-        tables = self.instance.tables
-        role_groups = self.instance.role_groups
-
-        # Test
         users.update({"new_user": "user"})
         self.assertEqual({"admin_user": "admin", "new_user": "user"}, users)
 
+        tables = self.instance.tables
         tables.update({"new_table": {}})
         expected_tables = copy(DEFAULT_TABLES_IN_TEST)
         expected_tables.update({"new_table": {}})
         self.assertEqual(expected_tables, tables)
 
+        role_groups = self.instance.role_groups
+        self.assertIsNotNone(role_groups)
         role_groups.update({"new_group": "group"})
         self.assertEqual(
             {"admin_user": {"admin_group": ["admin_user"]}, "new_group": "group"},
