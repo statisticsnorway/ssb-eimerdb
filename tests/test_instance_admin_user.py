@@ -86,21 +86,13 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
 
     @parameterized.expand(
         [
-            (True, True, True),
-            (True, True, False),
-            (True, False, False),
-            (False, False, False),
+            (True,),
+            (False,),
         ]
     )
-    def test_get_inserts_or_changes(
-        self, raw: bool, find_inserts: bool, raise_file_not_found_error: bool
-    ) -> None:
-        if find_inserts:
-            suffix = "_raw" if raw else ""
-        else:
-            suffix = "_changes"
-
-        expected_table = self._get_expected_table(raw)
+    def test_get_inserts_or_changes(self, raise_file_not_found_error: bool) -> None:
+        expected_source_folder = "path/to/eimer/table1_changes"
+        expected_table = self._get_expected_table(False)
 
         with patch("eimerdb.instance.FileClient.get_gcs_file_system"), patch(
             "eimerdb.instance.ds.dataset"
@@ -114,14 +106,14 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
 
             # Call the method under test
             inserts_table = self.instance._get_inserts_or_changes(
-                table_name="table1", find_inserts=find_inserts, raw=raw
+                table_name="table1", source_folder=expected_source_folder, raw=False
             )
 
             mock_dataset.assert_called_once_with(
-                f"test_bucket/path/to/eimer/table1{suffix}/",
+                "test_bucket/path/to/eimer/table1_changes/",
                 format="parquet",
                 partitioning="hive",
-                schema=self.instance.get_arrow_schema("table1", raw),
+                schema=self.instance.get_arrow_schema("table1", False),
                 filesystem=ANY,
             )
 
@@ -180,6 +172,8 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
         ]
     )
     def test_combine_changes(self, expect_table: bool) -> None:
+        expected_source_folder = "path/to/eimer/table1_changes"
+
         with patch(
             "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
         ) as mock_get_inserts_or_changes, patch(
@@ -197,7 +191,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             # Mock asserts
 
             mock_get_inserts_or_changes.assert_called_once_with(
-                table_name="table1", find_inserts=False, raw=True
+                table_name="table1", source_folder=expected_source_folder, raw=True
             )
 
             if not expect_table:
@@ -221,6 +215,9 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
         ]
     )
     def test_combine_inserts(self, raw: bool, expect_table: bool) -> None:
+        suffix = "_raw" if raw else ""
+        expected_source_folder = "path/to/eimer/table1" + suffix
+
         with patch(
             "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
         ) as mock_get_inserts_or_changes, patch(
@@ -236,15 +233,12 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             self.instance.combine_inserts("table1", raw)
 
             mock_get_inserts_or_changes.assert_called_once_with(
-                table_name="table1", find_inserts=True, raw=raw
+                table_name="table1", source_folder=expected_source_folder, raw=raw
             )
 
             if not expect_table:
                 mock_write_to_table_and_delete_blobs.assert_not_called()
                 return
-
-            suffix = "/_raw" if raw else ""
-            expected_source_folder = "path/to/eimer/table1" + suffix
 
             # Assert that the dependencies are called with the expected arguments
             mock_write_to_table_and_delete_blobs.assert_called_once_with(

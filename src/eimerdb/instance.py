@@ -247,13 +247,13 @@ class EimerDBInstance(AbstractDbInstance):
         return uuid_list
 
     def _get_inserts_or_changes(
-        self, table_name: str, find_inserts: bool, raw: bool
+        self, table_name: str, source_folder: str, raw: bool
     ) -> Optional[pa.Table]:
         """Retrieve inserts or changes for a given table. Returns None if file not found.
 
         Args:
             table_name (str): The name of the table for which changes are to be retrieved.
-            find_inserts (bool): Flag indicating whether to retrieve inserts or changes.
+            source_folder (str): The folder where the inserts/changes are stored.
             raw (bool): Indicates whether to retrieve the raw schema. Only in use when
                 retrieving inserts.
 
@@ -261,18 +261,10 @@ class EimerDBInstance(AbstractDbInstance):
             DataFrame: A pandas DataFrame containing inserts/changes
             for the specified table, or None if file not found.
         """
-
-        def get_path() -> str:
-            if find_inserts:
-                suffix = "_raw" if raw else ""
-                return self.tables[table_name][TABLE_PATH_KEY] + suffix
-
-            return self.tables[table_name][TABLE_PATH_KEY] + "_changes"
-
         try:
             # noinspection PyTypeChecker
             dataset = ds.dataset(
-                f"{self.bucket_name}/{get_path()}/",
+                f"{self.bucket_name}/{source_folder}/",
                 format="parquet",
                 partitioning="hive",
                 schema=self.get_arrow_schema(table_name, raw),
@@ -305,15 +297,15 @@ class EimerDBInstance(AbstractDbInstance):
             blob.delete()
 
     def combine_changes(self, table_name: str) -> None:  # noqa: D102
+        source_folder = self._tables[table_name][TABLE_PATH_KEY] + "_changes"
+
         changes_table = self._get_inserts_or_changes(
-            table_name=table_name, find_inserts=False, raw=True
+            table_name=table_name, source_folder=source_folder, raw=True
         )
 
         if changes_table is None:
             logger.info("No changes found for table %s", table_name)
             return
-
-        source_folder = self._tables[table_name][TABLE_PATH_KEY] + "_changes"
 
         self._write_to_table_and_delete_blobs(
             table_name=table_name,
@@ -325,16 +317,16 @@ class EimerDBInstance(AbstractDbInstance):
         logger.info("The changes were successfully merged into one file per partition!")
 
     def combine_inserts(self, table_name: str, raw: bool) -> None:  # noqa: D102
+        suffix = "_raw" if raw else ""
+        source_folder = self._tables[table_name][TABLE_PATH_KEY] + suffix
+
         inserts_table = self._get_inserts_or_changes(
-            table_name=table_name, find_inserts=True, raw=raw
+            table_name=table_name, source_folder=source_folder, raw=raw
         )
 
         if inserts_table is None:
             logger.info("No inserts found for table %s", table_name)
             return
-
-        suffix = "/_raw" if raw else ""
-        source_folder = self._tables[table_name][TABLE_PATH_KEY] + suffix
 
         self._write_to_table_and_delete_blobs(
             table_name=table_name,
