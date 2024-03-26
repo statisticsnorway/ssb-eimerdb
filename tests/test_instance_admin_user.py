@@ -130,6 +130,49 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             else:
                 self.assertIs(expected_table, inserts_table)
 
+    def test_write_to_table_and_delete_blobs(self) -> None:
+        with patch(
+            "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
+        ), patch("eimerdb.instance.storage.Client") as mock_client, patch(
+            "eimerdb.instance.pq.write_to_dataset"
+        ) as mock_write_to_dataset, patch(
+            "eimerdb.instance.uuid4", return_value="mocked_uuid"
+        ), patch(
+            "eimerdb.instance.FileClient.get_gcs_file_system"
+        ):
+            # Setup mocks
+            expected_table = self._get_expected_table(False)
+            mock_write_to_dataset.return_value = expected_table
+
+            blob_1 = Mock(spec=Blob)
+            blob_2 = Mock(spec=Blob)
+
+            mock_client.return_value.bucket.return_value.list_blobs.return_value = [
+                blob_1,
+                blob_2,
+            ]
+
+            # Call the method under test
+            self.instance._write_to_table_and_delete_blobs(
+                table_name="table1",
+                table=expected_table,
+                source_folder="path/to/eimer/table1",
+                raw=False,
+            )
+
+            # Assert that the dependencies are called with the expected arguments
+            mock_write_to_dataset.assert_called_once_with(
+                table=expected_table,
+                root_path="gs://test_bucket/path/to/eimer/table1",
+                partition_cols=None,
+                basename_template="merged_commit_mocked_uuid_{i}.parquet",
+                schema=self.instance.get_arrow_schema("table1", False),
+                filesystem=ANY,
+            )
+
+            blob_1.delete.assert_called_once()
+            blob_2.delete.assert_called_once()
+
     @parameterized.expand(
         [
             (False,),
@@ -138,49 +181,30 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
     )
     def test_combine_changes(self, expect_table: bool) -> None:
         with patch(
-            "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
-        ), patch("eimerdb.instance.storage.Client") as mock_client, patch(
             "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
         ) as mock_get_inserts_or_changes, patch(
-            "eimerdb.instance.pq.write_to_dataset"
-        ) as mock_write_to_dataset, patch(
-            "eimerdb.instance.uuid4", return_value="mocked_uuid"
-        ), patch(
-            "eimerdb.instance.FileClient.get_gcs_file_system"
-        ):
-            if expect_table is True:
-                mock_get_inserts_or_changes.return_value = self._get_expected_table(
-                    False
-                )
-                blob_1 = Mock(spec=Blob)
-                blob_2 = Mock(spec=Blob)
-
-                mock_client.return_value.bucket.return_value.list_blobs.return_value = [
-                    blob_1,
-                    blob_2,
-                ]
-            else:
-                mock_get_inserts_or_changes.return_value = None
+            "eimerdb.instance.EimerDBInstance._write_to_table_and_delete_blobs",
+            return_value=None,
+        ) as mock_write_to_table_and_delete_blobs:
+            # Setup mocks
+            mock_get_inserts_or_changes.return_value = (
+                self._get_expected_table(False) if expect_table else None
+            )
 
             # Call the merge_changes method
             self.instance.combine_changes("table1")
 
             if not expect_table:
-                mock_write_to_dataset.call_count = 0
+                mock_write_to_table_and_delete_blobs.call_count = 0
                 return
 
             # Assert that the dependencies are called with the expected arguments
-            mock_write_to_dataset.assert_called_once_with(
+            mock_write_to_table_and_delete_blobs.assert_called_once_with(
+                table_name="table1",
                 table=mock_get_inserts_or_changes.return_value,
-                root_path="gs://test_bucket/path/to/eimer/table1_changes",
-                partition_cols=None,
-                basename_template="merged_commit_mocked_uuid_{i}.parquet",
-                schema=self.instance.get_arrow_schema("table1", True),
-                filesystem=ANY,
+                source_folder="path/to/eimer/table1_changes",
+                raw=True,
             )
-
-            blob_1.delete.assert_called_once()
-            blob_2.delete.assert_called_once()
 
     @parameterized.expand(
         [
@@ -192,49 +216,30 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
     )
     def test_combine_inserts(self, raw: bool, expect_table: bool) -> None:
         with patch(
-            "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
-        ), patch("eimerdb.instance.storage.Client") as mock_client, patch(
             "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
         ) as mock_get_inserts_or_changes, patch(
-            "eimerdb.instance.pq.write_to_dataset"
-        ) as mock_write_to_dataset, patch(
-            "eimerdb.instance.uuid4", return_value="mocked_uuid"
-        ), patch(
-            "eimerdb.instance.FileClient.get_gcs_file_system"
-        ):
+            "eimerdb.instance.EimerDBInstance._write_to_table_and_delete_blobs",
+            return_value=None,
+        ) as mock_write_to_table_and_delete_blobs:
             # Setup mocks
-            if expect_table is True:
-                mock_get_inserts_or_changes.return_value = self._get_expected_table(raw)
-
-                blob_1 = Mock(spec=Blob)
-                blob_2 = Mock(spec=Blob)
-
-                mock_client.return_value.bucket.return_value.list_blobs.return_value = [
-                    blob_1,
-                    blob_2,
-                ]
-            else:
-                mock_get_inserts_or_changes.return_value = None
+            mock_get_inserts_or_changes.return_value = (
+                self._get_expected_table(raw) if expect_table else None
+            )
 
             # Call the method under test
             self.instance.combine_inserts("table1", raw)
 
             if not expect_table:
-                mock_write_to_dataset.call_count = 0
+                mock_write_to_table_and_delete_blobs.call_count = 0
                 return
 
             suffix = "/_raw" if raw else ""
-            expected_root_path = "gs://test_bucket/path/to/eimer/table1" + suffix
+            expected_source_folder = "path/to/eimer/table1" + suffix
 
             # Assert that the dependencies are called with the expected arguments
-            mock_write_to_dataset.assert_called_once_with(
+            mock_write_to_table_and_delete_blobs.assert_called_once_with(
+                table_name="table1",
                 table=mock_get_inserts_or_changes.return_value,
-                root_path=expected_root_path,
-                partition_cols=None,
-                basename_template="merged_commit_mocked_uuid_{i}.parquet",
-                schema=self.instance.get_arrow_schema("table1", raw),
-                filesystem=ANY,
+                source_folder=expected_source_folder,
+                raw=raw,
             )
-
-            blob_1.delete.assert_called_once()
-            blob_2.delete.assert_called_once()
