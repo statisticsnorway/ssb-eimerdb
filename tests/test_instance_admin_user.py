@@ -201,7 +201,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             )
 
             if not expect_table:
-                mock_write_to_table_and_delete_blobs.call_count = 0
+                mock_write_to_table_and_delete_blobs.assert_not_called()
                 return
 
             # Assert that the dependencies are called with the expected arguments
@@ -240,7 +240,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             )
 
             if not expect_table:
-                mock_write_to_table_and_delete_blobs.call_count = 0
+                mock_write_to_table_and_delete_blobs.assert_not_called()
                 return
 
             suffix = "/_raw" if raw else ""
