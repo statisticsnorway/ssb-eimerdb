@@ -175,29 +175,6 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """
 
     @abstractmethod
-    def get_changes(self, table_name: str) -> pa.Table:
-        """Retrieve changes for a given table.
-
-        Args:
-            table_name (str): The name of the table for which changes are to be retrieved.
-
-        Returns:
-            Table: A pyarrow table containing the changes for the specified table.
-        """
-
-    @abstractmethod
-    def get_inserts(self, table_name: str, raw: bool) -> pa.Table:
-        """Retrieve changes for a given table.
-
-        Args:
-            table_name (str): The name of the table for which changes are to be retrieved.
-            raw (bool): Indicates whether to retrieve the raw schema.
-
-        Returns:
-            DataFrame: A pandas DataFrame containing the changes for the specified table.
-        """
-
-    @abstractmethod
     def combine_changes(self, table_name: str) -> None:
         """Combines the files containing the changes of the table into one file.
 

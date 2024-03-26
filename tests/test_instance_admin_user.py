@@ -55,67 +55,16 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             # Assert that the dependencies are called with the expected arguments
             mock_write_to_dataset.assert_has_calls(expected_calls)
 
-    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance.ds.dataset")
-    def test_get_changes(self, mock_dataset: Mock, _: Mock) -> None:
+    @staticmethod
+    def _get_expected_table(raw: bool) -> pa.Table:
         schema_fields = [
             pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
             pa.field("field1", pa.int8(), metadata={"label": "Field1"}),
         ]
-
-        schema_fields.extend(
-            [
-                pa.field("user", pa.string()),
-                pa.field("datetime", pa.string()),
-                pa.field("operation", pa.string()),
-            ]
-        )
-
-        schema = pa.schema(schema_fields)
-
-        expected_table = pa.Table.from_pydict(
-            {
-                "row_id": ["1"],
-                "field1": [1],
-                "user": ["user42"],
-                "datetime": ["2024-03-12T12:00:00"],
-                "operation": ["insert"],
-            },
-            schema=schema,
-        )
-
-        dataset = Mock(spec=ds.Dataset)
-        dataset.to_table.return_value = expected_table
-        mock_dataset.return_value = dataset
-
-        # Call the get_changes method
-        changes_df = self.instance.get_changes("table1")
-
-        # Assert that ds.dataset is called with the correct arguments
-        mock_dataset.assert_called_once_with(
-            "test_bucket/path/to/eimer/table1_changes/",
-            format="parquet",
-            partitioning="hive",
-            schema=self.instance.get_arrow_schema("table1", True),
-            filesystem=ANY,
-        )
-
-        # Assert that the returned DataFrame is the same as the mock DataFrame
-        self.assertIs(expected_table, changes_df)
-
-    @parameterized.expand(
-        [
-            (True,),
-            (False,),
-        ]
-    )
-    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance.ds.dataset")
-    def test_get_inserts(self, raw: bool, mock_dataset: Mock, _: Mock) -> None:
-        schema_fields = [
-            pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
-            pa.field("field1", pa.int8(), metadata={"label": "Field1"}),
-        ]
+        expected_data = {
+            "row_id": ["1"],
+            "field1": [1],
+        }
 
         if not raw:
             schema_fields.extend(
@@ -125,15 +74,6 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
                     pa.field("operation", pa.string()),
                 ]
             )
-
-        schema = pa.schema(schema_fields)
-
-        expected_data = {
-            "row_id": ["1"],
-            "field1": [1],
-        }
-
-        if not raw:
             expected_data.update(
                 {
                     "user": ["user42"],
@@ -142,176 +82,159 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
                 }
             )
 
-        expected_table = pa.Table.from_pydict(expected_data, schema=schema)
-
-        dataset = Mock(spec=ds.Dataset)
-        dataset.to_table.return_value = expected_table
-        mock_dataset.return_value = dataset
-
-        inserts_table = self.instance.get_inserts("table1", raw=raw)
-
-        suffix = "_raw" if raw else ""
-
-        mock_dataset.assert_called_once_with(
-            f"test_bucket/path/to/eimer/table1{suffix}/",
-            format="parquet",
-            partitioning="hive",
-            schema=self.instance.get_arrow_schema("table1", raw),
-            filesystem=ANY,
-        )
-
-        self.assertIs(expected_table, inserts_table)
-
-    @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
-    @patch("eimerdb.instance.storage.Client")
-    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance.uuid4")
-    @patch("eimerdb.instance.pq.write_to_dataset")
-    @patch("eimerdb.instance.EimerDBInstance.get_changes")
-    def test_combine_changes(
-        self,
-        mock_get_changes: Mock,
-        mock_write_to_dataset: Mock,
-        mock_uuid4: Mock,
-        _: Mock,
-        mock_client: Mock,
-        mock_fetch_credentials: Mock,
-    ) -> None:
-        # Mock the return value of get_changes
-        schema_fields = [
-            pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
-            pa.field("field1", pa.int8(), metadata={"label": "Field1"}),
-        ]
-
-        schema_fields.extend(
-            [
-                pa.field("user", pa.string()),
-                pa.field("datetime", pa.string()),
-                pa.field("operation", pa.string()),
-            ]
-        )
-
-        schema = pa.schema(schema_fields)
-
-        expected_table = pa.Table.from_pydict(
-            {
-                "row_id": ["1"],
-                "field1": [1],
-                "user": ["user42"],
-                "datetime": ["2024-03-12T12:00:00"],
-                "operation": ["insert"],
-            },
-            schema=schema,
-        )
-
-        mock_get_changes.return_value = expected_table
-
-        # Mock the return values of other dependencies
-        mock_uuid4.return_value = "mocked_uuid"
-
-        blob_1 = Mock(spec=Blob)
-        blob_2 = Mock(spec=Blob)
-
-        mock_fetch_credentials.return_value = "token"
-        mock_client.return_value.bucket.return_value.list_blobs.return_value = [
-            blob_1,
-            blob_2,
-        ]
-
-        # Call the merge_changes method
-        self.instance.combine_changes("table1")
-
-        # Assert that the dependencies are called with the expected arguments
-        mock_write_to_dataset.assert_called_once_with(
-            table=mock_get_changes.return_value,
-            root_path="gs://test_bucket/path/to/eimer/table1_changes",
-            partition_cols=None,
-            basename_template="merged_commit_mocked_uuid_{i}.parquet",
-            schema=self.instance.get_arrow_schema("table1", True),
-            filesystem=ANY,
-        )
-        blob_1.delete.assert_called_once()
-        blob_2.delete.assert_called_once()
+        return pa.Table.from_pydict(expected_data, schema=pa.schema(schema_fields))
 
     @parameterized.expand(
         [
-            (True,),
-            (False,),
+            (True, True, True),
+            (True, True, False),
+            (True, False, False),
+            (False, False, False),
         ]
     )
-    @patch("eimerdb.instance.AuthClient.fetch_google_credentials")
-    @patch("eimerdb.instance.storage.Client")
-    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    @patch("eimerdb.instance.uuid4")
-    @patch("eimerdb.instance.pq.write_to_dataset")
-    @patch("eimerdb.instance.EimerDBInstance.get_inserts")
-    def test_combine_inserts(
-        self,
-        raw: bool,
-        mock_get_inserts: Mock,
-        mock_write_to_dataset: Mock,
-        mock_uuid4: Mock,
-        _: Mock,
-        mock_client: Mock,
-        mock_fetch_credentials: Mock,
+    def test_get_inserts_or_changes(
+        self, raw: bool, find_inserts: bool, raise_file_not_found_error: bool
     ) -> None:
-        # Mock the return value of get_changes
-        schema_fields = [
-            pa.field("row_id", pa.string(), metadata={"label": "Unique row ID"}),
-            pa.field("field1", pa.int64(), metadata={"label": "Field1"}),
-        ]
+        if find_inserts:
+            suffix = "_raw" if raw else ""
+        else:
+            suffix = "_changes"
 
-        if not raw:
-            schema_fields.extend(
-                [
-                    pa.field("user", pa.string()),
-                    pa.field("datetime", pa.string()),
-                    pa.field("operation", pa.string()),
+        expected_table = self._get_expected_table(raw)
+
+        with patch("eimerdb.instance.FileClient.get_gcs_file_system"), patch(
+            "eimerdb.instance.ds.dataset"
+        ) as mock_dataset:
+            if raise_file_not_found_error:
+                mock_dataset.side_effect = FileNotFoundError
+            else:
+                dataset = Mock(spec=ds.Dataset)
+                dataset.to_table.return_value = expected_table
+                mock_dataset.return_value = dataset
+
+            # Call the method under test
+            inserts_table = self.instance._get_inserts_or_changes(
+                table_name="table1", find_inserts=find_inserts, raw=raw
+            )
+
+            mock_dataset.assert_called_once_with(
+                f"test_bucket/path/to/eimer/table1{suffix}/",
+                format="parquet",
+                partitioning="hive",
+                schema=self.instance.get_arrow_schema("table1", raw),
+                filesystem=ANY,
+            )
+
+            if raise_file_not_found_error:
+                self.assertIsNone(inserts_table)
+            else:
+                self.assertIs(expected_table, inserts_table)
+
+    @parameterized.expand(
+        [
+            (False,),
+            (True,),
+        ]
+    )
+    def test_combine_changes(self, expect_table: bool) -> None:
+        with patch(
+            "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
+        ), patch("eimerdb.instance.storage.Client") as mock_client, patch(
+            "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
+        ) as mock_get_inserts_or_changes, patch(
+            "eimerdb.instance.pq.write_to_dataset"
+        ) as mock_write_to_dataset, patch(
+            "eimerdb.instance.uuid4", return_value="mocked_uuid"
+        ), patch(
+            "eimerdb.instance.FileClient.get_gcs_file_system"
+        ):
+            if expect_table is True:
+                mock_get_inserts_or_changes.return_value = self._get_expected_table(
+                    False
+                )
+                blob_1 = Mock(spec=Blob)
+                blob_2 = Mock(spec=Blob)
+
+                mock_client.return_value.bucket.return_value.list_blobs.return_value = [
+                    blob_1,
+                    blob_2,
                 ]
+            else:
+                mock_get_inserts_or_changes.return_value = None
+
+            # Call the merge_changes method
+            self.instance.combine_changes("table1")
+
+            if not expect_table:
+                mock_write_to_dataset.call_count = 0
+                return
+
+            # Assert that the dependencies are called with the expected arguments
+            mock_write_to_dataset.assert_called_once_with(
+                table=mock_get_inserts_or_changes.return_value,
+                root_path="gs://test_bucket/path/to/eimer/table1_changes",
+                partition_cols=None,
+                basename_template="merged_commit_mocked_uuid_{i}.parquet",
+                schema=self.instance.get_arrow_schema("table1", True),
+                filesystem=ANY,
             )
 
-        schema = pa.schema(schema_fields)
+            blob_1.delete.assert_called_once()
+            blob_2.delete.assert_called_once()
 
-        expected_data = {
-            "row_id": ["1"],
-            "field1": [1],
-        }
-
-        if not raw:
-            expected_data.update(
-                {
-                    "user": ["user42"],
-                    "datetime": ["2024-03-12T12:00:00"],
-                    "operation": ["insert"],
-                }
-            )
-
-        expected_table = pa.Table.from_pydict(expected_data, schema=schema)
-
-        mock_get_inserts.return_value = expected_table
-
-        # Mock the return values of other dependencies
-        mock_uuid4.return_value = "mocked_uuid"
-
-        blob_1 = Mock(spec=Blob)
-        blob_2 = Mock(spec=Blob)
-
-        mock_fetch_credentials.return_value = "token"
-        mock_client.return_value.bucket.return_value.list_blobs.return_value = [
-            blob_1,
-            blob_2,
+    @parameterized.expand(
+        [
+            (True, False),
+            (False, False),
+            (True, True),
+            (False, True),
         ]
+    )
+    def test_combine_inserts(self, raw: bool, expect_table: bool) -> None:
+        with patch(
+            "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
+        ), patch("eimerdb.instance.storage.Client") as mock_client, patch(
+            "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
+        ) as mock_get_inserts_or_changes, patch(
+            "eimerdb.instance.pq.write_to_dataset"
+        ) as mock_write_to_dataset, patch(
+            "eimerdb.instance.uuid4", return_value="mocked_uuid"
+        ), patch(
+            "eimerdb.instance.FileClient.get_gcs_file_system"
+        ):
+            # Setup mocks
+            if expect_table is True:
+                mock_get_inserts_or_changes.return_value = self._get_expected_table(raw)
 
-        self.instance.combine_inserts("table1", raw)
+                blob_1 = Mock(spec=Blob)
+                blob_2 = Mock(spec=Blob)
 
-        mock_write_to_dataset.assert_called_once_with(
-            table=mock_get_inserts.return_value,
-            root_path=ANY,  # FIXME f"gs://test_bucket/path/to/eimer/table1{suffix}",
-            partition_cols=None,
-            basename_template="merged_commit_mocked_uuid_{i}.parquet",
-            schema=self.instance.get_arrow_schema("table1", raw),
-            filesystem=ANY,
-        )
+                mock_client.return_value.bucket.return_value.list_blobs.return_value = [
+                    blob_1,
+                    blob_2,
+                ]
+            else:
+                mock_get_inserts_or_changes.return_value = None
 
-        blob_1.delete.assert_called_once()
-        blob_2.delete.assert_called_once()
+            # Call the method under test
+            self.instance.combine_inserts("table1", raw)
+
+            if not expect_table:
+                mock_write_to_dataset.call_count = 0
+                return
+
+            suffix = "/_raw" if raw else ""
+            expected_root_path = "gs://test_bucket/path/to/eimer/table1" + suffix
+
+            # Assert that the dependencies are called with the expected arguments
+            mock_write_to_dataset.assert_called_once_with(
+                table=mock_get_inserts_or_changes.return_value,
+                root_path=expected_root_path,
+                partition_cols=None,
+                basename_template="merged_commit_mocked_uuid_{i}.parquet",
+                schema=self.instance.get_arrow_schema("table1", raw),
+                filesystem=ANY,
+            )
+
+            blob_1.delete.assert_called_once()
+            blob_2.delete.assert_called_once()
