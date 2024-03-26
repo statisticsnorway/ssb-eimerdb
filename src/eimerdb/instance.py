@@ -306,7 +306,7 @@ class EimerDBInstance(AbstractDbInstance):
 
     def combine_changes(self, table_name: str) -> None:  # noqa: D102
         changes_table = self._get_inserts_or_changes(
-            table_name=table_name, find_inserts=False, raw=False
+            table_name=table_name, find_inserts=False, raw=True
         )
 
         if changes_table is None:

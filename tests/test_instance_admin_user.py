@@ -194,6 +194,12 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             # Call the merge_changes method
             self.instance.combine_changes("table1")
 
+            # Mock asserts
+
+            mock_get_inserts_or_changes.assert_called_once_with(
+                table_name="table1", find_inserts=False, raw=True
+            )
+
             if not expect_table:
                 mock_write_to_table_and_delete_blobs.call_count = 0
                 return
@@ -228,6 +234,10 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
 
             # Call the method under test
             self.instance.combine_inserts("table1", raw)
+
+            mock_get_inserts_or_changes.assert_called_once_with(
+                table_name="table1", find_inserts=True, raw=raw
+            )
 
             if not expect_table:
                 mock_write_to_table_and_delete_blobs.call_count = 0
