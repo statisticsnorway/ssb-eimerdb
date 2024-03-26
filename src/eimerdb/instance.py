@@ -23,7 +23,6 @@ import pyarrow.parquet as pq
 from dapla import AuthClient
 from dapla import FileClient
 from google.cloud import storage
-from pyarrow import Table
 
 from .abstract_db_instance import AbstractDbInstance
 from .eimerdb_constants import APPLICATION_JSON
@@ -138,7 +137,7 @@ class EimerDBInstance(AbstractDbInstance):
         user_roles_blob.upload_from_string(
             data=json.dumps(self._users), content_type=APPLICATION_JSON
         )
-        print(f"User {username} added with the role {role}!")
+        logger.info("User %s added with the role %s!", username, role)
 
     def remove_user(self, username: str) -> None:  # noqa: D102
         if self._is_admin is not True:
@@ -155,7 +154,7 @@ class EimerDBInstance(AbstractDbInstance):
         user_roles_blob.upload_from_string(
             data=json.dumps(self._users), content_type=APPLICATION_JSON
         )
-        print(f"User {username} successfully removed!")
+        logger.info("User %s successfully removed!", username)
 
     def create_table(  # noqa: D102
         self,
@@ -247,91 +246,104 @@ class EimerDBInstance(AbstractDbInstance):
 
         return uuid_list
 
-    def get_changes(self, table_name: str) -> Table:  # noqa: D102
-        path = self._tables[table_name][TABLE_PATH_KEY]
+    def _get_inserts_or_changes(
+        self, table_name: str, find_inserts: bool, raw: bool
+    ) -> Optional[pa.Table]:
+        """Retrieve inserts or changes for a given table. Returns None if file not found.
 
-        fs = FileClient.get_gcs_file_system()
+        Args:
+            table_name (str): The name of the table for which changes are to be retrieved.
+            find_inserts (bool): Flag indicating whether to retrieve inserts or changes.
+            raw (bool): Indicates whether to retrieve the raw schema. Only in use when
+                retrieving inserts.
+
+        Returns:
+            DataFrame: A pandas DataFrame containing inserts/changes
+            for the specified table, or None if file not found.
+        """
+
+        def get_path() -> str:
+            if find_inserts:
+                suffix = "_raw" if raw else ""
+                return self.tables[table_name][TABLE_PATH_KEY] + suffix
+
+            return self.tables[table_name][TABLE_PATH_KEY] + "_changes"
+
+        try:
+            # noinspection PyTypeChecker
+            dataset = ds.dataset(
+                f"{self.bucket_name}/{get_path()}/",
+                format="parquet",
+                partitioning="hive",
+                schema=self.get_arrow_schema(table_name, raw),
+                filesystem=FileClient.get_gcs_file_system(),
+            )
+        except FileNotFoundError:
+            return None
+
+        return dataset.to_table()
+
+    def _write_to_table_and_delete_blobs(
+        self, table_name: str, table: pa.Table, source_folder: str, raw: bool
+    ) -> None:
+        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        bucket = client.bucket(self._bucket_name)
+
+        partitions = self._tables[table_name][PARTITION_COLUMNS_KEY]
+        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
+
         # noinspection PyTypeChecker
-        dataset = ds.dataset(
-            f"{self._bucket_name}/{path}_changes/",
-            format="parquet",
-            partitioning="hive",
-            schema=self.get_arrow_schema(table_name, True),
-            filesystem=fs,
-        )
-
-        df_changes: Table = dataset.to_table()
-        return df_changes
-
-    def get_inserts(self, table_name: str, raw: bool) -> pa.Table:  # noqa: D102
-        if raw is True:
-            suffix = "_raw"
-        else:
-            suffix = ""
-
-        path = self._tables[table_name][TABLE_PATH_KEY] + suffix
-
-        fs = FileClient.get_gcs_file_system()
-        # noinspection PyTypeChecker
-        dataset = ds.dataset(
-            f"{self._bucket_name}/{path}/",
-            format="parquet",
-            partitioning="hive",
+        pq.write_to_dataset(
+            table=table,
+            root_path=f"gs://{self._bucket_name}/{source_folder}",
+            partition_cols=partitions,
+            basename_template=f"merged_commit_{uuid4()}_{{i}}.parquet",
             schema=self.get_arrow_schema(table_name, raw),
-            filesystem=fs,
+            filesystem=FileClient.get_gcs_file_system(),
         )
-
-        df_inserts: pa.Table = dataset.to_table()
-        return df_inserts
+        for blob in blobs_to_delete:
+            blob.delete()
 
     def combine_changes(self, table_name: str) -> None:  # noqa: D102
-        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
-        bucket = client.bucket(self._bucket_name)
-
-        partitions = self._tables[table_name][PARTITION_COLUMNS_KEY]
-        source_folder = self._tables[table_name][TABLE_PATH_KEY] + "_changes"
-        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
-
-        # noinspection PyTypeChecker
-        pq.write_to_dataset(
-            table=self.get_changes(table_name),
-            root_path=f"gs://{self._bucket_name}/{source_folder}",
-            partition_cols=partitions,
-            basename_template=f"merged_commit_{uuid4()}_{{i}}.parquet",
-            schema=self.get_arrow_schema(table_name, True),
-            filesystem=FileClient.get_gcs_file_system(),
+        changes_table = self._get_inserts_or_changes(
+            table_name=table_name, find_inserts=False, raw=True
         )
-        for blob in blobs_to_delete:
-            blob.delete()
 
-        print("The changes were successfully merged into one file per partition!")
+        if changes_table is None:
+            logger.info("No changes found for table %s", table_name)
+            return
+
+        source_folder = self._tables[table_name][TABLE_PATH_KEY] + "_changes"
+
+        self._write_to_table_and_delete_blobs(
+            table_name=table_name,
+            table=changes_table,
+            source_folder=source_folder,
+            raw=True,
+        )
+
+        logger.info("The changes were successfully merged into one file per partition!")
 
     def combine_inserts(self, table_name: str, raw: bool) -> None:  # noqa: D102
-        if raw is True:
-            suffix = "/_raw"
-        else:
-            suffix = ""
-
-        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
-        bucket = client.bucket(self._bucket_name)
-
-        partitions = self._tables[table_name][PARTITION_COLUMNS_KEY]
-        source_folder = self._tables[table_name][TABLE_PATH_KEY] + suffix
-        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
-
-        # noinspection PyTypeChecker
-        pq.write_to_dataset(
-            table=self.get_inserts(table_name, raw),
-            root_path=f"gs://{self._bucket_name}/{source_folder}",
-            partition_cols=partitions,
-            basename_template=f"merged_commit_{uuid4()}_{{i}}.parquet",
-            schema=self.get_arrow_schema(table_name, raw),
-            filesystem=FileClient.get_gcs_file_system(),
+        inserts_table = self._get_inserts_or_changes(
+            table_name=table_name, find_inserts=True, raw=raw
         )
-        for blob in blobs_to_delete:
-            blob.delete()
 
-        print("The inserts were successfully merged into one file per partition!")
+        if inserts_table is None:
+            logger.info("No inserts found for table %s", table_name)
+            return
+
+        suffix = "/_raw" if raw else ""
+        source_folder = self._tables[table_name][TABLE_PATH_KEY] + suffix
+
+        self._write_to_table_and_delete_blobs(
+            table_name=table_name,
+            table=inserts_table,
+            source_folder=source_folder,
+            raw=raw,
+        )
+
+        logger.info("The inserts were successfully merged into one file per partition!")
 
     def get_arrow_schema(  # noqa: D102
         self,
