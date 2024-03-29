@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pandas as pd
 import pyarrow as pa
+import pytest
 from parameterized import parameterized
 
 from eimerdb.instance_query_worker import QueryWorker
@@ -13,6 +14,12 @@ from tests.test_instance_base import TestEimerDBInstanceBase
 
 VALID_STAR_QUERY = "SELECT * FROM table1 WHERE row_id='1'"
 PARTITION_SELECT = {"table1": {"field1": [1]}}
+
+
+@pytest.fixture(autouse=True)
+def patch_uuid4():
+    with patch("eimerdb.instance_query_worker.uuid4", return_value="mocked_uuid"):
+        yield
 
 
 class TestQueryWorker(TestEimerDBInstanceBase):
@@ -129,8 +136,6 @@ class TestQueryWorker(TestEimerDBInstanceBase):
     def test_query_update_success(self) -> None:
         # Setup mocks
         with patch(
-            "eimerdb.instance_query_worker.uuid4", return_value="mocked_uuid"
-        ), patch(
             "eimerdb.instance_query_worker.pq.write_to_dataset"
         ) as mock_write_to_dataset, patch(
             "eimerdb.instance_query_worker.QueryWorker.query_select"
@@ -193,8 +198,6 @@ class TestQueryWorker(TestEimerDBInstanceBase):
     def test_query_delete_success(self) -> None:
         # Setup mocks
         with patch(
-            "eimerdb.instance_query_worker.uuid4", return_value="mocked_uuid"
-        ), patch(
             "eimerdb.instance_query_worker.pq.write_to_dataset"
         ) as mock_write_to_dataset, patch(
             "eimerdb.instance_query_worker.QueryWorker.query_select"

@@ -3,15 +3,18 @@ from unittest.mock import patch
 
 import pandas as pd
 import pyarrow as pa
+import pytest
 
 from tests.test_instance_base import TestEimerDBInstanceBase
 
 
-class TestEimerDBInstanceQuery(TestEimerDBInstanceBase):
+@pytest.fixture(autouse=True)
+def patch_get_gcs_file_system():
+    with patch("eimerdb.instance.FileClient.get_gcs_file_system"):
+        yield
 
-    @patch("eimerdb.instance.FileClient.get_gcs_file_system")
-    def setUp(self, _: Mock) -> None:
-        super().setUp()
+
+class TestEimerDBInstanceQuery(TestEimerDBInstanceBase):
 
     def test_query_invalid_output_format_expect_exception(self) -> None:
         with self.assertRaises(ValueError) as context:
