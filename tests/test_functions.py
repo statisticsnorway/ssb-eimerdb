@@ -7,6 +7,7 @@ from unittest.mock import call
 from unittest.mock import patch
 
 import pyarrow as pa
+import pytest
 from parameterized import parameterized
 
 from eimerdb.functions import arrow_schema_from_json
@@ -16,6 +17,14 @@ from eimerdb.functions import get_datetime
 from eimerdb.functions import get_initials
 from eimerdb.functions import get_json
 from eimerdb.functions import parse_sql_query
+
+
+@pytest.fixture(autouse=True)
+def patch_fetch_google_credentials():
+    with patch(
+        "eimerdb.functions.AuthClient.fetch_google_credentials", return_value="token"
+    ):
+        yield
 
 
 class TestFunctions(unittest.TestCase):
@@ -83,10 +92,7 @@ class TestFunctions(unittest.TestCase):
         mock_bucket = MagicMock()
         mock_bucket.blob.return_value = mock_blob
 
-        with patch(
-            "eimerdb.functions.AuthClient.fetch_google_credentials",
-            return_value="token",
-        ), patch("google.cloud.storage.Client") as mock_storage_client:
+        with patch("google.cloud.storage.Client") as mock_storage_client:
             # Setup mocks
             mock_storage_client.return_value.get_bucket.return_value = mock_bucket
 
@@ -272,10 +278,7 @@ class TestFunctions(unittest.TestCase):
 
         mock_bucket.blob.return_value = mock_blob
 
-        with patch(
-            "eimerdb.functions.AuthClient.fetch_google_credentials",
-            return_value="token",
-        ), patch("google.cloud.storage.Client") as mock_storage_client:
+        with patch("google.cloud.storage.Client") as mock_storage_client:
             mock_storage_client.return_value.bucket.return_value = mock_bucket
 
             # Call the method under test

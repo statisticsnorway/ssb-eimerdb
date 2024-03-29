@@ -1,8 +1,18 @@
 from copy import copy
 from unittest.mock import patch
 
+import pytest
+
 from tests.test_instance_base import DEFAULT_TABLES_IN_TEST
 from tests.test_instance_base import TestEimerDBInstanceBase
+
+
+@pytest.fixture(autouse=True)
+def patch_fetch_google_credentials():
+    with patch(
+        "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
+    ):
+        yield
 
 
 class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
@@ -49,9 +59,7 @@ class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
 
     def test_add_user_expect_added_user(self) -> None:
         # Setup
-        with patch(
-            "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
-        ), patch("eimerdb.instance.storage.Client") as mock_storage_client:
+        with patch("eimerdb.instance.storage.Client") as mock_storage_client:
             mock_bucket = mock_storage_client.return_value.bucket.return_value
             mock_blob = mock_bucket.blob.return_value
 
@@ -80,9 +88,7 @@ class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
 
     def test_remove_user_expect_removed_user(self) -> None:
         # Setup
-        with patch(
-            "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
-        ), patch("eimerdb.instance.storage.Client") as mock_storage_client:
+        with patch("eimerdb.instance.storage.Client") as mock_storage_client:
             mock_bucket = mock_storage_client.return_value.bucket.return_value
             mock_blob = mock_bucket.blob.return_value
 
@@ -103,10 +109,7 @@ class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
         self.assertEqual("User new_user does not exist.", str(context.exception))
 
     def test_create_table_as_admin_expect_added_table(self) -> None:
-        with patch(
-            "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
-        ), patch("eimerdb.instance.storage.Client") as mock_storage_client:
-
+        with patch("eimerdb.instance.storage.Client") as mock_storage_client:
             # Setup
             mock_bucket = mock_storage_client.return_value.bucket.return_value
             mock_blob = mock_bucket.blob.return_value

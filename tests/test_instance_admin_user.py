@@ -6,10 +6,31 @@ from unittest.mock import patch
 import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
+import pytest
 from google.cloud.storage import Blob
 from parameterized import parameterized
 
 from tests.test_instance_base import TestEimerDBInstanceBase
+
+
+@pytest.fixture(autouse=True)
+def patch_get_gcs_file_system():
+    with patch("eimerdb.instance.FileClient.get_gcs_file_system"):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def patch_fetch_google_credentials():
+    with patch(
+        "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def patch_uuid4():
+    with patch("eimerdb.instance.uuid4", return_value="mocked_uuid"):
+        yield
 
 
 class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
@@ -18,13 +39,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
         # Sample DataFrame for testing
         df = pd.DataFrame({"field1": [1, 2]})
 
-        with patch(
-            "eimerdb.instance.pq.write_to_dataset"
-        ) as mock_write_to_dataset, patch(
-            "eimerdb.instance.FileClient.get_gcs_file_system"
-        ), patch(
-            "eimerdb.instance.uuid4", return_value="mocked_uuid"
-        ):
+        with patch("eimerdb.instance.pq.write_to_dataset") as mock_write_to_dataset:
             expected_calls = [
                 call(
                     table=ANY,
@@ -91,9 +106,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
         expected_source_folder = "path/to/eimer/table1_changes"
         expected_table = self._get_expected_table(False)
 
-        with patch("eimerdb.instance.FileClient.get_gcs_file_system"), patch(
-            "eimerdb.instance.ds.dataset"
-        ) as mock_dataset:
+        with patch("eimerdb.instance.ds.dataset") as mock_dataset:
             if raise_file_not_found_error:
                 mock_dataset.side_effect = FileNotFoundError
             else:
@@ -122,15 +135,9 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
                 self.assertIs(expected_table, inserts_table)
 
     def test_write_to_table_and_delete_blobs(self) -> None:
-        with patch(
-            "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
-        ), patch("eimerdb.instance.storage.Client") as mock_client, patch(
+        with patch("eimerdb.instance.storage.Client") as mock_client, patch(
             "eimerdb.instance.pq.write_to_dataset"
-        ) as mock_write_to_dataset, patch(
-            "eimerdb.instance.uuid4", return_value="mocked_uuid"
-        ), patch(
-            "eimerdb.instance.FileClient.get_gcs_file_system"
-        ):
+        ) as mock_write_to_dataset:
             # Setup mocks
             expected_table = self._get_expected_table(False)
             mock_write_to_dataset.return_value = expected_table
