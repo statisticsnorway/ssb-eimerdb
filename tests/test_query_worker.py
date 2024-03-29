@@ -16,7 +16,6 @@ PARTITION_SELECT = {"table1": {"field1": [1]}}
 
 
 class TestQueryWorker(TestEimerDBInstanceBase):
-    worker_instance: QueryWorker
 
     def setUp(self) -> None:
         super().setUp()
@@ -46,12 +45,8 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         parsed_query = {"table_name": [table_name]}
         sql_query = f"SELECT * FROM {table_name}"
         partition_select = None
-        unedited = unedited
-        output_format = output_format
 
         with patch(
-            "eimerdb.instance.FileClient.get_gcs_file_system"
-        ) as mock_gcs_filesystem, patch(
             "eimerdb.instance_query_worker.get_partitioned_files"
         ) as mock_get_partitioned_files, patch(
             "eimerdb.instance_query_worker.pq.read_table"
@@ -60,8 +55,6 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         ) as mock_query_changes, patch(
             "eimerdb.instance_query_worker.update_pyarrow_table"
         ) as mock_update_pyarrow_table:
-            fs_mock = mock_gcs_filesystem.return_value
-
             expected_df = pd.DataFrame({"row_id": [1, 2, 3]})
             expected_table = pa.Table.from_pandas(expected_df)
 
@@ -86,20 +79,20 @@ class TestQueryWorker(TestEimerDBInstanceBase):
                 partition_select=partition_select,
                 unedited=unedited,
                 output_format=output_format,
-                fs=fs_mock,
+                fs=MagicMock(),
             )
 
             if output_format == "pandas":
-                assert result.equals(expected_df)
+                self.assertTrue(result.equals(expected_df))
             else:
-                assert result.equals(expected_table)
+                self.assertTrue(result.equals(expected_table))
 
             mock_get_partitioned_files.assert_called_once_with(
                 table_name=table_name,
                 instance_name="test_eimerdb",
                 table_config=self.instance.tables[table_name],
                 suffix="_raw",
-                fs=fs_mock,
+                fs=ANY,
                 partition_select=partition_select,
                 unedited=unedited,
             )
@@ -133,45 +126,45 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             str(context.exception),
         )
 
-    @patch("eimerdb.instance_query_worker.QueryWorker.query_select")
-    @patch("eimerdb.instance_query_worker.pq.write_to_dataset")
-    @patch("eimerdb.instance_query_worker.uuid4")
-    def test_query_update_success(
-        self, mock_uuid4: Mock, mock_write_to_dataset: Mock, mock_query_method: Mock
-    ) -> None:
+    def test_query_update_success(self) -> None:
         # Setup mocks
-        mock_uuid4.return_value = "mocked_uuid"
+        with patch(
+            "eimerdb.instance_query_worker.uuid4", return_value="mocked_uuid"
+        ), patch(
+            "eimerdb.instance_query_worker.pq.write_to_dataset"
+        ) as mock_write_to_dataset, patch(
+            "eimerdb.instance_query_worker.QueryWorker.query_select"
+        ) as mock_query_method:
+            mock_query_method.return_value = pd.DataFrame(
+                {"field1": [1, 2, 3], "row_id": ["1", "2", "3"]}
+            )
 
-        mock_query_method.return_value = pd.DataFrame(
-            {"field1": [1, 2, 3], "row_id": ["1", "2", "3"]}
-        )
+            parsed_query = {
+                "operation": "UPDATE",
+                "set_clause": "field1=1",
+                "table_name": "table1",
+                "where_clause": "row_id='1'",
+            }
 
-        parsed_query = {
-            "operation": "UPDATE",
-            "set_clause": "field1=1",
-            "table_name": "table1",
-            "where_clause": "row_id='1'",
-        }
+            # Call the method
+            result = self.worker_instance.query_update_or_delete(
+                parsed_query=parsed_query,
+                update_sql_query="UPDATE table1 SET field1=4 WHERE row_id='1'",
+                partition_select=None,
+                fs=MagicMock(),
+            )
 
-        # Call the method
-        result = self.worker_instance.query_update_or_delete(
-            parsed_query=parsed_query,
-            update_sql_query="UPDATE table1 SET field1=4 WHERE row_id='1'",
-            partition_select=None,
-            fs=MagicMock(),
-        )
+            # Assertions
+            self.assertEqual("1 rows updated by user", result)
 
-        # Assertions
-        self.assertEqual("1 rows updated by user", result)
-
-        mock_write_to_dataset.assert_called_with(
-            table=ANY,
-            root_path="gs://test_bucket/path/to/eimer/table1_changes",
-            partition_cols=None,
-            basename_template="commit_mocked_uuid_{i}.parquet",
-            schema=self.instance.get_arrow_schema("table1", True),
-            filesystem=ANY,
-        )
+            mock_write_to_dataset.assert_called_with(
+                table=ANY,
+                root_path="gs://test_bucket/path/to/eimer/table1_changes",
+                partition_cols=None,
+                basename_template="commit_mocked_uuid_{i}.parquet",
+                schema=self.instance.get_arrow_schema("table1", True),
+                filesystem=ANY,
+            )
 
     #
     # START _query_delete
@@ -197,44 +190,44 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             str(context.exception),
         )
 
-    @patch("eimerdb.instance_query_worker.QueryWorker.query_select")
-    @patch("eimerdb.instance_query_worker.pq.write_to_dataset")
-    @patch("eimerdb.instance_query_worker.uuid4")
-    def test_query_delete_success(
-        self, mock_uuid4: Mock, mock_write_to_dataset: Mock, mock_query_method: Mock
-    ) -> None:
+    def test_query_delete_success(self) -> None:
         # Setup mocks
-        mock_uuid4.return_value = "mocked_uuid"
+        with patch(
+            "eimerdb.instance_query_worker.uuid4", return_value="mocked_uuid"
+        ), patch(
+            "eimerdb.instance_query_worker.pq.write_to_dataset"
+        ) as mock_write_to_dataset, patch(
+            "eimerdb.instance_query_worker.QueryWorker.query_select"
+        ) as mock_query_method:
+            mock_query_method.return_value = pd.DataFrame(
+                {"field1": [1, 2, 3], "row_id": ["1", "2", "3"]}
+            )
 
-        mock_query_method.return_value = pd.DataFrame(
-            {"field1": [1, 2, 3], "row_id": ["1", "2", "3"]}
-        )
+            parsed_query = {
+                "operation": "DELETE",
+                "table_name": "table1",
+                "where_clause": "row_id='1'",
+            }
 
-        parsed_query = {
-            "operation": "DELETE",
-            "table_name": "table1",
-            "where_clause": "row_id='1'",
-        }
+            # Call the method
+            result = self.worker_instance.query_update_or_delete(
+                parsed_query=parsed_query,
+                update_sql_query=None,
+                partition_select=None,
+                fs=MagicMock(),
+            )
 
-        # Call the method
-        result = self.worker_instance.query_update_or_delete(
-            parsed_query=parsed_query,
-            update_sql_query=None,
-            partition_select=None,
-            fs=MagicMock(),
-        )
+            # Assertions
+            self.assertEqual("1 rows deleted by user", result)
 
-        # Assertions
-        self.assertEqual("1 rows deleted by user", result)
-
-        mock_write_to_dataset.assert_called_with(
-            table=ANY,
-            root_path="gs://test_bucket/path/to/eimer/table1_changes",
-            partition_cols=None,
-            basename_template="commit_mocked_uuid_{i}.parquet",
-            filesystem=ANY,
-            schema=None,
-        )
+            mock_write_to_dataset.assert_called_with(
+                table=ANY,
+                root_path="gs://test_bucket/path/to/eimer/table1_changes",
+                partition_cols=None,
+                basename_template="commit_mocked_uuid_{i}.parquet",
+                filesystem=ANY,
+                schema=None,
+            )
 
     @parameterized.expand(
         [
@@ -324,7 +317,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
         # Assertions
         if expected_rows > 0:
-            assert len(result) == expected_rows
+            self.assertEqual(expected_rows, len(result))
         else:
             self.assertIsNone(result)
 
@@ -365,14 +358,15 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             first = pa.Table.from_pandas(expected_df) if use_first else None
             second = pa.Table.from_pandas(expected_df) if use_second else None
 
+        # Call the method
         result: pa.Table = self.worker_instance._concat_changes(
             first=first, second=second, table_name="table1", output_format=output_format
         )
 
         # Assertions
         if use_first and use_second:
-            assert len(result) == 2
+            self.assertEqual(2, len(result))
         elif use_first or use_second:
-            assert len(result) == 1
+            self.assertEqual(1, len(result))
         else:
             self.assertIsNone(result)

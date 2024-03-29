@@ -1,5 +1,4 @@
 import unittest
-from unittest.mock import Mock
 from unittest.mock import patch
 
 import pandas as pd
@@ -8,29 +7,31 @@ from eimerdb.instance import EimerDBInstance
 
 
 class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
-    @patch("eimerdb.instance.get_json")
-    @patch("eimerdb.instance.get_initials", return_value="non_admin_user")
-    def setUp(self, _: Mock, mock_get_json: Mock) -> None:
-        mock_get_json.side_effect = [
-            {
-                "eimerdb_name": "test_eimerdb",
-                "path": "/path/to/config",
-                "eimer_path": "/path/to/eimer",
-                "created_by": "admin_user",
-                "time_created": "2024-03-09T12:00:00Z",
-            },
-            {"non_admin_user": "user"},
-            {"admin_user": {"admin_group": ["admin_user"]}},
-            {"table1": {"created_by": "admin_user"}},
-        ]
+    def setUp(self) -> None:
+        with patch(
+            "eimerdb.instance.get_initials", return_value="non_admin_user"
+        ), patch("eimerdb.instance.get_json") as mock_get_json:
+            mock_get_json.side_effect = [
+                {
+                    "eimerdb_name": "test_eimerdb",
+                    "path": "/path/to/config",
+                    "eimer_path": "/path/to/eimer",
+                    "created_by": "admin_user",
+                    "time_created": "2024-03-09T12:00:00Z",
+                },
+                {"non_admin_user": "user"},
+                {"admin_user": {"admin_group": ["admin_user"]}},
+                {"table1": {"created_by": "admin_user"}},
+            ]
 
-        self.instance = EimerDBInstance("test_bucket", "test_eimer")
+            self.instance = EimerDBInstance("test_bucket", "test_eimer")
 
     def test_init_non_admin(self) -> None:
-        self.assertEqual(self.instance.created_by, "admin_user")
-        self.assertEqual(self.instance.users, {"non_admin_user": ""})
-        self.assertIsNone(self.instance.role_groups)
-        self.assertEqual(self.instance.is_admin, False)
+        self.assertEqual("admin_user", self.instance._created_by)
+        self.assertEqual({"non_admin_user": ""}, self.instance._users)
+
+        self.assertIsNone(self.instance._role_groups)
+        self.assertFalse(self.instance._is_admin)
 
     def test_add_user_non_admin(self) -> None:
         # Test & Assertion

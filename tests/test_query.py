@@ -26,14 +26,21 @@ class TestGetPartitionedFiles(unittest.TestCase):
     #
 
     def test_get_partitioned_files_no_partition_select(self) -> None:
+        # Setup mocks
         self.fs.glob.return_value = [
             "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value2",
         ]
 
+        # Call the function under test
         files = get_partitioned_files(
-            self.table_name, self.instance_name, self.table_config, self.suffix, self.fs
+            table_name=self.table_name,
+            instance_name=self.instance_name,
+            table_config=self.table_config,
+            suffix=self.suffix,
+            fs=self.fs,
         )
 
+        # Assert result
         self.assertEqual(
             [
                 "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value2"
@@ -42,20 +49,23 @@ class TestGetPartitionedFiles(unittest.TestCase):
         )
 
     def test_get_partitioned_files_with_partition_select(self) -> None:
+        # Setup mocks
         self.fs.glob.return_value = [
             "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value1",
             "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value2",
         ]
 
+        # Call the function under test
         files = get_partitioned_files(
-            self.table_name,
-            self.instance_name,
-            self.table_config,
-            self.suffix,
-            self.fs,
-            self.partition_select,
+            table_name=self.table_name,
+            instance_name=self.instance_name,
+            table_config=self.table_config,
+            suffix=self.suffix,
+            fs=self.fs,
+            partition_select=self.partition_select,
         )
 
+        # Assert result
         self.assertEqual(
             [
                 "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value1"
@@ -64,21 +74,24 @@ class TestGetPartitionedFiles(unittest.TestCase):
         )
 
     def test_get_partitioned_files_with_partition_select_and_unedited(self) -> None:
+        # Setup mocks
         self.fs.glob.return_value = [
             "gs://example_bucket/eimerdb/example_instance/table1_suffix/partition_col1=value1",
             "gs://example_bucket/eimerdb/example_instance/table1/partition_col1=value2",
         ]
 
+        # Call the function under test
         files = get_partitioned_files(
-            self.table_name,
-            self.instance_name,
-            self.table_config,
-            self.suffix,
-            self.fs,
-            self.partition_select,
-            True,
+            table_name=self.table_name,
+            instance_name=self.instance_name,
+            table_config=self.table_config,
+            suffix=self.suffix,
+            fs=self.fs,
+            partition_select=self.partition_select,
+            unedited=True,
         )
 
+        # Assert result
         self.assertEqual(
             [
                 "gs://example_bucket/eimerdb/example_instance/table1_suffix/partition_col1=value1"
@@ -86,6 +99,7 @@ class TestGetPartitionedFiles(unittest.TestCase):
             files,
         )
 
+        # Assert mocks
         self.fs.glob.assert_called_with(
             "gs://example_bucket/eimerdb/example_instance/table1_suffix/**/*"
         )
@@ -100,13 +114,17 @@ class TestGetPartitionedFiles(unittest.TestCase):
             "file3/partition_col1=value2/partition_col2=value3",
         ]
 
-        filtered_files = filter_partitions(table_files, self.partition_select)
+        # Call the function under test
+        filtered_files = filter_partitions(
+            table_files=table_files, partition_select=self.partition_select
+        )
 
+        # Assert result
         self.assertEqual(
-            filtered_files,
             [
                 "file1/partition_col1=value1/partition_col2=value2",
             ],
+            filtered_files,
         )
 
     # noinspection PyArgumentList
@@ -144,9 +162,9 @@ class TestGetPartitionedFiles(unittest.TestCase):
         changes_table = pa.Table.from_arrays(changes_data, schema=changes_schema)
 
         # Call the function under test
-        update_pyarrow_table(original_table, changes_table)
-
-        updated_table = update_pyarrow_table(original_table, changes_table)
+        updated_table = update_pyarrow_table(
+            df=original_table, df_changes=changes_table
+        )
 
         # Assert the expected output
 

@@ -232,15 +232,14 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
         bucket_name: A GCP bucket.
         db_name: Name of the instance.
     """
+    storage_client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+    bucket = storage_client.bucket(bucket_name)
+
     creator = get_initials()
-    token = AuthClient.fetch_google_credentials()
-    client = storage.Client(credentials=token)
-    bucket = client.bucket(bucket_name)
     full_path = f"eimerdb/{db_name}"
-    parts = db_name.split("/")
-    name = parts[-1]
+
     json_about = {
-        "eimerdb_name": f"{name}",
+        "eimerdb_name": f"{db_name}",
         "path": f"gs://{bucket_name}/{full_path}",
         BUCKET_KEY: bucket_name,
         "eimer_path": full_path,
@@ -287,4 +286,5 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
 
     tables_blob = bucket.blob(f"{full_path}/config/tables.json")
     tables_blob.upload_from_string(data=json.dumps({}), content_type=APPLICATION_JSON)
+
     logger.info("EimerDB instance %s created.", db_name)
