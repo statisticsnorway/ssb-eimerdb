@@ -6,10 +6,31 @@ from unittest.mock import patch
 import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
+import pytest
 from google.cloud.storage import Blob
 from parameterized import parameterized
 
 from tests.test_instance_base import TestEimerDBInstanceBase
+
+
+@pytest.fixture(autouse=True)
+def patch_get_gcs_file_system():
+    with patch("eimerdb.instance.FileClient.get_gcs_file_system"):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def patch_fetch_google_credentials():
+    with patch(
+        "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def patch_uuid4():
+    with patch("eimerdb.instance.uuid4", return_value="mocked_uuid"):
+        yield
 
 
 class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
@@ -18,23 +39,14 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
         # Sample DataFrame for testing
         df = pd.DataFrame({"field1": [1, 2]})
 
-        with patch(
-            "eimerdb.instance.pq.write_to_dataset"
-        ) as mock_write_to_dataset, patch(
-            "eimerdb.instance.FileClient.get_gcs_file_system"
-        ) as mock_get_gcs_file_system, patch(
-            "eimerdb.instance.uuid4"
-        ) as mock_uuid4:
-            mock_fs = mock_get_gcs_file_system.return_value
-            mock_uuid4.return_value = "mocked_uuid"
-
+        with patch("eimerdb.instance.pq.write_to_dataset") as mock_write_to_dataset:
             expected_calls = [
                 call(
                     table=ANY,
                     root_path="gs://test_bucket/path/to/eimer/table1",
                     partition_cols=None,
                     basename_template=ANY,
-                    filesystem=mock_fs,
+                    filesystem=ANY,
                     schema=ANY,
                 ),
                 call(
@@ -42,7 +54,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
                     root_path="gs://test_bucket/path/to/eimer/table1_raw",
                     partition_cols=None,
                     basename_template=ANY,
-                    filesystem=mock_fs,
+                    filesystem=ANY,
                 ),
             ]
 
@@ -50,7 +62,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             row_ids = self.instance.insert(table_name="table1", df=df)
 
             # Assert the return value
-            assert row_ids == ["mocked_uuid", "mocked_uuid"]
+            self.assertEqual(["mocked_uuid", "mocked_uuid"], row_ids)
 
             # Assert that the dependencies are called with the expected arguments
             mock_write_to_dataset.assert_has_calls(expected_calls)
@@ -94,9 +106,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
         expected_source_folder = "path/to/eimer/table1_changes"
         expected_table = self._get_expected_table(False)
 
-        with patch("eimerdb.instance.FileClient.get_gcs_file_system"), patch(
-            "eimerdb.instance.ds.dataset"
-        ) as mock_dataset:
+        with patch("eimerdb.instance.ds.dataset") as mock_dataset:
             if raise_file_not_found_error:
                 mock_dataset.side_effect = FileNotFoundError
             else:
@@ -108,6 +118,8 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             inserts_table = self.instance._get_inserts_or_changes(
                 table_name="table1", source_folder=expected_source_folder, raw=False
             )
+
+            # Assert that the dependencies are called with the expected arguments
 
             mock_dataset.assert_called_once_with(
                 "test_bucket/path/to/eimer/table1_changes/",
@@ -123,15 +135,9 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
                 self.assertIs(expected_table, inserts_table)
 
     def test_write_to_table_and_delete_blobs(self) -> None:
-        with patch(
-            "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
-        ), patch("eimerdb.instance.storage.Client") as mock_client, patch(
+        with patch("eimerdb.instance.storage.Client") as mock_client, patch(
             "eimerdb.instance.pq.write_to_dataset"
-        ) as mock_write_to_dataset, patch(
-            "eimerdb.instance.uuid4", return_value="mocked_uuid"
-        ), patch(
-            "eimerdb.instance.FileClient.get_gcs_file_system"
-        ):
+        ) as mock_write_to_dataset:
             # Setup mocks
             expected_table = self._get_expected_table(False)
             mock_write_to_dataset.return_value = expected_table
@@ -153,6 +159,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             )
 
             # Assert that the dependencies are called with the expected arguments
+
             mock_write_to_dataset.assert_called_once_with(
                 table=expected_table,
                 root_path="gs://test_bucket/path/to/eimer/table1",
@@ -232,6 +239,8 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             # Call the method under test
             self.instance.combine_inserts("table1", raw)
 
+            # Mock asserts
+
             mock_get_inserts_or_changes.assert_called_once_with(
                 table_name="table1", source_folder=expected_source_folder, raw=raw
             )
@@ -240,7 +249,6 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
                 mock_write_to_table_and_delete_blobs.assert_not_called()
                 return
 
-            # Assert that the dependencies are called with the expected arguments
             mock_write_to_table_and_delete_blobs.assert_called_once_with(
                 table_name="table1",
                 table=mock_get_inserts_or_changes.return_value,
