@@ -282,7 +282,7 @@ class EimerDBInstance(AbstractDbInstance):
         bucket = client.bucket(self._bucket_name)
 
         partitions = self._tables[table_name][PARTITION_COLUMNS_KEY]
-        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder))
+        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder + "/"))
 
         # noinspection PyTypeChecker
         pq.write_to_dataset(
