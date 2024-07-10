@@ -16,6 +16,8 @@ from .eimerdb_constants import ARROW_OUTPUT_FORMAT
 from .eimerdb_constants import BUCKET_KEY
 from .eimerdb_constants import CHANGES_ALL
 from .eimerdb_constants import CHANGES_RECENT
+from .eimerdb_constants import DEFAULT_COMPRESSION
+from .eimerdb_constants import DEFAULT_MIN_ROWS_PER_GROUP
 from .eimerdb_constants import DUCKDB_DEFAULT_CONFIG
 from .eimerdb_constants import EDITABLE_KEY
 from .eimerdb_constants import PANDAS_OUTPUT_FORMAT
@@ -199,6 +201,8 @@ class QueryWorker:
             root_path=f"gs://{self._db_instance.bucket_name}/{table_path}",
             partition_cols=table_config[PARTITION_COLUMNS_KEY],
             basename_template=f"commit_{uuid4()}_{{i}}.parquet",
+            compression=DEFAULT_COMPRESSION,
+            min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
             schema=arrow_schema if is_update else None,
             filesystem=fs,
         )

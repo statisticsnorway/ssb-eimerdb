@@ -10,6 +10,8 @@ import pytest
 from google.cloud.storage import Blob
 from parameterized import parameterized
 
+from eimerdb.eimerdb_constants import DEFAULT_COMPRESSION
+from eimerdb.eimerdb_constants import DEFAULT_MIN_ROWS_PER_GROUP
 from tests.test_instance_base import TestEimerDBInstanceBase
 
 
@@ -46,6 +48,8 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
                     root_path="gs://test_bucket/path/to/eimer/table1",
                     partition_cols=None,
                     basename_template=ANY,
+                    compression=DEFAULT_COMPRESSION,
+                    min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
                     filesystem=ANY,
                     schema=ANY,
                 ),
@@ -54,6 +58,8 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
                     root_path="gs://test_bucket/path/to/eimer/table1_raw",
                     partition_cols=None,
                     basename_template=ANY,
+                    compression=DEFAULT_COMPRESSION,
+                    min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
                     filesystem=ANY,
                 ),
             ]
@@ -166,6 +172,8 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
                 partition_cols=None,
                 basename_template="merged_commit_mocked_uuid_{i}.parquet",
                 schema=self.instance.get_arrow_schema("table1", False),
+                compression=DEFAULT_COMPRESSION,
+                min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
                 filesystem=ANY,
             )
 

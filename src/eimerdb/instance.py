@@ -31,6 +31,8 @@ from .eimerdb_constants import BUCKET_KEY
 from .eimerdb_constants import CHANGES_ALL
 from .eimerdb_constants import CHANGES_RECENT
 from .eimerdb_constants import CREATED_BY_KEY
+from .eimerdb_constants import DEFAULT_COMPRESSION
+from .eimerdb_constants import DEFAULT_MIN_ROWS_PER_GROUP
 from .eimerdb_constants import EDITABLE_KEY
 from .eimerdb_constants import OPERATION_KEY
 from .eimerdb_constants import PANDAS_OUTPUT_FORMAT
@@ -232,6 +234,8 @@ class EimerDBInstance(AbstractDbInstance):
             root_path=f"gs://{self._bucket_name}/{table_path}",
             partition_cols=partitions,
             basename_template=filename,
+            compression=DEFAULT_COMPRESSION,
+            min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
             filesystem=fs,
             schema=arrow_schema,
         )
@@ -241,6 +245,8 @@ class EimerDBInstance(AbstractDbInstance):
             root_path=f"gs://{self._bucket_name}/{table_path}_raw",
             partition_cols=partitions,
             basename_template=filename,
+            compression=DEFAULT_COMPRESSION,
+            min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
             filesystem=fs,
         )
 
@@ -290,6 +296,8 @@ class EimerDBInstance(AbstractDbInstance):
             root_path=f"gs://{self._bucket_name}/{source_folder}",
             partition_cols=partitions,
             basename_template=f"merged_commit_{uuid4()}_{{i}}.parquet",
+            compression=DEFAULT_COMPRESSION,
+            min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
             schema=self.get_arrow_schema(table_name, raw),
             filesystem=FileClient.get_gcs_file_system(),
         )
