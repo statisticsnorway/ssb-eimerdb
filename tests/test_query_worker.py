@@ -9,6 +9,8 @@ import pyarrow as pa
 import pytest
 from parameterized import parameterized
 
+from eimerdb.eimerdb_constants import DEFAULT_COMPRESSION
+from eimerdb.eimerdb_constants import DEFAULT_MIN_ROWS_PER_GROUP
 from eimerdb.instance_query_worker import QueryWorker
 from tests.test_instance_base import TestEimerDBInstanceBase
 
@@ -168,6 +170,8 @@ class TestQueryWorker(TestEimerDBInstanceBase):
                 partition_cols=None,
                 basename_template="commit_mocked_uuid_{i}.parquet",
                 schema=self.instance.get_arrow_schema("table1", True),
+                compression=DEFAULT_COMPRESSION,
+                min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
                 filesystem=ANY,
             )
 
@@ -229,6 +233,8 @@ class TestQueryWorker(TestEimerDBInstanceBase):
                 partition_cols=None,
                 basename_template="commit_mocked_uuid_{i}.parquet",
                 filesystem=ANY,
+                compression=DEFAULT_COMPRESSION,
+                min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
                 schema=None,
             )
 
