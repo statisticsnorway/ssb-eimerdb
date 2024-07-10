@@ -199,6 +199,8 @@ class QueryWorker:
             root_path=f"gs://{self._db_instance.bucket_name}/{table_path}",
             partition_cols=table_config[PARTITION_COLUMNS_KEY],
             basename_template=f"commit_{uuid4()}_{{i}}.parquet",
+            compression="snappy",
+            min_rows_per_group=500000,
             schema=arrow_schema if is_update else None,
             filesystem=fs,
         )

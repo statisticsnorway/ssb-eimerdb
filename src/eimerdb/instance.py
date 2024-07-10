@@ -232,6 +232,8 @@ class EimerDBInstance(AbstractDbInstance):
             root_path=f"gs://{self._bucket_name}/{table_path}",
             partition_cols=partitions,
             basename_template=filename,
+            compression="snappy",
+            min_rows_per_group=500000,
             filesystem=fs,
             schema=arrow_schema,
         )
@@ -241,6 +243,8 @@ class EimerDBInstance(AbstractDbInstance):
             root_path=f"gs://{self._bucket_name}/{table_path}_raw",
             partition_cols=partitions,
             basename_template=filename,
+            compression="snappy",
+            min_rows_per_group=500000,
             filesystem=fs,
         )
 
@@ -290,6 +294,8 @@ class EimerDBInstance(AbstractDbInstance):
             root_path=f"gs://{self._bucket_name}/{source_folder}",
             partition_cols=partitions,
             basename_template=f"merged_commit_{uuid4()}_{{i}}.parquet",
+            compression="snappy",
+            min_rows_per_group=500000,
             schema=self.get_arrow_schema(table_name, raw),
             filesystem=FileClient.get_gcs_file_system(),
         )
