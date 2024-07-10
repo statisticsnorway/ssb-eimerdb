@@ -249,3 +249,4 @@ This project was generated from [Statistics Norway]'s [SSB PyPI Template].
 [license]: https://github.com/statisticsnorway/ssb-eimerdb/blob/main/LICENSE
 [contributor guide]: https://github.com/statisticsnorway/ssb-eimerdb/blob/main/CONTRIBUTING.md
 [reference guide]: https://statisticsnorway.github.io/ssb-eimerdb/reference.html
+
