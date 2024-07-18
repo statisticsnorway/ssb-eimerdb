@@ -107,8 +107,7 @@ def update_pyarrow_table(
     Args:
         df (pa.Table): The original PyArrow table to be updated.
         df_changes (pa.Table): The PyArrow table containing updates and deletions.
-        timetravel (str, optional): A string with the date and time for when to timetravel.
-        Written in this format 2024-04-15 00:00:00
+        timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
 
     Returns:
         pa.Table: A new PyArrow table with the changes applied.
