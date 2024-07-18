@@ -28,7 +28,7 @@ def get_partitioned_files(
         table_config (dict[str, Any]): Configuration details for the table.
         suffix (str): The suffix to be appended to the table name.
         fs (GCSFileSystem): The filesystem object.
-        timetravel (str, optional): A string with the date and time in this format: 2024-04-15 00:00:00. Defaults to None.
+        timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
         partition_select (Optional[dict[str, Any]]): Optional dictionary specifying partition
             selection criteria. Defaults to None.
         unedited (bool): Flag indicating whether the file paths should include
