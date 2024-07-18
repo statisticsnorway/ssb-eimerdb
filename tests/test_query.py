@@ -163,7 +163,9 @@ class TestGetPartitionedFiles(unittest.TestCase):
 
         # Call the function under test
         updated_table = update_pyarrow_table(
-            df=original_table, df_changes=changes_table
+            df=original_table,
+            df_changes=changes_table,
+            timetravel=None,
         )
 
         # Assert the expected output

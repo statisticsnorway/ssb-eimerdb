@@ -54,6 +54,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         parsed_query = {"table_name": [table_name]}
         sql_query = f"SELECT * FROM {table_name}"
         partition_select = None
+        timetravel = None
 
         with patch(
             "eimerdb.instance_query_worker.get_partitioned_files"
@@ -88,6 +89,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
                 partition_select=partition_select,
                 unedited=unedited,
                 output_format=output_format,
+                timetravel=timetravel,
                 fs=MagicMock(),
             )
 
@@ -101,6 +103,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
                 instance_name="test_eimerdb",
                 table_config=self.instance.tables[table_name],
                 suffix="_raw",
+                timetravel=None,
                 fs=ANY,
                 partition_select=partition_select,
                 unedited=unedited,

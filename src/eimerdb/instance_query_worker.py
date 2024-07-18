@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Any
 from typing import Optional
 from typing import Union
@@ -7,6 +8,7 @@ from uuid import uuid4
 import duckdb
 import pandas as pd
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 from dapla import FileClient
 from gcsfs import GCSFileSystem
@@ -58,6 +60,7 @@ class QueryWorker:
         partition_select: Optional[dict[str, Any]],
         unedited: bool,
         output_format: str,
+        timetravel: Optional[str],
         fs: GCSFileSystem,
     ) -> Union[pd.DataFrame, pa.Table]:
         """Query the database.
@@ -68,6 +71,7 @@ class QueryWorker:
             partition_select (dict, optional): Dictionary containing partition selection criteria. Defaults to None.
             unedited (bool): Flag indicating whether to retrieve unedited data. Defaults to False.
             output_format (str): Desired output format ('pandas' or 'arrow'). Defaults to PANDAS_OUTPUT_FORMAT.
+            timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
             fs (GCSFileSystem): The GCSFileSystem instance.
 
         Returns:
@@ -86,6 +90,7 @@ class QueryWorker:
                 instance_name=self._db_instance.eimerdb_name,
                 table_config=table_config,
                 suffix="_raw",
+                timetravel=timetravel,
                 fs=fs,
                 partition_select=current_partition_select,
                 unedited=unedited,
@@ -93,6 +98,19 @@ class QueryWorker:
 
             # noinspection PyTypeChecker
             df = pq.read_table(table_files, filesystem=fs)
+
+            if timetravel is not None:
+                timetravel_datetime = datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S")
+                timetravel_datetime = pa.scalar(
+                    timetravel_datetime, type=pa.timestamp("ns")
+                )
+                df = df.filter(pc.less_equal(df["datetime"], timetravel_datetime))
+                columns_to_remove = ["user", "operation", "datetime"]
+                all_columns = df.column_names
+                columns_to_keep = [
+                    col for col in all_columns if col not in columns_to_remove
+                ]
+                df = df.select(columns_to_keep)
 
             if table_config[EDITABLE_KEY] is True and unedited is False:
                 changes_table = self.query_changes(
@@ -104,7 +122,7 @@ class QueryWorker:
                 )
 
                 if changes_table is not None and changes_table.num_rows > 0:
-                    df = update_pyarrow_table(df, changes_table)
+                    df = update_pyarrow_table(df, changes_table, timetravel)
 
             con.register(table_name, df)
             del df
@@ -169,6 +187,7 @@ class QueryWorker:
             partition_select=partition_select,
             unedited=False,
             output_format=PANDAS_OUTPUT_FORMAT,
+            timetravel=None,
             fs=fs,
         )
 

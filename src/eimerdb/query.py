@@ -1,7 +1,9 @@
+from datetime import datetime
 from typing import Any
 from typing import Optional
 
 import pyarrow as pa
+import pyarrow.compute as pc
 from gcsfs import GCSFileSystem
 
 from eimerdb.eimerdb_constants import BUCKET_KEY
@@ -14,6 +16,7 @@ def get_partitioned_files(
     table_config: dict[str, Any],
     suffix: str,
     fs: GCSFileSystem,
+    timetravel: Optional[str] = None,
     partition_select: Optional[dict[str, Any]] = None,
     unedited: bool = False,
 ) -> list[str]:
@@ -25,6 +28,7 @@ def get_partitioned_files(
         table_config (dict[str, Any]): Configuration details for the table.
         suffix (str): The suffix to be appended to the table name.
         fs (GCSFileSystem): The filesystem object.
+        timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
         partition_select (Optional[dict[str, Any]]): Optional dictionary specifying partition
             selection criteria. Defaults to None.
         unedited (bool): Flag indicating whether the file paths should include
@@ -39,7 +43,7 @@ def get_partitioned_files(
     partitions_len = len(partitions) if partitions is not None else 0
     partition_levels = "**/" * partitions_len + "*"
 
-    if unedited is True:
+    if unedited is True or timetravel is not None:
         table_name_parts = table_name + f"{suffix}"
     else:
         table_name_parts = table_name
@@ -95,12 +99,15 @@ def filter_partitions(
     return filtered_files
 
 
-def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
+def update_pyarrow_table(
+    df: pa.Table, df_changes: pa.Table, timetravel: Optional[str]
+) -> pa.Table:
     """Apply changes from a PyArrow table of updates and deletions to another PyArrow table.
 
     Args:
         df (pa.Table): The original PyArrow table to be updated.
         df_changes (pa.Table): The PyArrow table containing updates and deletions.
+        timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
 
     Returns:
         pa.Table: A new PyArrow table with the changes applied.
@@ -114,6 +121,13 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table) -> pa.Table:
         pa.field("datetime", pa.timestamp("ns")),
         timestamp_column,
     )
+    if timetravel is not None:
+        timetravel_datetime = datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S")
+
+        timetravel_datetime = pa.scalar(timetravel_datetime, type=pa.timestamp("ns"))
+        df_changes = df_changes.filter(
+            pc.less_equal(df_changes["datetime"], timetravel_datetime)
+        )
 
     # Aggregate max datetime per row_id
     row_id_max: pa.Table = df_changes.group_by("row_id").aggregate(
