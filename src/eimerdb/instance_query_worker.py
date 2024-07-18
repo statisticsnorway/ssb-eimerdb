@@ -60,7 +60,7 @@ class QueryWorker:
         partition_select: Optional[dict[str, Any]],
         unedited: bool,
         output_format: str,
-        timetravel: str,
+        timetravel: Optional[str],
         fs: GCSFileSystem,
     ) -> Union[pd.DataFrame, pa.Table]:
         """Query the database.
@@ -71,7 +71,7 @@ class QueryWorker:
             partition_select (dict, optional): Dictionary containing partition selection criteria. Defaults to None.
             unedited (bool): Flag indicating whether to retrieve unedited data. Defaults to False.
             output_format (str): Desired output format ('pandas' or 'arrow'). Defaults to PANDAS_OUTPUT_FORMAT.
-            timetravel (str): A string with the date and time in this format: 2024-04-15 00:00:00. Defaults to None.
+            timetravel (str, optional): A string with the date and time in this format: 2024-04-15 00:00:00. Defaults to None.
             fs (GCSFileSystem): The GCSFileSystem instance.
 
         Returns:

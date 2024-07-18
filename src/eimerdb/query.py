@@ -15,7 +15,7 @@ def get_partitioned_files(
     instance_name: str,
     table_config: dict[str, Any],
     suffix: str,
-    timetravel: str,
+    timetravel: Optional[str] = None,
     fs: GCSFileSystem,
     partition_select: Optional[dict[str, Any]] = None,
     unedited: bool = False,
@@ -27,7 +27,7 @@ def get_partitioned_files(
         instance_name (str): The name of the instance.
         table_config (dict[str, Any]): Configuration details for the table.
         suffix (str): The suffix to be appended to the table name.
-        timetravel (str): A string with the date and time in this format: 2024-04-15 00:00:00. Defaults to None.
+        timetravel (str, optional): A string with the date and time in this format: 2024-04-15 00:00:00. Defaults to None.
         fs (GCSFileSystem): The filesystem object.
         partition_select (Optional[dict[str, Any]]): Optional dictionary specifying partition
             selection criteria. Defaults to None.
@@ -99,13 +99,15 @@ def filter_partitions(
     return filtered_files
 
 
-def update_pyarrow_table(df: pa.Table, df_changes: pa.Table, timetravel: str) -> pa.Table:
+def update_pyarrow_table(
+    df: pa.Table, df_changes: pa.Table, timetravel: Optional[str]
+) -> pa.Table:
     """Apply changes from a PyArrow table of updates and deletions to another PyArrow table.
 
     Args:
         df (pa.Table): The original PyArrow table to be updated.
         df_changes (pa.Table): The PyArrow table containing updates and deletions.
-        timetravel (str): A string with the date and time for when to timetravel.
+        timetravel (str, optional): A string with the date and time for when to timetravel.
         Written in this format 2024-04-15 00:00:00
 
     Returns:
