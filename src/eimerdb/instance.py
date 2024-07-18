@@ -366,6 +366,7 @@ class EimerDBInstance(AbstractDbInstance):
         partition_select: Optional[dict[str, Any]] = None,
         unedited: bool = False,
         output_format: str = PANDAS_OUTPUT_FORMAT,
+        timetravel: str = None,
     ) -> Union[pd.DataFrame, pa.Table, str]:
         if output_format not in [PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT]:
             raise ValueError(
@@ -384,6 +385,7 @@ class EimerDBInstance(AbstractDbInstance):
                     partition_select=partition_select,
                     unedited=unedited,
                     output_format=output_format,
+                    timetravel=timetravel,
                     fs=fs,
                 )
             case DbOperation.UPDATE_QUERY_OPERATION:
