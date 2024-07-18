@@ -187,6 +187,7 @@ class QueryWorker:
             partition_select=partition_select,
             unedited=False,
             output_format=PANDAS_OUTPUT_FORMAT,
+            timetravel=False,
             fs=fs,
         )
 
