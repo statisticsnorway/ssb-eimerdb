@@ -123,8 +123,10 @@ def update_pyarrow_table(df: pa.Table, df_changes: pa.Table, timetravel: str) ->
     if timetravel is not None:
         timetravel_datetime = datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S")
 
-        timetravel_datetime = pa.scalar(timetravel_datetime, type=pa.timestamp('ns'))
-        df_changes = df_changes.filter(pc.less_equal(df_changes["datetime"], timetravel_datetime))
+        timetravel_datetime = pa.scalar(timetravel_datetime, type=pa.timestamp("ns"))
+        df_changes = df_changes.filter(
+            pc.less_equal(df_changes["datetime"], timetravel_datetime)
+        )
 
     # Aggregate max datetime per row_id
     row_id_max: pa.Table = df_changes.group_by("row_id").aggregate(

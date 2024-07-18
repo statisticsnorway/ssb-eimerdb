@@ -101,7 +101,7 @@ class QueryWorker:
 
             if timetravel is not None:
                 timetravel_datetime = datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S")
-                timetravel_datetime = pa.scalar(timetravel_datetime, type=pa.timestamp('ns'))
+                timetravel_datetime = pa.scalar(timetravel_datetime, type=pa.timestamp("ns"))
                 df = df.filter(pc.less_equal(df["datetime"], timetravel_datetime))
                 columns_to_remove = ["user", "operation", "datetime"]
                 all_columns = df.column_names
