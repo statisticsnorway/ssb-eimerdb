@@ -108,7 +108,7 @@ class QueryWorker:
                 columns_to_remove = ["user", "operation", "datetime"]
                 all_columns = df.column_names
                 columns_to_keep = [
-                    col for col in all_columns if col not in columns_to_remov
+                    col for col in all_columns if col not in columns_to_remove
                 ]
                 df = df.select(columns_to_keep)
 
