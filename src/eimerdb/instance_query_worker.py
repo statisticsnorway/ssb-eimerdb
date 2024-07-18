@@ -1,5 +1,5 @@
-from datetime import datetime
 import logging
+from datetime import datetime
 from typing import Any
 from typing import Optional
 from typing import Union
@@ -101,11 +101,15 @@ class QueryWorker:
 
             if timetravel is not None:
                 timetravel_datetime = datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S")
-                timetravel_datetime = pa.scalar(timetravel_datetime, type=pa.timestamp("ns"))
+                timetravel_datetime = pa.scalar(
+                    timetravel_datetime, type=pa.timestamp("ns")
+                )
                 df = df.filter(pc.less_equal(df["datetime"], timetravel_datetime))
                 columns_to_remove = ["user", "operation", "datetime"]
                 all_columns = df.column_names
-                columns_to_keep = [col for col in all_columns if col not in columns_to_remove]
+                columns_to_keep = [
+                    col for col in all_columns if col not in columns_to_remov
+                ]
                 df = df.select(columns_to_keep)
 
             if table_config[EDITABLE_KEY] is True and unedited is False:
