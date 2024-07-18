@@ -103,6 +103,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
                 instance_name="test_eimerdb",
                 table_config=self.instance.tables[table_name],
                 suffix="_raw",
+                timetravel=None,
                 fs=ANY,
                 partition_select=partition_select,
                 unedited=unedited,
