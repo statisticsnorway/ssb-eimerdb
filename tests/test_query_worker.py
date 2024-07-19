@@ -410,11 +410,12 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             target_table=target_table, timetravel=timetravel
         )
 
-        if timetravel is None:
-            expected_table = target_table
-        else:
-            expected_table = pa.Table.from_pydict(
+        expected_table = (
+            target_table
+            if timetravel is None
+            else pa.Table.from_pydict(
                 mapping=expected_data, schema=pa.schema([("value", pa.int64())])
             )
+        )
 
         self.assertTrue(expected_table.equals(result_table))
