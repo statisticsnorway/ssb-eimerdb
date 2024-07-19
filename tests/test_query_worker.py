@@ -80,7 +80,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             mock_update_pyarrow_table.return_value = expected_table
 
             # Mock pq_read_table
-            mock_pq_read_table.return_value = expected_df
+            mock_pq_read_table.return_value = expected_table
 
             # Call the method
             result = self.worker_instance.query_select(
