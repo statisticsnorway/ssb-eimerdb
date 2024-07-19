@@ -100,7 +100,7 @@ def filter_partitions(
 
 
 def update_pyarrow_table(
-    df: pa.Table, df_changes: pa.Table, timetravel: Optional[str]
+    df: pa.Table, df_changes: pa.Table, timetravel: Optional[str] = None
 ) -> pa.Table:
     """Apply changes from a PyArrow table of updates and deletions to another PyArrow table.
 
@@ -111,7 +111,6 @@ def update_pyarrow_table(
 
     Returns:
         pa.Table: A new PyArrow table with the changes applied.
-
     """
     timestamp_column = df_changes["datetime"].cast(pa.timestamp("ns"))
     df_changes = df_changes.drop(["datetime"])
@@ -122,9 +121,10 @@ def update_pyarrow_table(
         timestamp_column,
     )
     if timetravel is not None:
-        timetravel_datetime = datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S")
+        timetravel_datetime = pa.scalar(
+            datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S"), type=pa.timestamp("ns")
+        )
 
-        timetravel_datetime = pa.scalar(timetravel_datetime, type=pa.timestamp("ns"))
         df_changes = df_changes.filter(
             pc.less_equal(df_changes["datetime"], timetravel_datetime)
         )

@@ -1,7 +1,9 @@
 import unittest
+from typing import Optional
 from unittest.mock import Mock
 
 import pyarrow as pa
+from parameterized import parameterized
 
 from eimerdb.query import filter_partitions
 from eimerdb.query import get_partitioned_files
@@ -127,8 +129,8 @@ class TestGetPartitionedFiles(unittest.TestCase):
             filtered_files,
         )
 
-    # noinspection PyArgumentList
-    def test_update_pyarrow_table(self):
+    @parameterized.expand([(None,), ("2023-11-13 00:00:00",)])
+    def test_update_pyarrow_table(self, timetravel: Optional[str]) -> None:
         # Create the original PyArrow table
         original_schema = pa.schema(
             [pa.field("row_id", pa.string()), pa.field("value", pa.int32())]
@@ -150,12 +152,14 @@ class TestGetPartitionedFiles(unittest.TestCase):
                 pa.field("user", pa.string()),
             ]
         )
+
         changes_data = [
             pa.array(["id2", "id3", "id4"]),
             pa.array([1, 2, 3]),
             pa.array(
-                [1640995200000000000, 1640995200000000000, 1640995200000000000]
-            ),  # Timestamps in nanoseconds
+                # Timestamps in nanoseconds, 2023-11-14 23:13:20
+                [1700000000000000000, 1700000000000000000, 1700000000000000000]
+            ),
             pa.array(["update", "delete", "update"]),
             pa.array(["user2", "user3", "user4"]),
         ]
@@ -165,7 +169,7 @@ class TestGetPartitionedFiles(unittest.TestCase):
         updated_table = update_pyarrow_table(
             df=original_table,
             df_changes=changes_table,
-            timetravel=None,
+            timetravel=timetravel,
         )
 
         # Assert the expected output
@@ -177,10 +181,15 @@ class TestGetPartitionedFiles(unittest.TestCase):
             ]
         )
 
-        expected_data = [
-            pa.array(["id1", "id2", "id4"]),
-            pa.array([1, 1, 3]),  # Value of 'id3' deleted
-        ]
+        if timetravel is None:
+            expected_data = [
+                pa.array(["id1", "id2", "id4"]),
+                pa.array([1, 1, 3]),  # Value of 'id3' deleted
+            ]
+        else:
+            # timetravel is before changes, hence expect only the original data
+            expected_data = original_data
+
         expected_output = pa.Table.from_arrays(expected_data, schema=expected_schema)
 
         # Assert the table contents are equal

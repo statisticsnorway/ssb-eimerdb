@@ -60,8 +60,8 @@ class QueryWorker:
         partition_select: Optional[dict[str, Any]],
         unedited: bool,
         output_format: str,
-        timetravel: Optional[str],
         fs: GCSFileSystem,
+        timetravel: Optional[str] = None,
     ) -> Union[pd.DataFrame, pa.Table]:
         """Query the database.
 
@@ -90,8 +90,8 @@ class QueryWorker:
                 instance_name=self._db_instance.eimerdb_name,
                 table_config=table_config,
                 suffix="_raw",
-                timetravel=timetravel,
                 fs=fs,
+                timetravel=timetravel,
                 partition_select=current_partition_select,
                 unedited=unedited,
             )
