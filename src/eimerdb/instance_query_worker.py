@@ -61,8 +61,10 @@ class QueryWorker:
         if timetravel is None:
             return target_table
 
-        timetravel_datetime = datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S")
-        timetravel_datetime = pa.scalar(timetravel_datetime, type=pa.timestamp("ns"))
+        timetravel_datetime = pa.scalar(
+            datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S"), type=pa.timestamp("ns")
+        )
+
         result_table = target_table.filter(
             pc.less_equal(target_table["datetime"], timetravel_datetime)
         )
@@ -117,7 +119,7 @@ class QueryWorker:
                 unedited=unedited,
             )
 
-            df: pa.Table = QueryWorker._timetravel_filter(
+            df = QueryWorker._timetravel_filter(
                 target_table=pq.read_table(table_files, filesystem=fs),
                 timetravel=timetravel,
             )
