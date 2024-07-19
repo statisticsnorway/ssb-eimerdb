@@ -1,3 +1,4 @@
+import datetime
 from typing import Optional
 from unittest.mock import ANY
 from unittest.mock import MagicMock
@@ -40,7 +41,6 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             ("table1", False, "pandas", None, None),
             ("table1", False, "pandas", 0, None),
             ("table1", False, "pandas", 1, None),
-            # ("table1", False, "pandas", 1, "2023-11-13 00:00:00"), FAILS
             ("table1", True, "arrow", None, None),
         ]
     )
@@ -383,3 +383,38 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             self.assertEqual(1, len(result))
         else:
             self.assertIsNone(result)
+
+    @parameterized.expand(
+        [
+            ("no_timetravel", None, {"value": [10, 20, 30]}),
+            ("timetravel_matches_some", "2024-04-16 12:00:00", {"value": [10, 20]}),
+            ("timetravel_matches_none", "2024-04-14 12:00:00", {"value": []}),
+            ("timetravel_matches_all", "2024-04-18 12:00:00", {"value": [10, 20, 30]}),
+        ]
+    )
+    def test_timetravel_filter(self, _: str, timetravel: str, expected_data) -> None:
+        target_table = pa.Table.from_pydict(
+            {
+                "user": ["user1", "user2", "user3"],
+                "operation": ["create", "update", "delete"],
+                "datetime": [
+                    datetime.datetime(2024, 4, 15, 12, 0, 0),
+                    datetime.datetime(2024, 4, 16, 12, 0, 0),
+                    datetime.datetime(2024, 4, 17, 12, 0, 0),
+                ],
+                "value": [10, 20, 30],
+            }
+        )
+
+        result_table = QueryWorker._timetravel_filter(
+            target_table=target_table, timetravel=timetravel
+        )
+
+        if timetravel is None:
+            expected_table = target_table
+        else:
+            expected_table = pa.Table.from_pydict(
+                mapping=expected_data, schema=pa.schema([("value", pa.int64())])
+            )
+
+        self.assertTrue(expected_table.equals(result_table))

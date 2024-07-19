@@ -53,6 +53,27 @@ class QueryWorker:
         """
         self._db_instance = db_instance
 
+    @staticmethod
+    def _timetravel_filter(
+        target_table: pa.Table,
+        timetravel: Optional[str],
+    ) -> pa.Table:
+        if timetravel is None:
+            return target_table
+
+        timetravel_datetime = datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S")
+        timetravel_datetime = pa.scalar(timetravel_datetime, type=pa.timestamp("ns"))
+        result_table = target_table.filter(
+            pc.less_equal(target_table["datetime"], timetravel_datetime)
+        )
+
+        columns_to_keep = [
+            col
+            for col in result_table.column_names
+            if col not in ["user", "operation", "datetime"]
+        ]
+        return result_table.select(columns_to_keep)
+
     def query_select(
         self,
         parsed_query: dict[str, Any],
@@ -96,21 +117,10 @@ class QueryWorker:
                 unedited=unedited,
             )
 
-            # noinspection PyTypeChecker
-            df = pq.read_table(table_files, filesystem=fs)
-
-            if timetravel is not None:
-                timetravel_datetime = datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S")
-                timetravel_datetime = pa.scalar(
-                    timetravel_datetime, type=pa.timestamp("ns")
-                )
-                df = df.filter(pc.less_equal(df["datetime"], timetravel_datetime))
-                columns_to_remove = ["user", "operation", "datetime"]
-                all_columns = df.column_names
-                columns_to_keep = [
-                    col for col in all_columns if col not in columns_to_remove
-                ]
-                df = df.select(columns_to_keep)
+            df: pa.Table = QueryWorker._timetravel_filter(
+                target_table=pq.read_table(table_files, filesystem=fs),
+                timetravel=timetravel,
+            )
 
             if table_config[EDITABLE_KEY] is True and unedited is False:
                 changes_table = self.query_changes(
@@ -187,7 +197,6 @@ class QueryWorker:
             partition_select=partition_select,
             unedited=False,
             output_format=PANDAS_OUTPUT_FORMAT,
-            timetravel=None,
             fs=fs,
         )
 
