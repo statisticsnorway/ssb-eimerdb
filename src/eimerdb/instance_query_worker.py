@@ -69,12 +69,7 @@ class QueryWorker:
             pc.less_equal(target_table["datetime"], timetravel_datetime)
         )
 
-        columns_to_keep = [
-            col
-            for col in result_table.column_names
-            if col not in ["user", "operation", "datetime"]
-        ]
-        return result_table.select(columns_to_keep)
+        return result_table.drop(["user", "operation", "datetime"])
 
     def query_select(
         self,
