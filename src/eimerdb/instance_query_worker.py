@@ -119,7 +119,7 @@ class QueryWorker:
                 unedited=unedited,
             )
 
-            df = QueryWorker._timetravel_filter(
+            table = QueryWorker._timetravel_filter(
                 target_table=pq.read_table(table_files, filesystem=fs),
                 timetravel=timetravel,
             )
@@ -134,10 +134,10 @@ class QueryWorker:
                 )
 
                 if changes_table is not None and changes_table.num_rows > 0:
-                    df = update_pyarrow_table(df, changes_table, timetravel)
+                    table = update_pyarrow_table(table, changes_table, timetravel)
 
-            con.register(table_name, df)
-            del df
+            con.register(table_name, table)
+            del table
 
         query_result = con.execute(sql_query)
         return (
