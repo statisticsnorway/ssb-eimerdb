@@ -75,7 +75,23 @@ class TestGetPartitionedFiles(unittest.TestCase):
             files,
         )
 
-    def test_get_partitioned_files_with_partition_select_and_unedited(self) -> None:
+    @parameterized.expand(
+        [
+            (
+                True,
+                None,
+            ),
+            (
+                False,
+                "2023-11-13 00:00:00",
+            ),
+        ]
+    )
+    def test_get_partitioned_files_with_partition_select_and_unedited_or_timetravel(
+        self,
+        unedited: bool,
+        timetravel: Optional[str],
+    ) -> None:
         # Setup mocks
         self.fs.glob.return_value = [
             "gs://example_bucket/eimerdb/example_instance/table1_suffix/partition_col1=value1",
@@ -90,7 +106,8 @@ class TestGetPartitionedFiles(unittest.TestCase):
             suffix=self.suffix,
             fs=self.fs,
             partition_select=self.partition_select,
-            unedited=True,
+            unedited=unedited,
+            timetravel=timetravel,
         )
 
         # Assert result
