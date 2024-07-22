@@ -1,3 +1,4 @@
+import datetime
 from typing import Optional
 from unittest.mock import ANY
 from unittest.mock import MagicMock
@@ -54,7 +55,6 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         parsed_query = {"table_name": [table_name]}
         sql_query = f"SELECT * FROM {table_name}"
         partition_select = None
-        timetravel = None
 
         with patch(
             "eimerdb.instance_query_worker.get_partitioned_files"
@@ -80,7 +80,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             mock_update_pyarrow_table.return_value = expected_table
 
             # Mock pq_read_table
-            mock_pq_read_table.return_value = expected_df
+            mock_pq_read_table.return_value = expected_table
 
             # Call the method
             result = self.worker_instance.query_select(
@@ -89,7 +89,6 @@ class TestQueryWorker(TestEimerDBInstanceBase):
                 partition_select=partition_select,
                 unedited=unedited,
                 output_format=output_format,
-                timetravel=timetravel,
                 fs=MagicMock(),
             )
 
@@ -103,10 +102,10 @@ class TestQueryWorker(TestEimerDBInstanceBase):
                 instance_name="test_eimerdb",
                 table_config=self.instance.tables[table_name],
                 suffix="_raw",
-                timetravel=None,
                 fs=ANY,
                 partition_select=partition_select,
                 unedited=unedited,
+                timetravel=None,
             )
             mock_pq_read_table.assert_called_once()
 
@@ -382,3 +381,39 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             self.assertEqual(1, len(result))
         else:
             self.assertIsNone(result)
+
+    @parameterized.expand(
+        [
+            ("no_timetravel", None, {"value": [10, 20, 30]}),
+            ("timetravel_matches_some", "2024-04-16 12:00:00", {"value": [10, 20]}),
+            ("timetravel_matches_none", "2024-04-14 12:00:00", {"value": []}),
+            ("timetravel_matches_all", "2024-04-18 12:00:00", {"value": [10, 20, 30]}),
+        ]
+    )
+    def test_timetravel_filter(self, _: str, timetravel: str, expected_data) -> None:
+        target_table = pa.Table.from_pydict(
+            {
+                "user": ["user1", "user2", "user3"],
+                "operation": ["create", "update", "delete"],
+                "datetime": [
+                    datetime.datetime(2024, 4, 15, 12, 0, 0),
+                    datetime.datetime(2024, 4, 16, 12, 0, 0),
+                    datetime.datetime(2024, 4, 17, 12, 0, 0),
+                ],
+                "value": [10, 20, 30],
+            }
+        )
+
+        result_table = QueryWorker._timetravel_filter(
+            target_table=target_table, timetravel=timetravel
+        )
+
+        expected_table = (
+            target_table
+            if timetravel is None
+            else pa.Table.from_pydict(
+                mapping=expected_data, schema=pa.schema([("value", pa.int64())])
+            )
+        )
+
+        self.assertTrue(expected_table.equals(result_table))

@@ -53,6 +53,24 @@ class QueryWorker:
         """
         self._db_instance = db_instance
 
+    @staticmethod
+    def _timetravel_filter(
+        target_table: pa.Table,
+        timetravel: Optional[str],
+    ) -> pa.Table:
+        if timetravel is None:
+            return target_table
+
+        timetravel_datetime = pa.scalar(
+            datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S"), type=pa.timestamp("ns")
+        )
+
+        result_table = target_table.filter(
+            pc.less_equal(target_table["datetime"], timetravel_datetime)
+        )
+
+        return result_table.drop(["user", "operation", "datetime"])
+
     def query_select(
         self,
         parsed_query: dict[str, Any],
@@ -60,8 +78,8 @@ class QueryWorker:
         partition_select: Optional[dict[str, Any]],
         unedited: bool,
         output_format: str,
-        timetravel: Optional[str],
         fs: GCSFileSystem,
+        timetravel: Optional[str] = None,
     ) -> Union[pd.DataFrame, pa.Table]:
         """Query the database.
 
@@ -90,27 +108,16 @@ class QueryWorker:
                 instance_name=self._db_instance.eimerdb_name,
                 table_config=table_config,
                 suffix="_raw",
-                timetravel=timetravel,
                 fs=fs,
+                timetravel=timetravel,
                 partition_select=current_partition_select,
                 unedited=unedited,
             )
 
-            # noinspection PyTypeChecker
-            df = pq.read_table(table_files, filesystem=fs)
-
-            if timetravel is not None:
-                timetravel_datetime = datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S")
-                timetravel_datetime = pa.scalar(
-                    timetravel_datetime, type=pa.timestamp("ns")
-                )
-                df = df.filter(pc.less_equal(df["datetime"], timetravel_datetime))
-                columns_to_remove = ["user", "operation", "datetime"]
-                all_columns = df.column_names
-                columns_to_keep = [
-                    col for col in all_columns if col not in columns_to_remove
-                ]
-                df = df.select(columns_to_keep)
+            table = QueryWorker._timetravel_filter(
+                target_table=pq.read_table(table_files, filesystem=fs),
+                timetravel=timetravel,
+            )
 
             if table_config[EDITABLE_KEY] is True and unedited is False:
                 changes_table = self.query_changes(
@@ -122,10 +129,10 @@ class QueryWorker:
                 )
 
                 if changes_table is not None and changes_table.num_rows > 0:
-                    df = update_pyarrow_table(df, changes_table, timetravel)
+                    table = update_pyarrow_table(table, changes_table, timetravel)
 
-            con.register(table_name, df)
-            del df
+            con.register(table_name, table)
+            del table
 
         query_result = con.execute(sql_query)
         return (
@@ -187,7 +194,6 @@ class QueryWorker:
             partition_select=partition_select,
             unedited=False,
             output_format=PANDAS_OUTPUT_FORMAT,
-            timetravel=None,
             fs=fs,
         )
 

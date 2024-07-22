@@ -100,49 +100,49 @@ def filter_partitions(
 
 
 def update_pyarrow_table(
-    df: pa.Table, df_changes: pa.Table, timetravel: Optional[str]
+    target_table: pa.Table, changes_table: pa.Table, timetravel: Optional[str] = None
 ) -> pa.Table:
     """Apply changes from a PyArrow table of updates and deletions to another PyArrow table.
 
     Args:
-        df (pa.Table): The original PyArrow table to be updated.
-        df_changes (pa.Table): The PyArrow table containing updates and deletions.
+        target_table (pa.Table): The original PyArrow table to be updated.
+        changes_table (pa.Table): The PyArrow table containing updates and deletions.
         timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
 
     Returns:
         pa.Table: A new PyArrow table with the changes applied.
-
     """
-    timestamp_column = df_changes["datetime"].cast(pa.timestamp("ns"))
-    df_changes = df_changes.drop(["datetime"])
+    timestamp_column = changes_table["datetime"].cast(pa.timestamp("ns"))
+    changes_table = changes_table.drop(["datetime"])
 
-    df_changes = df_changes.add_column(
-        len(df_changes.column_names),
+    changes_table = changes_table.add_column(
+        len(changes_table.column_names),
         pa.field("datetime", pa.timestamp("ns")),
         timestamp_column,
     )
     if timetravel is not None:
-        timetravel_datetime = datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S")
+        timetravel_datetime = pa.scalar(
+            datetime.strptime(timetravel, "%Y-%m-%d %H:%M:%S"), type=pa.timestamp("ns")
+        )
 
-        timetravel_datetime = pa.scalar(timetravel_datetime, type=pa.timestamp("ns"))
-        df_changes = df_changes.filter(
-            pc.less_equal(df_changes["datetime"], timetravel_datetime)
+        changes_table = changes_table.filter(
+            pc.less_equal(changes_table["datetime"], timetravel_datetime)
         )
 
     # Aggregate max datetime per row_id
-    row_id_max: pa.Table = df_changes.group_by("row_id").aggregate(
+    row_id_max: pa.Table = changes_table.group_by("row_id").aggregate(
         [("datetime", "max")]
     )
     row_id_max = row_id_max.select(["row_id", "datetime_max"])
     row_id_max = row_id_max.rename_columns(["row_id", "datetime"])
 
     # Join df_changes with row_id_max to get the latest changes
-    df_changes = df_changes.join(
+    changes_table = changes_table.join(
         row_id_max, ["row_id", "datetime"], join_type="inner"
     ).combine_chunks()
 
     def filter_on_operation_and_drop_columns(operation: str) -> pa.Table:
-        _df = df_changes.filter(pa.compute.field("operation") == operation)
+        _df = changes_table.filter(pa.compute.field("operation") == operation)
         return _df.drop(["datetime", "operation", "user"])
 
     # Separate updates and deletions
@@ -151,9 +151,9 @@ def update_pyarrow_table(
 
     # Filter out rows to be deleted
     filter_array = pa.compute.invert(
-        pa.compute.is_in(df["row_id"], df_changes["row_id"])
+        pa.compute.is_in(target_table["row_id"], changes_table["row_id"])
     )
-    df_filtered = pa.compute.filter(df, filter_array)
+    df_filtered = pa.compute.filter(target_table, filter_array)
     column_order = [field.name for field in df_updates.schema]
 
     # Select relevant columns and update schema
