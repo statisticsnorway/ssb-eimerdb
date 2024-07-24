@@ -2,7 +2,6 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 import pandas as pd
-import pyarrow as pa
 import pytest
 
 from tests.test_instance_base import TestEimerDBInstanceBase
@@ -128,7 +127,7 @@ class TestEimerDBInstanceQuery(TestEimerDBInstanceBase):
 
     @patch("eimerdb.instance_query_worker.QueryWorker.query_changes")
     def test_query_changes_expect_result(self, mock_query_changes: Mock) -> None:
-        mock_query_changes.return_value = pa.Table
+        mock_query_changes.return_value = pd.DataFrame()
 
         # Call the method under test
         result = self.instance.query_changes(sql_query="SELECT * FROM table1")

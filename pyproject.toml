@@ -17,15 +17,17 @@ Changelog = "https://github.com/statisticsnorway/ssb-eimerdb/releases"
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
 click = ">=8.0.1"
-duckdb = "^0.10.0"
+duckdb = "^1.0.0"
 google-cloud-storage = "^2.15.0"
-pyarrow = "14.0.2"
+pyarrow = "^17.0.0"
 dapla-toolbelt = "^2.0.8"
 uuid = "^1.30"
 ipykernel = "^6.29.3"
 pandas = "^2.2.1"
 parameterized = {extras = ["typed"], version = "^0.9.0"}
 docstring-inheritance = "^2.2.0"
+numpy = "^2.0.1"
+filelock = "^3.15.4"
 
 [tool.poetry.group.dev.dependencies]
 Pygments = ">=2.10.0"
