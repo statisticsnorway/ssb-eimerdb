@@ -330,9 +330,11 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         # Assertions
         if expected_rows > 0:
             self.assertIsNotNone(result)
-            self.assertTrue(result is pa.Table or result is pd.DataFrame)
+            self.assertTrue(
+                isinstance(result, pa.Table) or isinstance(result, pd.DataFrame)
+            )
 
-            if result is pa.Table or result is pd.DataFrame:
+            if isinstance(result, pa.Table) or isinstance(result, pd.DataFrame):
                 self.assertEqual(expected_rows, len(result))
         else:
             self.assertIsNone(result)
