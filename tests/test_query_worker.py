@@ -1,4 +1,5 @@
 import datetime
+from typing import Any
 from typing import Optional
 from unittest.mock import ANY
 from unittest.mock import MagicMock
@@ -257,7 +258,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
     def test_query_changes(
         self,
         table_name: str,
-        partition_select: Optional[dict[str, list]],
+        partition_select: Optional[dict[str, Any]],
         unedited: bool,
         output_format: str,
         changes_output: str,
@@ -318,7 +319,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             "eimerdb.instance_query_worker.duckdb.DuckDBPyConnection.query",
             return_value=mock_duckdb_query_result,
         ):
-            result: pa.Table = self.worker_instance.query_changes(
+            result = self.worker_instance.query_changes(
                 sql_query=f"SELECT * FROM {table_name}",
                 partition_select=partition_select,
                 unedited=unedited,
