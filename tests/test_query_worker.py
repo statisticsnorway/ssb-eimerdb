@@ -329,6 +329,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
         # Assertions
         if expected_rows > 0:
+            self.assertIsNotNone(result)
             self.assertEqual(expected_rows, len(result))
         else:
             self.assertIsNone(result)
