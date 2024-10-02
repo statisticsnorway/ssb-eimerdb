@@ -80,7 +80,7 @@ def get_initials() -> str:
 
     """
     try:
-        user = AuthClient.fetch_email_from_credentials()
+        user: str = AuthClient.fetch_email_from_credentials()
         user_split: str = user.split("@")[0]
         return user_split
     except KeyError:
