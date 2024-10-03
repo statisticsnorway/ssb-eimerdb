@@ -76,15 +76,13 @@ def get_initials() -> str:
     """A function that returns user initials.
 
     Returns:
-        The users initials.
-
+        The user's initials or "user" if the user is None.
     """
-    try:
-        user = AuthClient.fetch_local_user_from_jupyter()["username"]
-        user_split: str = user.split("@")[0]
-        return user_split
-    except KeyError:
+    user: str | None = AuthClient.fetch_email_from_credentials()
+    if user is None:
         return "user"
+    user_split: str = user.split("@")[0]
+    return user_split
 
 
 def get_json(bucket_name: str, blob_path: str) -> dict[str, Any]:
