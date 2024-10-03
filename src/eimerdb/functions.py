@@ -78,7 +78,7 @@ def get_initials() -> str:
     Returns:
         The user's initials or "user" if the user is None.
     """
-    user: str | None = AuthClient.fetch_email_from_credentials()  # noqa: D102
+    user: str | None = AuthClient.fetch_email_from_credentials()
     if user is None:
         return "user"
     user_split: str = user.split("@")[0]
