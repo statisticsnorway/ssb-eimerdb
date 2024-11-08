@@ -40,7 +40,7 @@ Create a new database by specifying the bucket name and a database name.
 ```python
 import eimerdb as db
 
-db.create_eimerdb(bucket="bucket-name", db_name="prodcombasen")
+db.create_eimerdb(bucket_name="bucket-name", db_name="prodcombasen")
 ```
 
 Connect to your EimerDB database.
