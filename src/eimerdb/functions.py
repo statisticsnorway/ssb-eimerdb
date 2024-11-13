@@ -4,6 +4,7 @@ The template and this example uses Google style docstrings as described at:
 https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
 """
 
+import os
 import json
 import logging
 import re
@@ -80,7 +81,9 @@ def get_initials() -> str:
     """
     user: str | None = AuthClient.fetch_email_from_credentials()
     if user is None:
-        return "user"
+        user = os.getenv("DAPLA_USER")
+    if user is None:
+        return = "user"
     user_split: str = user.split("@")[0]
     return user_split
 
