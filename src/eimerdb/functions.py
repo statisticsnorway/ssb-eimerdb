@@ -4,9 +4,9 @@ The template and this example uses Google style docstrings as described at:
 https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
 """
 
-import os
 import json
 import logging
+import os
 import re
 from datetime import datetime
 from typing import Any
