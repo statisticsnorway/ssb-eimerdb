@@ -83,7 +83,7 @@ def get_initials() -> str:
     if user is None:
         user = os.getenv("DAPLA_USER")
     if user is None:
-        return = "user"
+        return "user"
     user_split: str = user.split("@")[0]
     return user_split
 
