@@ -6,6 +6,7 @@ https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
 
 import json
 import logging
+import os
 import re
 from datetime import datetime
 from typing import Any
@@ -79,6 +80,8 @@ def get_initials() -> str:
         The user's initials or "user" if the user is None.
     """
     user: str | None = AuthClient.fetch_email_from_credentials()
+    if user is None:
+        user = os.getenv("DAPLA_USER")
     if user is None:
         return "user"
     user_split: str = user.split("@")[0]
