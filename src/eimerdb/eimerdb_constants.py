@@ -10,7 +10,7 @@ SET_CLAUSE_KEY = "set_clause"
 
 # table config keys
 CREATED_BY_KEY = "created_by"
-BUCKET_KEY = "bucket"
+BASE_PATH_KEY = "base_path"
 EDITABLE_KEY = "editable"
 TABLE_PATH_KEY = "table_path"
 PARTITION_COLUMNS_KEY = "partition_columns"

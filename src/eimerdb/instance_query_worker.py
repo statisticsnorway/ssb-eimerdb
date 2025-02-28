@@ -1,3 +1,4 @@
+import os
 import logging
 from datetime import datetime
 from typing import Any
@@ -6,16 +7,15 @@ from typing import Union
 from uuid import uuid4
 
 import duckdb
+import glob
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
-from dapla import FileClient
-from gcsfs import GCSFileSystem
 
 from .abstract_db_instance import AbstractDbInstance
 from .eimerdb_constants import ARROW_OUTPUT_FORMAT
-from .eimerdb_constants import BUCKET_KEY
+from .eimerdb_constants import BASE_PATH_KEY
 from .eimerdb_constants import CHANGES_ALL
 from .eimerdb_constants import CHANGES_RECENT
 from .eimerdb_constants import DEFAULT_COMPRESSION
@@ -78,7 +78,6 @@ class QueryWorker:
         partition_select: Optional[dict[str, Any]],
         unedited: bool,
         output_format: str,
-        fs: GCSFileSystem,
         timetravel: Optional[str] = None,
     ) -> Union[pd.DataFrame, pa.Table]:
         """Query the database.
@@ -90,7 +89,6 @@ class QueryWorker:
             unedited (bool): Flag indicating whether to retrieve unedited data. Defaults to False.
             output_format (str): Desired output format ('pandas' or 'arrow'). Defaults to PANDAS_OUTPUT_FORMAT.
             timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
-            fs (GCSFileSystem): The GCSFileSystem instance.
 
         Returns:
             Union[pd.DataFrame, pa.Table]: Returns a pandas DataFrame if 'pandas' output format is specified,
@@ -108,14 +106,14 @@ class QueryWorker:
                 instance_name=self._db_instance.eimerdb_name,
                 table_config=table_config,
                 suffix="_raw",
-                fs=fs,
+                path=self._db_instance._path,
                 timetravel=timetravel,
                 partition_select=current_partition_select,
                 unedited=unedited,
             )
 
             table = QueryWorker._timetravel_filter(
-                target_table=pq.read_table(table_files, filesystem=fs),
+                target_table=pq.read_table(table_files),
                 timetravel=timetravel,
             )
 
@@ -162,31 +160,29 @@ class QueryWorker:
         parsed_query: dict[str, Any],
         update_sql_query: Optional[str],
         partition_select: Optional[dict[str, Any]],
-        fs: GCSFileSystem,
     ) -> str:
         """Query the database to update or delete records.
-
+    
         Args:
             parsed_query (dict): The parsed query.
-            update_sql_query (str): The SQL query to execute. When defines, assumes update operation.
+            update_sql_query (str): The SQL query to execute. When defined, assumes update operation.
             partition_select (Dict, optional): Dictionary containing partition selection criteria.
-            fs (GCSFileSystem): The GCSFileSystem instance.
-
+    
         Returns:
             str: String containing number of rows updated.
-
+    
         Raises:
             ValueError: If the table is not editable.
         """
         table_name = parsed_query[TABLE_NAME_KEY]
         where_clause = parsed_query[WHERE_CLAUSE_KEY]
         table_config = self._db_instance.tables[table_name]
-
+    
         if table_config[EDITABLE_KEY] is not True:
             raise ValueError(f"The table {table_name} is not editable!")
-
+    
         arrow_schema = self._db_instance.get_arrow_schema(table_name, True)
-
+    
         select_query = f"{SELECT_STAR_QUERY} {table_name} WHERE {where_clause}"
         df_change_results: pd.DataFrame = self.query_select(
             parsed_query=parse_sql_query(select_query),
@@ -194,18 +190,17 @@ class QueryWorker:
             partition_select=partition_select,
             unedited=False,
             output_format=PANDAS_OUTPUT_FORMAT,
-            fs=fs,
         )
-
+    
         is_update = update_sql_query is not None
         df_change_results = QueryWorker._add_meta_data(
             target_df=df_change_results, operation="update" if is_update else "delete"
         )
         dataset = pa.Table.from_pandas(df_change_results, schema=arrow_schema)
-
+    
         con = duckdb.connect()
         con.register("dataset", dataset)
-
+    
         if update_sql_query is not None:
             con.execute(f"CREATE TABLE updates AS FROM dataset WHERE {where_clause}")
             local_sql_query = update_sql_query.replace(
@@ -216,21 +211,23 @@ class QueryWorker:
         else:
             con.execute(f"CREATE TABLE deletes AS FROM dataset WHERE {where_clause}")
             changes_df = con.table("deletes").df()
-
+    
         changes_table = pa.Table.from_pandas(changes_df, schema=arrow_schema)
-        table_path = self._db_instance.tables[table_name][TABLE_PATH_KEY] + "_changes"
-
+        table_path = os.path.join(self._db_instance.eimer_path, f"{table_name}_changes")
+    
+        os.makedirs(table_path, exist_ok=True)
+    
         # noinspection PyTypeChecker
         pq.write_to_dataset(
             table=changes_table,
-            root_path=f"gs://{self._db_instance.bucket_name}/{table_path}",
+            root_path=table_path,
             partition_cols=table_config[PARTITION_COLUMNS_KEY],
             basename_template=f"commit_{uuid4()}_{{i}}.parquet",
             compression=DEFAULT_COMPRESSION,
             min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
             schema=arrow_schema if is_update else None,
-            filesystem=fs,
         )
+    
         operation = "updated" if is_update else "deleted"
         return f"{changes_df.shape[0]} rows {operation} by {get_initials()}"
 
@@ -280,18 +277,14 @@ class QueryWorker:
         changes_output: str,
     ) -> Optional[Union[pd.DataFrame, pa.Table]]:
         """Query changes made in the database table.
-
+    
         Args:
             sql_query (str): The SQL query to execute.
-            partition_select (dict):
-                Dictionary containing partition selection criteria. Defaults to None.
-            unedited (bool):
-                Flag indicating whether to retrieve unedited changes.
-            output_format (str):
-                The desired output format ('pandas' or 'arrow').
-            changes_output (str):
-                The changes that are to be retrieved ('recent' or 'all').
-
+            partition_select (Optional[dict[str, Any]]): Dictionary containing partition selection criteria.
+            unedited (bool): Flag indicating whether to retrieve unedited changes.
+            output_format (str): The desired output format ('pandas' or 'arrow').
+            changes_output (str): The changes that are to be retrieved ('recent' or 'all').
+    
         Returns:
             Optional[pd.DataFrame, pa.Table]:
                 Returns a pandas DataFrame if 'pandas' output format is specified,
@@ -301,49 +294,100 @@ class QueryWorker:
         parsed_query = parse_sql_query(sql_query)
         table_name = parsed_query[TABLE_NAME_KEY][0]
         table_config = self._db_instance.tables[table_name]
-
+    
         def get_partition_levels() -> str:
             partitions = table_config[PARTITION_COLUMNS_KEY]
             partitions_len = len(partitions) if partitions is not None else 0
-            return "**/" * partitions_len + "*"
-
-        def get_duckdb_query(_local_changes_output: str) -> str:
+            return os.path.join(*["**"] * partitions_len, "*")
+    
+        def get_duckdb_query(local_changes_output: str) -> str:
             modified_query = sql_query.replace(f"FROM {table_name}", "FROM dataset")
-
-            if _local_changes_output == CHANGES_RECENT:
+    
+            if local_changes_output == CHANGES_RECENT:
                 return modified_query
-
-            if table_config[EDITABLE_KEY] is True and unedited is not True:
-                # add row_id to the select clause
+    
+            if table_config[EDITABLE_KEY] and not unedited:
                 return modified_query.replace(" FROM", ", row_id FROM")
-
+    
             return modified_query
 
-        fs = FileClient.get_gcs_file_system()
+        def get_change_dataset(local_changes_output: str) -> Optional[pa.Table]:
+            changes_suffix = "changes_all" if local_changes_output == CHANGES_ALL else "changes"
+        
+            changes_path = os.path.join(
+                self._db_instance.eimer_path,
+                f"{table_name}_{changes_suffix}",
+                get_partition_levels(),
+            )
+        
+            #if not os.path.exists(changes_path):
+            #    return None
+        
+            changes_files = glob.glob(
+                os.path.join(changes_path, "**", "*.parquet"), recursive=True
+            )
+        
+            if not changes_files:
+                return None
+    
+            changes_files_relative = [
+                os.path.relpath(f, changes_path) for f in changes_files
+            ]
+    
+            max_depth = max(f.count(os.sep) for f in changes_files_relative)
+    
+            changes_files_at_max_depth = [
+                f for f in changes_files if os.path.relpath(f, changes_path).count(os.sep) == max_depth
+            ]
+    
+            table_level_partition_select = filter_partition_select_on_table(
+                table_name=table_name, partition_select=partition_select
+            )
+        
+            if table_level_partition_select is not None:
+                changes_files_at_max_depth  = filter_partitions(
+                    table_files=changes_files_at_max_depth,
+                    partition_select=table_level_partition_select,
+                )
+        
+            # noinspection PyTypeChecker
+            dataset = pq.read_table(
+                source=changes_files_at_max_depth,
+                schema=self._db_instance.get_arrow_schema(table_name, True),
+                columns=None,
+            )
+        
+            return dataset if dataset.num_rows > 0 else None
 
         def get_change_dataset(local_changes_output: str) -> Optional[pa.Table]:
-            changes_suffix = (
-                "changes_all" if local_changes_output == CHANGES_ALL else "changes"
+            changes_suffix = "changes_all" if local_changes_output == CHANGES_ALL else "changes"
+
+            changes_path = os.path.join(
+                self._db_instance.eimer_path,
+                f"{table_name}_{changes_suffix}",
+                get_partition_levels(),
             )
 
-            changes_files = fs.glob(
-                f"gs://{table_config[BUCKET_KEY]}/eimerdb/{self._db_instance.eimerdb_name}/"
-                f"{table_name}_{changes_suffix}/"
-                f"{get_partition_levels()}"
+            #if not os.path.exists(changes_path):
+            #    return None
+
+            changes_files = glob.glob(
+                os.path.join(changes_path, "**", "*.parquet"), recursive=True
             )
 
-            if len(changes_files) < 1:
+            if not changes_files:
                 return None
-
-            max_depth = max(obj.count("/") for obj in changes_files)
+    
+            max_depth = max(file.count(os.sep) for file in changes_files)
 
             changes_files_at_max_depth = [
-                obj for obj in changes_files if obj.count("/") == max_depth
+                file for file in changes_files if file.count(os.sep) == max_depth
             ]
 
             table_level_partition_select = filter_partition_select_on_table(
                 table_name=table_name, partition_select=partition_select
             )
+
             if table_level_partition_select is not None:
                 changes_files_at_max_depth = filter_partitions(
                     table_files=changes_files_at_max_depth,
@@ -354,7 +398,6 @@ class QueryWorker:
             dataset = pq.read_table(
                 source=changes_files_at_max_depth,
                 schema=self._db_instance.get_arrow_schema(table_name, True),
-                filesystem=fs,
                 columns=None,
             )
 

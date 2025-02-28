@@ -17,7 +17,7 @@ from dapla import AuthClient
 from google.cloud import storage
 
 from eimerdb.eimerdb_constants import APPLICATION_JSON
-from eimerdb.eimerdb_constants import BUCKET_KEY
+from eimerdb.eimerdb_constants import BASE_PATH_KEY
 from eimerdb.eimerdb_constants import COLUMNS_KEY
 from eimerdb.eimerdb_constants import CREATED_BY_KEY
 from eimerdb.eimerdb_constants import OPERATION_KEY
@@ -88,24 +88,19 @@ def get_initials() -> str:
     return user_split
 
 
-def get_json(bucket_name: str, blob_path: str) -> dict[str, Any]:
-    """A function that retrieves a JSON file from Google Cloud Storage.
+def get_json(file_path: str) -> dict[str, Any]:
+    """
+    A function that retrieves a JSON file from a file path.
 
     Args:
-        bucket_name (str): Name of the bucket.
-        blob_path (str): Path to the blob.
+        file_path (str): The path to the JSON file.
 
     Returns:
-        str: The JSON content.
+        dict[str, Any]: The JSON content as a dictionary.
     """
-    token = AuthClient.fetch_google_credentials()
-    client = storage.Client(credentials=token)
-    bucket = client.get_bucket(bucket_name)
-    blob = bucket.blob(blob_path)
+    with open(file_path, "r", encoding="utf-8") as file:
+        data = json.load(file)
 
-    json_content = blob.download_as_text()
-
-    data: dict[str, Any] = json.loads(json_content)
     return data
 
 
@@ -226,38 +221,34 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
     raise ValueError("Error parsing sql-query. Syntax error or query not supported.")
 
 
-def create_eimerdb(bucket_name: str, db_name: str) -> None:
-    """Creates an EimerDB instance.
+def create_eimerdb(base_path: str, db_name: str) -> None:
+    """
+    Creates an EimerDB instance in the local filesystem.
 
     Args:
-        bucket_name: A GCP bucket.
-        db_name: Name of the instance.
+        base_path (str): The root directory where the database will be created.
+        db_name (str): The name of the instance.
     """
-    storage_client = storage.Client(credentials=AuthClient.fetch_google_credentials())
-    bucket = storage_client.bucket(bucket_name)
+    full_path = os.path.join(base_path, "eimerdb", db_name)
+    os.makedirs(os.path.join(full_path, "config"), exist_ok=True)
 
     creator = get_initials()
-    full_path = f"eimerdb/{db_name}"
 
-    json_about = {
-        "eimerdb_name": f"{db_name}",
-        "path": f"gs://{bucket_name}/{full_path}",
-        BUCKET_KEY: bucket_name,
+    json_about: Dict[str, str] = {
+        "eimerdb_name": db_name,
+        "path": os.path.abspath(full_path),
+        BASE_PATH_KEY: base_path,
         "eimer_path": full_path,
         CREATED_BY_KEY: creator,
         "time_created": get_datetime(),
     }
 
-    about_blob = bucket.blob(f"{full_path}/config/about.json")
-    about_blob.upload_from_string(
-        data=json.dumps(json_about), content_type=APPLICATION_JSON
-    )
+    with open(os.path.join(full_path, "config", "about.json"), "w", encoding="utf-8") as f:
+        json.dump(json_about, f, indent=4)
 
     user_roles = {creator: "admin"}
-    user_roles_blob = bucket.blob(f"{full_path}/config/users.json")
-    user_roles_blob.upload_from_string(
-        data=json.dumps(user_roles), content_type=APPLICATION_JSON
-    )
+    with open(os.path.join(full_path, "config", "users.json"), "w", encoding="utf-8") as f:
+        json.dump(user_roles, f, indent=4)
 
     role_groups = {
         "role_groups": {
@@ -267,25 +258,17 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
                 "tables": "all",
             },
             "editor": {
-                "operations": [
-                    "insert",
-                    "delete",
-                    "update",
-                    "reset",
-                ],
+                "operations": ["insert", "delete", "update", "reset"],
                 "functions": "",
                 "tables": "",
             },
         }
     }
 
-    role_groups_blob = bucket.blob(f"{full_path}/config/role_groups.json")
-    role_groups_blob.upload_from_string(
-        data=json.dumps(role_groups),
-        content_type=APPLICATION_JSON,
-    )
+    with open(os.path.join(full_path, "config", "role_groups.json"), "w", encoding="utf-8") as f:
+        json.dump(role_groups, f, indent=4)
 
-    tables_blob = bucket.blob(f"{full_path}/config/tables.json")
-    tables_blob.upload_from_string(data=json.dumps({}), content_type=APPLICATION_JSON)
+    with open(os.path.join(full_path, "config", "tables.json"), "w", encoding="utf-8") as f:
+        json.dump({}, f, indent=4)
 
-    logger.info("EimerDB instance %s created.", db_name)
+    logger.info("EimerDB instance %s created at %s.", db_name, full_path)

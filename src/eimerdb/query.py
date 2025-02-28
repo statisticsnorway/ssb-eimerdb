@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from typing import Any
 from typing import Optional
@@ -6,7 +7,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 from gcsfs import GCSFileSystem
 
-from eimerdb.eimerdb_constants import BUCKET_KEY
+from eimerdb.eimerdb_constants import BASE_PATH_KEY
 from eimerdb.eimerdb_constants import PARTITION_COLUMNS_KEY
 
 
@@ -15,7 +16,7 @@ def get_partitioned_files(
     instance_name: str,
     table_config: dict[str, Any],
     suffix: str,
-    fs: GCSFileSystem,
+    path: str,
     timetravel: Optional[str] = None,
     partition_select: Optional[dict[str, Any]] = None,
     unedited: bool = False,
@@ -27,7 +28,7 @@ def get_partitioned_files(
         instance_name (str): The name of the instance.
         table_config (dict[str, Any]): Configuration details for the table.
         suffix (str): The suffix to be appended to the table name.
-        fs (GCSFileSystem): The filesystem object.
+        path (str): The path.
         timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
         partition_select (Optional[dict[str, Any]]): Optional dictionary specifying partition
             selection criteria. Defaults to None.
@@ -36,33 +37,34 @@ def get_partitioned_files(
 
     Returns:
         list[str]: A list of file paths corresponding to the partitioned files of the table.
-
     """
     partitions = table_config[PARTITION_COLUMNS_KEY]
-    bucket_name = table_config[BUCKET_KEY]
     partitions_len = len(partitions) if partitions is not None else 0
-    partition_levels = "**/" * partitions_len + "*"
+    partition_levels = os.path.join(*["**"] * partitions_len, "*")
 
-    if unedited is True or timetravel is not None:
-        table_name_parts = table_name + f"{suffix}"
-    else:
-        table_name_parts = table_name
+    table_name_parts = f"{table_name}{suffix}" if unedited or timetravel else table_name
+    table_path = os.path.join(path, table_name_parts)
 
-    table_files: list[str] = fs.glob(
-        f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_parts}/{partition_levels}"
-    )
+    if not os.path.exists(table_path):
+        return []
 
-    max_depth = max(obj.count("/") for obj in table_files)
-    filtered_files: list[str] = [
-        obj for obj in table_files if obj.count("/") == max_depth
+    table_files = [
+        os.path.join(root, file)
+        for root, _, files in os.walk(table_path)
+        for file in files
+        if file.endswith(".parquet")
     ]
+
+    if not table_files:
+        return []
+
+    max_depth = max(file.count(os.sep) for file in table_files)
+    filtered_files = [file for file in table_files if file.count(os.sep) == max_depth]
 
     if partition_select is None:
         return filtered_files
 
-    return filter_partitions(
-        table_files=filtered_files, partition_select=partition_select
-    )
+    return filter_partitions(table_files=filtered_files, partition_select=partition_select)
 
 
 def filter_partitions(
