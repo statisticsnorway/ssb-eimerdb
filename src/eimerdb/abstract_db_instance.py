@@ -28,7 +28,6 @@ class AbstractDbInstance(ABC, metaclass=Meta):
 
     def __init__(
         self,
-        bucket_name: str,
         eimerdb_name: str,
         path: str,
         eimer_path: str,
@@ -42,7 +41,6 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """Initialize AbstractDbInstance.
 
         Args:
-            bucket_name (str): Name of the bucket.
             eimerdb_name (str): Name of the EimerDB.
             path (str): Path to the EimerDB configuration file.
             eimer_path (str): Path to the EimerDB.
@@ -53,7 +51,6 @@ class AbstractDbInstance(ABC, metaclass=Meta):
             role_groups (dict, optional): Dictionary containing the role groups in the EimerDB.
             is_admin (bool): Indicates whether the current user is an admin.
         """
-        self._bucket_name: str = bucket_name
         self._eimerdb_name: str = eimerdb_name
         self._path: str = path
         self._eimer_path: str = eimer_path
@@ -63,11 +60,6 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         self._users: dict[str, Any] = users
         self._role_groups: Optional[dict[str, Any]] = role_groups
         self._is_admin: bool = is_admin
-
-    @property
-    def bucket_name(self) -> str:
-        """Get the bucket name."""
-        return self._bucket_name
 
     @property
     def eimerdb_name(self) -> str:
