@@ -390,11 +390,17 @@ class EimerDBInstance(AbstractDbInstance):
         suffix = "_raw" if raw else ""
         source_folder = self._tables[table_name][TABLE_PATH_KEY] + suffix
 
+        filtered_blobs=self._get_blobs(
+            table_name=table_name,
+            source_folder=source_folder,
+            partition_select=partition_select
+        )
+
         inserts_table = self._get_inserts_or_changes(
             table_name=table_name,
             source_folder=source_folder,
-            files_list=files_list,
-            raw=raw
+            filtered_blobs=filtered_blobs,
+            raw=raw,
         )
 
         if inserts_table is None:
@@ -403,10 +409,13 @@ class EimerDBInstance(AbstractDbInstance):
 
         self._write_to_table_and_delete_blobs(
             table_name=table_name,
-            table=inserts_table,
+            table=changes_table,
             source_folder=source_folder,
             raw=raw,
         )
+
+        for blob in filtered_blobs:
+            blob.delete()
 
         logger.info("The inserts were successfully merged into one file per partition!")
 
