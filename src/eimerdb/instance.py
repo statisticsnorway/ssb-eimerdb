@@ -441,6 +441,7 @@ class EimerDBInstance(AbstractDbInstance):
         unedited: bool = False,
         output_format: str = PANDAS_OUTPUT_FORMAT,
         timetravel: Optional[str] = None,
+        custom_user: Optional[str] = None,
     ) -> Union[pd.DataFrame, pa.Table, str]:
         if output_format not in [PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT]:
             raise ValueError(
@@ -468,6 +469,7 @@ class EimerDBInstance(AbstractDbInstance):
                     update_sql_query=sql_query,
                     partition_select=partition_select,
                     fs=fs,
+                    custom_user=custom_user,
                 )
             case DbOperation.DELETE_QUERY_OPERATION:
                 return self.query_worker.query_update_or_delete(
@@ -475,6 +477,7 @@ class EimerDBInstance(AbstractDbInstance):
                     update_sql_query=None,
                     partition_select=partition_select,
                     fs=fs,
+                    custom_user=custom_user,
                 )
             case _:
                 raise ValueError(f"Unsupported SQL operation: {query_operation}.")

@@ -142,7 +142,11 @@ class QueryWorker:
         )
 
     @staticmethod
-    def _add_meta_data(target_df: pd.DataFrame, operation: str) -> pd.DataFrame:
+    def _add_meta_data(
+        target_df: pd.DataFrame,
+        operation: str,
+        custom_user: Optional[str] = None,
+    ) -> pd.DataFrame:
         """Add metadata to the DataFrame.
 
         Args:
@@ -152,7 +156,8 @@ class QueryWorker:
         Returns:
             pd.DataFrame: The DataFrame with added metadata.
         """
-        target_df["user"] = get_initials()
+        user = custom_user or get_initials()
+        target_df["user"] = user
         target_df["datetime"] = get_datetime()
         target_df["operation"] = operation
         return target_df
@@ -163,6 +168,7 @@ class QueryWorker:
         update_sql_query: Optional[str],
         partition_select: Optional[dict[str, Any]],
         fs: GCSFileSystem,
+        custom_user: Optional[str] = None,
     ) -> str:
         """Query the database to update or delete records.
 
@@ -199,7 +205,9 @@ class QueryWorker:
 
         is_update = update_sql_query is not None
         df_change_results = QueryWorker._add_meta_data(
-            target_df=df_change_results, operation="update" if is_update else "delete"
+            target_df=df_change_results,
+            operation="update" if is_update else "delete",
+            custom_user=custom_user,
         )
         dataset = pa.Table.from_pandas(df_change_results, schema=arrow_schema)
 
