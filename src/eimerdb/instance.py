@@ -12,6 +12,7 @@ Date: September 16, 2023
 import json
 import logging
 from typing import Any
+from typing import Dict
 from typing import Optional
 from typing import Union
 from uuid import uuid4
@@ -253,7 +254,7 @@ class EimerDBInstance(AbstractDbInstance):
         return uuid_list
 
     def _get_inserts_or_changes(
-        self, table_name: str, source_folder: str, raw: bool
+        self, table_name: str, source_folder: str, filtered_blobs: list[str], raw: bool
     ) -> Optional[pa.Table]:
         """Retrieve inserts or changes for a given table. Returns None if file not found.
 
@@ -267,10 +268,16 @@ class EimerDBInstance(AbstractDbInstance):
             DataFrame: A pandas DataFrame containing inserts/changes
             for the specified table, or None if file not found.
         """
+        file_path_list = [
+            f"gs://{blob.bucket.name}/{blob.name}"
+            for blob in filtered_blobs
+            if blob.name.endswith(".parquet")
+        ]
+
         try:
             # noinspection PyTypeChecker
             dataset = ds.dataset(
-                f"{self.bucket_name}/{source_folder}/",
+                file_path_list,
                 format="parquet",
                 partitioning="hive",
                 schema=self.get_arrow_schema(table_name, raw),
@@ -281,16 +288,52 @@ class EimerDBInstance(AbstractDbInstance):
 
         return dataset.to_table()
 
-    def _write_to_table_and_delete_blobs(
-        self, table_name: str, table: pa.Table, source_folder: str, raw: bool
-    ) -> None:
+    def _get_blobs(
+        self,
+        table_name: str,
+        source_folder: str,
+        partition_select: Dict
+    ) -> list:
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
         bucket = client.bucket(self._bucket_name)
-
+    
         partitions = self._tables[table_name][PARTITION_COLUMNS_KEY]
-        blobs_to_delete = list(bucket.list_blobs(prefix=source_folder + "/"))
+    
+        prefix = source_folder.rstrip("/") + "/"
+        all_blobs = list(bucket.list_blobs(prefix=prefix))
+    
+        def match_blob(blob_name: str) -> bool:
+            if not partition_select:
+                return True
+            for key, values in partition_select.items():
+                if not any(f"{key}={v}/" in blob_name for v in values):
+                    return False
+            return True
+    
+        filtered_blobs = [blob for blob in all_blobs if match_blob(blob.name)]
+        return filtered_blobs
 
-        # noinspection PyTypeChecker
+    def _write_to_table_and_delete_blobs(
+        self,
+        table_name: str,
+        table: pa.Table,
+        source_folder: str,
+        raw: bool,
+    ) -> None:
+        """
+        Write the table to a Hive-partitioned Parquet dataset, and delete matched blobs.
+    
+        Args:
+            table_name: Name of the table.
+            table: PyArrow table to write.
+            source_folder: Folder (GCS path) to write to and clean up from.
+            raw: Whether to use the raw schema.
+
+        Returns:
+            List of GCS file paths that were matched by partition_select and deleted.
+        """
+        partitions=self.tables[table_name][PARTITION_COLUMNS_KEY]
+
         pq.write_to_dataset(
             table=table,
             root_path=f"gs://{self._bucket_name}/{source_folder}",
@@ -301,14 +344,25 @@ class EimerDBInstance(AbstractDbInstance):
             schema=self.get_arrow_schema(table_name, raw),
             filesystem=FileClient.get_gcs_file_system(),
         )
-        for blob in blobs_to_delete:
-            blob.delete()
 
-    def combine_changes(self, table_name: str) -> None:  # noqa: D102
+    def combine_changes(
+        self,
+        table_name: str,
+        partition_select: Optional[Dict[str, list[Any]]] = None,
+    ) -> None:  # noqa: D102
         source_folder = self._tables[table_name][TABLE_PATH_KEY] + "_changes"
 
+        filtered_blobs=self._get_blobs(
+            table_name=table_name,
+            source_folder=source_folder,
+            partition_select=partition_select
+        )
+
         changes_table = self._get_inserts_or_changes(
-            table_name=table_name, source_folder=source_folder, raw=True
+            table_name=table_name,
+            source_folder=source_folder,
+            filtered_blobs=filtered_blobs,
+            raw=True,
         )
 
         if changes_table is None:
@@ -322,14 +376,25 @@ class EimerDBInstance(AbstractDbInstance):
             raw=True,
         )
 
+        for blob in filtered_blobs:
+            blob.delete()
+
         logger.info("The changes were successfully merged into one file per partition!")
 
-    def combine_inserts(self, table_name: str, raw: bool) -> None:  # noqa: D102
+    def combine_inserts(
+        self,
+        table_name: str,
+        raw: bool,
+        partition_select: Optional[Dict[str, list[Any]]] = None,
+    ) -> None:  # noqa: D102
         suffix = "_raw" if raw else ""
         source_folder = self._tables[table_name][TABLE_PATH_KEY] + suffix
 
         inserts_table = self._get_inserts_or_changes(
-            table_name=table_name, source_folder=source_folder, raw=raw
+            table_name=table_name,
+            source_folder=source_folder,
+            files_list=files_list,
+            raw=raw
         )
 
         if inserts_table is None:
