@@ -191,10 +191,15 @@ class EimerDBInstance(AbstractDbInstance):
             data=json.dumps(self._tables), content_type=APPLICATION_JSON
         )
 
-    def insert(self, table_name: str, df: pd.DataFrame) -> list[str]:  # noqa: D102
+    def insert(
+        self,
+        table_name: str,
+        df: pd.DataFrame,
+        custom_user: Optional[str] = None,
+    ) -> list[str]:  # noqa: D102
         if self._is_admin is not True:
             raise PermissionError(
-                "Cannot insert into main table. You are not an admin!"
+                "Cannot insert. You are not an admin!"
             )
 
         uuid_list = [str(uuid4()) for _ in range(len(df))]
@@ -204,7 +209,7 @@ class EimerDBInstance(AbstractDbInstance):
         table = pa.Table.from_pandas(df, schema=arrow_schema)
 
         df_raw = df.copy()
-        df_raw["user"] = get_initials()
+        df_raw["user"] = custom_user or get_initials()
         df_raw["datetime"] = get_datetime()
         df_raw[OPERATION_KEY] = "insert"
 
