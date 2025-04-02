@@ -409,7 +409,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         self._write_to_table_and_delete_blobs(
             table_name=table_name,
-            table=changes_table,
+            table=inserts_table,
             source_folder=source_folder,
             raw=raw,
         )
