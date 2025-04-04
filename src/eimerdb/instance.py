@@ -127,14 +127,15 @@ class EimerDBInstance(AbstractDbInstance):
         self.query_worker = QueryWorker(self)
 
     def add_user(self, username: str, role: Any) -> None:
-        """Adds a user to the EimerDB with a role.
-
+        """Add a user to the EimerDB with a role.
+    
         Args:
-            username (str): Username.
-            role (any): The role of the user.
-
-        Returns:
-            None
+            username (str): The username to add.
+            role (Any): The role to assign to the user.
+    
+        Raises:
+            PermissionError: If the current user is not authorized to add users.
+            ValueError: If the given role is invalid.
         """
         if self._is_admin is not True:
             raise PermissionError("Cannot add user. You are not an admin!")
@@ -154,13 +155,14 @@ class EimerDBInstance(AbstractDbInstance):
         logger.info("User %s added with the role %s!", username, role)
 
     def remove_user(self, username: str) -> None:
-        """Removes a user.
+        """Remove a user.
 
         Args:
-            username (str): Username.
+            username (str): The username to remove.
 
-        Returns:
-            None
+        Raises:
+            PermissionError: If the user is not authorized to remove users.
+            ValueError: If the user does not exist.
         """
         if self._is_admin is not True:
             raise PermissionError("Cannot remove user. You are not an admin!")
@@ -195,9 +197,6 @@ class EimerDBInstance(AbstractDbInstance):
 
         Raises:
             PermissionError: If the user is not an admin.
-
-        Returns:
-            None
         """
         if self._is_admin is not True:
             raise PermissionError("Cannot create table. You are not an admin!")
@@ -234,11 +233,14 @@ class EimerDBInstance(AbstractDbInstance):
 
         Args:
             table_name (str): The name of the table to insert into.
-            df (DataFrame): The DataFrame to insert.
+            df (pd.DataFrame): The DataFrame to insert.
             custom_user (str | None): Overrides the current user.
 
         Returns:
-            list: A list containing the row IDs of the inserted rows.
+            list[str]: A list containing the row IDs of the inserted rows.
+
+        Raises:
+            PermissionError: If the user does not have permission to insert into the table.
         """
         if self._is_admin is not True:
             raise PermissionError(
@@ -380,13 +382,10 @@ class EimerDBInstance(AbstractDbInstance):
         """Write a table to a Hive-partitioned Parquet dataset, and delete matched blobs.
 
         Args:
-            table_name: Name of the table.
-            table: PyArrow table to write.
-            source_folder: Folder (GCS path) to write to and clean up from.
+            table_name (str): Name of the table.
+            table (pa.Table): PyArrow table to write.
+            source_folder (str): Folder (GCS path) to write to and clean up from.
             raw (bool): Whether to include additional metadata fields.
-
-        Returns:
-            None
         """
         partitions = self.tables[table_name][PARTITION_COLUMNS_KEY]
 
@@ -598,21 +597,25 @@ class EimerDBInstance(AbstractDbInstance):
         output_format: str = PANDAS_OUTPUT_FORMAT,
         changes_output: str = CHANGES_ALL,
     ) -> Optional[Union[pd.DataFrame, pl.DataFrame, pa.Table]]:
-        """SQL query execution for the edited data.
-
-        Supports SELECT, UPDATE, and DELETE operations with optional partition filtering,
-        time travel, and output format selection.
+        """Execute a SQL SELECT query against edited data.
+    
+        Supports partition filtering, output format selection, and the ability to include
+        only unedited changes or all available changes.
 
         Args:
-            sql_query (str): The SQL query to execute.
+            sql_query (str): The SQL SELECT query to execute.
             partition_select (dict[str, Any] | None): Optional partition filters to apply.
-            unedited (bool): If True, the output will only contain unedited, raw data from the inserts.
-            output_format (str): The format of the output. Must be 'pandas', 'arrow' or polars.
-            changes_output (str): Whether to include the non-merged changes only or all (might be discontinued.)
-
+            unedited (bool): If True, only unedited (raw) changes will be included in the result.
+            output_format (str): The format of the output. Must be 'pandas', 'arrow', or 'polars'.
+            changes_output (str): Whether to include only non-merged changes or all. Must be
+                one of CHANGES_ALL or CHANGES_RECENT. May be deprecated in the future.
+    
         Returns:
-            Union[pd.DataFrame, pl.DataFrame, pa.Table, str]: The result of the query, depending on
-            the operation and selected output format.
+            pd.DataFrame | pl.DataFrame | pa.Table | None: The result of the query, depending on
+            the selected output format.
+
+        Raises:
+            ValueError: If the output format, changes_output value, or SQL operation is invalid.
         """
         if output_format not in (
             PANDAS_OUTPUT_FORMAT,
