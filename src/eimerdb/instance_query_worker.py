@@ -151,7 +151,8 @@ class QueryWorker:
 
         Args:
             target_df (pd.DataFrame): The target DataFrame.
-            operation (str): The operation.
+            operation (str): The operation. Insert, update or delete.
+            custom_user (str | None): Overrides the current user.
 
         Returns:
             pd.DataFrame: The DataFrame with added metadata.
@@ -177,6 +178,7 @@ class QueryWorker:
             update_sql_query (str): The SQL query to execute. When defines, assumes update operation.
             partition_select (Dict, optional): Dictionary containing partition selection criteria.
             fs (GCSFileSystem): The GCSFileSystem instance.
+            custom_user (str | None): Overrides the current user.
 
         Returns:
             str: String containing number of rows updated.

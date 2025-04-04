@@ -12,7 +12,6 @@ Date: September 16, 2023
 import json
 import logging
 from typing import Any
-from typing import Dict
 from typing import Optional
 from typing import Union
 from uuid import uuid4
@@ -197,6 +196,16 @@ class EimerDBInstance(AbstractDbInstance):
         df: pd.DataFrame,
         custom_user: Optional[str] = None,
     ) -> list[str]:  # noqa: D102
+        """Insert a DataFrame into an EimerDB table.
+        
+        Args:
+            table_name (str): The name of the table to insert into.
+            df (DataFrame): The DataFrame to insert.
+            custom_user (str | None): Overrides the current user.
+        
+        Returns:
+            list: A list containing the row IDs of the inserted rows.
+        """
         if self._is_admin is not True:
             raise PermissionError(
                 "Cannot insert. You are not an admin!"
@@ -297,13 +306,21 @@ class EimerDBInstance(AbstractDbInstance):
         self,
         table_name: str,
         source_folder: str,
-        partition_select: Dict
+        partition_select: dict
     ) -> list:
+        """Retrieve a list of the parquet files for the given partition.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be retrieved.
+            source_folder (str): The folder where the inserts/changes are stored.
+            partition_select (dict): A dictionary with the selected partitions
+
+        Returns:
+            list: A list of parquet files.
+        """
         client = storage.Client(credentials=AuthClient.fetch_google_credentials())
         bucket = client.bucket(self._bucket_name)
-    
-        partitions = self._tables[table_name][PARTITION_COLUMNS_KEY]
-    
+
         prefix = source_folder.rstrip("/") + "/"
         all_blobs = list(bucket.list_blobs(prefix=prefix))
     
@@ -332,7 +349,7 @@ class EimerDBInstance(AbstractDbInstance):
             table_name: Name of the table.
             table: PyArrow table to write.
             source_folder: Folder (GCS path) to write to and clean up from.
-            raw: Whether to use the raw schema.
+            raw (bool): Whether to include additional metadata fields.
 
         Returns:
             List of GCS file paths that were matched by partition_select and deleted.
@@ -353,8 +370,17 @@ class EimerDBInstance(AbstractDbInstance):
     def combine_changes(
         self,
         table_name: str,
-        partition_select: Optional[Dict[str, list[Any]]] = None,
+        partition_select: Optional[dict[str, list[Any]]] = None,
     ) -> None:  # noqa: D102
+        """Combines a set of files to one single files for the given partitions.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be retrieved.
+            partition_select (Dict, optional): A dictionary with the selected partitions
+
+        Returns:
+            None
+        """
         source_folder = self._tables[table_name][TABLE_PATH_KEY] + "_changes"
 
         filtered_blobs=self._get_blobs(
@@ -390,8 +416,18 @@ class EimerDBInstance(AbstractDbInstance):
         self,
         table_name: str,
         raw: bool,
-        partition_select: Optional[Dict[str, list[Any]]] = None,
+        partition_select: Optional[dict[str, list[Any]]] = None,
     ) -> None:  # noqa: D102
+        """Combines a set of files to one single files for the given partitions.
+
+        Args:
+            table_name (str): The name of the table for which changes are to be retrieved.
+            partition_select (Dict, optional): A dictionary with the selected partitions
+            raw (bool): Whether to include additional metadata fields.
+
+        Returns:
+            None
+        """
         suffix = "_raw" if raw else ""
         source_folder = self._tables[table_name][TABLE_PATH_KEY] + suffix
 
@@ -429,6 +465,15 @@ class EimerDBInstance(AbstractDbInstance):
         table_name: str,
         raw: bool,
     ) -> pa.Schema:
+        """Retrieve the Arrow schema of a table.
+        
+        Args:
+            table_name (str): The name of the table.
+            raw (bool): Whether to include additional metadata fields.
+        
+        Returns:
+            Schema: A pyarrow schema.
+        """
         json_data = self._tables[table_name]
         arrow_schema = arrow_schema_from_json(json_data[SCHEMA_KEY])
 
