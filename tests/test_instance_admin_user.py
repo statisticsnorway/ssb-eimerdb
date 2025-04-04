@@ -148,6 +148,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
             else:
                 self.assertIs(expected_table, inserts_table)
 
+
 def test_write_to_table_and_delete_blobs(self) -> None:
     with patch("eimerdb.instance.storage.Client") as mock_client, patch(
         "eimerdb.instance.pq.write_to_dataset"
