@@ -175,11 +175,16 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """
 
     @abstractmethod
-    def combine_changes(self, table_name: str) -> None:
+    def combine_changes(
+        self,
+        table_name: str,
+        partition_select: Optional[dict[str, list[Any]]] = None,
+    ) -> None:
         """Combines the files containing the changes of the table into one file.
 
         Args:
             table_name (str): The name of the table for which changes are to be merged.
+            partition_select (Dict, optional): A dictionary with the selected partitions
         """
 
     @abstractmethod
@@ -194,6 +199,7 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         Args:
             table_name (str): The name of the table.
             raw (bool): Indicates whether to retrieve the raw schema.
+            partition_select (Dict, optional): A dictionary with the selected partitions
         """
 
     @abstractmethod
