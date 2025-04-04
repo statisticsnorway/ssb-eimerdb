@@ -598,7 +598,7 @@ class EimerDBInstance(AbstractDbInstance):
         changes_output: str = CHANGES_ALL,
     ) -> Optional[Union[pd.DataFrame, pl.DataFrame, pa.Table]]:
         """Execute a SQL SELECT query against edited data.
-    
+
         Supports partition filtering, output format selection, and the ability to include
         only unedited changes or all available changes.
 
