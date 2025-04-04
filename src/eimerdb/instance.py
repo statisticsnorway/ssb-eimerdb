@@ -338,7 +338,8 @@ class EimerDBInstance(AbstractDbInstance):
         return dataset.to_table()
 
     def _get_blobs(
-        self, table_name: str,
+        self,
+        table_name: str,
         source_folder: str,
         partition_select: Optional[dict[str, Any]],
     ) -> list:
