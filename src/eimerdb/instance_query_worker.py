@@ -24,8 +24,8 @@ from .eimerdb_constants import DEFAULT_MIN_ROWS_PER_GROUP
 from .eimerdb_constants import DUCKDB_DEFAULT_CONFIG
 from .eimerdb_constants import EDITABLE_KEY
 from .eimerdb_constants import PANDAS_OUTPUT_FORMAT
-from .eimerdb_constants import POLARS_OUTPUT_FORMAT
 from .eimerdb_constants import PARTITION_COLUMNS_KEY
+from .eimerdb_constants import POLARS_OUTPUT_FORMAT
 from .eimerdb_constants import SELECT_STAR_QUERY
 from .eimerdb_constants import TABLE_NAME_KEY
 from .eimerdb_constants import TABLE_PATH_KEY
@@ -140,9 +140,11 @@ class QueryWorker:
         return (
             query_result.df()
             if output_format == PANDAS_OUTPUT_FORMAT
-            else query_result.pl()
-            if output_format == POLARS_OUTPUT_FORMAT
-            else query_result.arrow()
+            else (
+                query_result.pl()
+                if output_format == POLARS_OUTPUT_FORMAT
+                else query_result.arrow()
+            )
         )
 
     @staticmethod

@@ -338,7 +338,9 @@ class EimerDBInstance(AbstractDbInstance):
         return dataset.to_table()
 
     def _get_blobs(
-        self, table_name: str, source_folder: str, partition_select: dict
+        self, table_name: str,
+        source_folder: str,
+        partition_select: Optional[dict[str, Any]],
     ) -> list:
         """Retrieve a list of the parquet files for the given partition.
 
@@ -447,7 +449,7 @@ class EimerDBInstance(AbstractDbInstance):
         self,
         table_name: str,
         raw: bool,
-        partition_select: Optional[dict[str, list[Any]]] = None,
+        partition_select: Optional[dict[str, Any]],
     ) -> None:
         """Combines a set of files to one single files for the given partitions.
 
@@ -544,7 +546,11 @@ class EimerDBInstance(AbstractDbInstance):
         Raises:
             ValueError: If the SQL operation or output format is unsupported.
         """
-        if output_format not in [PANDAS_OUTPUT_FORMAT, POLARS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT]:
+        if output_format not in [
+            PANDAS_OUTPUT_FORMAT,
+            POLARS_OUTPUT_FORMAT,
+            ARROW_OUTPUT_FORMAT,
+        ]:
             raise ValueError(
                 f"Invalid output format: {output_format}. Supported formats: pandas, polars, arrow."
             )
@@ -608,7 +614,9 @@ class EimerDBInstance(AbstractDbInstance):
             the operation and selected output format.
         """
         if output_format not in (
-            PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT, POLARS_OUTPUT_FORMAT
+            PANDAS_OUTPUT_FORMAT,
+            ARROW_OUTPUT_FORMAT,
+            POLARS_OUTPUT_FORMAT,
         ):
             raise ValueError(f"Invalid output format: {output_format}")
 
