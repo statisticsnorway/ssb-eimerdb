@@ -62,6 +62,6 @@ class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
         with self.assertRaises(PermissionError) as context:
             self.instance.insert("table1", pd.DataFrame())
         self.assertEqual(
-            "Cannot insert into main table. You are not an admin!",
+            "Cannot insert into table1. You are not an admin!",
             str(context.exception),
         )

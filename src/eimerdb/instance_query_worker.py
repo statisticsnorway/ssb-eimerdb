@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import duckdb
 import pandas as pd
+import polars as pl
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
@@ -24,6 +25,7 @@ from .eimerdb_constants import DUCKDB_DEFAULT_CONFIG
 from .eimerdb_constants import EDITABLE_KEY
 from .eimerdb_constants import PANDAS_OUTPUT_FORMAT
 from .eimerdb_constants import PARTITION_COLUMNS_KEY
+from .eimerdb_constants import POLARS_OUTPUT_FORMAT
 from .eimerdb_constants import SELECT_STAR_QUERY
 from .eimerdb_constants import TABLE_NAME_KEY
 from .eimerdb_constants import TABLE_PATH_KEY
@@ -80,7 +82,7 @@ class QueryWorker:
         output_format: str,
         fs: GCSFileSystem,
         timetravel: Optional[str] = None,
-    ) -> Union[pd.DataFrame, pa.Table]:
+    ) -> Union[pd.DataFrame, pl.DataFrame, pa.Table]:
         """Query the database.
 
         Args:
@@ -138,21 +140,31 @@ class QueryWorker:
         return (
             query_result.df()
             if output_format == PANDAS_OUTPUT_FORMAT
-            else query_result.arrow()
+            else (
+                query_result.pl()
+                if output_format == POLARS_OUTPUT_FORMAT
+                else query_result.arrow()
+            )
         )
 
     @staticmethod
-    def _add_meta_data(target_df: pd.DataFrame, operation: str) -> pd.DataFrame:
+    def _add_meta_data(
+        target_df: pd.DataFrame,
+        operation: str,
+        custom_user: Optional[str] = None,
+    ) -> pd.DataFrame:
         """Add metadata to the DataFrame.
 
         Args:
             target_df (pd.DataFrame): The target DataFrame.
-            operation (str): The operation.
+            operation (str): The operation. Insert, update or delete.
+            custom_user (str | None): Overrides the current user.
 
         Returns:
             pd.DataFrame: The DataFrame with added metadata.
         """
-        target_df["user"] = get_initials()
+        user = custom_user or get_initials()
+        target_df["user"] = user
         target_df["datetime"] = get_datetime()
         target_df["operation"] = operation
         return target_df
@@ -163,6 +175,7 @@ class QueryWorker:
         update_sql_query: Optional[str],
         partition_select: Optional[dict[str, Any]],
         fs: GCSFileSystem,
+        custom_user: Optional[str] = None,
     ) -> str:
         """Query the database to update or delete records.
 
@@ -171,6 +184,7 @@ class QueryWorker:
             update_sql_query (str): The SQL query to execute. When defines, assumes update operation.
             partition_select (Dict, optional): Dictionary containing partition selection criteria.
             fs (GCSFileSystem): The GCSFileSystem instance.
+            custom_user (str | None): Overrides the current user.
 
         Returns:
             str: String containing number of rows updated.
@@ -199,7 +213,9 @@ class QueryWorker:
 
         is_update = update_sql_query is not None
         df_change_results = QueryWorker._add_meta_data(
-            target_df=df_change_results, operation="update" if is_update else "delete"
+            target_df=df_change_results,
+            operation="update" if is_update else "delete",
+            custom_user=custom_user,
         )
         dataset = pa.Table.from_pandas(df_change_results, schema=arrow_schema)
 
@@ -236,11 +252,21 @@ class QueryWorker:
 
     def _cast_if_arrow(
         self,
-        table: Optional[Union[pd.DataFrame, pa.Table]],
+        table: Optional[Union[pd.DataFrame, pl.DataFrame, pa.Table]],
         table_name: str,
         output_format: str,
-    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
-        if table is None or output_format == PANDAS_OUTPUT_FORMAT:
+    ) -> Optional[Union[pd.DataFrame, pl.DataFrame, pa.Table]]:
+        if table is None:
+            return table
+
+        if output_format == PANDAS_OUTPUT_FORMAT:
+            if isinstance(table, pa.Table):
+                return table.to_pandas()
+            return table
+
+        if output_format == POLARS_OUTPUT_FORMAT:
+            if isinstance(table, pa.Table):
+                return pl.from_arrow(table)
             return table
 
         return table.cast(self._db_instance.get_arrow_schema(table_name, True))
@@ -264,6 +290,8 @@ class QueryWorker:
 
         if output_format == PANDAS_OUTPUT_FORMAT:
             return pd.concat([first, second])
+        elif output_format == POLARS_OUTPUT_FORMAT:
+            return pl.concat([first, second])
 
         return self._cast_if_arrow(
             table=pa.concat_tables([first, second]),
