@@ -258,12 +258,12 @@ class QueryWorker:
     ) -> Optional[Union[pd.DataFrame, pl.DataFrame, pa.Table]]:
         if table is None:
             return table
-    
+
         if output_format == PANDAS_OUTPUT_FORMAT:
             if isinstance(table, pa.Table):
                 return table.to_pandas()
             return table
-    
+
         if output_format == POLARS_OUTPUT_FORMAT:
             if isinstance(table, pa.Table):
                 return pl.from_arrow(table)
