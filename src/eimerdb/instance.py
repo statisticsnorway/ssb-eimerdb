@@ -23,6 +23,7 @@ import pyarrow.parquet as pq
 from dapla import AuthClient
 from dapla import FileClient
 from google.cloud import storage
+from google.cloud.storage import Blob
 
 from .abstract_db_instance import AbstractDbInstance
 from .eimerdb_constants import APPLICATION_JSON
@@ -123,7 +124,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         self.query_worker = QueryWorker(self)
 
-    def add_user(self, username: str, role: Any) -> None:  # noqa: D102
+    def add_user(self, username: str, role: Any) -> None:
         if self._is_admin is not True:
             raise PermissionError("Cannot add user. You are not an admin!")
 
@@ -141,7 +142,7 @@ class EimerDBInstance(AbstractDbInstance):
         )
         logger.info("User %s added with the role %s!", username, role)
 
-    def remove_user(self, username: str) -> None:  # noqa: D102
+    def remove_user(self, username: str) -> None:
         if self._is_admin is not True:
             raise PermissionError("Cannot remove user. You are not an admin!")
 
@@ -158,7 +159,7 @@ class EimerDBInstance(AbstractDbInstance):
         )
         logger.info("User %s successfully removed!", username)
 
-    def create_table(  # noqa: D102
+    def create_table(
         self,
         table_name: str,
         schema: list[dict[str, Any]],
@@ -195,7 +196,7 @@ class EimerDBInstance(AbstractDbInstance):
         table_name: str,
         df: pd.DataFrame,
         custom_user: Optional[str] = None,
-    ) -> list[str]:  # noqa: D102
+    ) -> list[str]:
         """Insert a DataFrame into an EimerDB table.
         
         Args:
@@ -208,7 +209,7 @@ class EimerDBInstance(AbstractDbInstance):
         """
         if self._is_admin is not True:
             raise PermissionError(
-                "Cannot insert. You are not an admin!"
+                f"Cannot insert into {table_name}. You are not an admin!"
             )
 
         uuid_list = [str(uuid4()) for _ in range(len(df))]
@@ -268,13 +269,14 @@ class EimerDBInstance(AbstractDbInstance):
         return uuid_list
 
     def _get_inserts_or_changes(
-        self, table_name: str, source_folder: str, filtered_blobs: list[str], raw: bool
+        self, table_name: str, source_folder: str, filtered_blobs: list[Blob], raw: bool
     ) -> Optional[pa.Table]:
         """Retrieve inserts or changes for a given table. Returns None if file not found.
 
         Args:
             table_name (str): The name of the table for which changes are to be retrieved.
             source_folder (str): The folder where the inserts/changes are stored.
+            filtered_blobs (list): List of filtered blobs.
             raw (bool): Indicates whether to retrieve the raw schema. Only in use when
                 retrieving inserts.
 
@@ -303,10 +305,7 @@ class EimerDBInstance(AbstractDbInstance):
         return dataset.to_table()
 
     def _get_blobs(
-        self,
-        table_name: str,
-        source_folder: str,
-        partition_select: dict
+        self, table_name: str, source_folder: str, partition_select: dict
     ) -> list:
         """Retrieve a list of the parquet files for the given partition.
 
@@ -342,8 +341,7 @@ class EimerDBInstance(AbstractDbInstance):
         source_folder: str,
         raw: bool,
     ) -> None:
-        """
-        Write the table to a Hive-partitioned Parquet dataset, and delete matched blobs.
+        """Write a table to a Hive-partitioned Parquet dataset, and delete matched blobs.
     
         Args:
             table_name: Name of the table.
@@ -352,9 +350,9 @@ class EimerDBInstance(AbstractDbInstance):
             raw (bool): Whether to include additional metadata fields.
 
         Returns:
-            List of GCS file paths that were matched by partition_select and deleted.
+            None
         """
-        partitions=self.tables[table_name][PARTITION_COLUMNS_KEY]
+        partitions = self.tables[table_name][PARTITION_COLUMNS_KEY]
 
         pq.write_to_dataset(
             table=table,
@@ -371,7 +369,7 @@ class EimerDBInstance(AbstractDbInstance):
         self,
         table_name: str,
         partition_select: Optional[dict[str, list[Any]]] = None,
-    ) -> None:  # noqa: D102
+    ) -> None:
         """Combines a set of files to one single files for the given partitions.
 
         Args:
@@ -386,7 +384,7 @@ class EimerDBInstance(AbstractDbInstance):
         filtered_blobs=self._get_blobs(
             table_name=table_name,
             source_folder=source_folder,
-            partition_select=partition_select
+            partition_select=partition_select,
         )
 
         changes_table = self._get_inserts_or_changes(
@@ -417,7 +415,7 @@ class EimerDBInstance(AbstractDbInstance):
         table_name: str,
         raw: bool,
         partition_select: Optional[dict[str, list[Any]]] = None,
-    ) -> None:  # noqa: D102
+    ) -> None:
         """Combines a set of files to one single files for the given partitions.
 
         Args:
@@ -434,7 +432,7 @@ class EimerDBInstance(AbstractDbInstance):
         filtered_blobs=self._get_blobs(
             table_name=table_name,
             source_folder=source_folder,
-            partition_select=partition_select
+            partition_select=partition_select,
         )
 
         inserts_table = self._get_inserts_or_changes(
@@ -460,7 +458,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         logger.info("The inserts were successfully merged into one file per partition!")
 
-    def get_arrow_schema(  # noqa: D102
+    def get_arrow_schema(
         self,
         table_name: str,
         raw: bool,
@@ -484,7 +482,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         return arrow_schema
 
-    def query(  # noqa: D102
+    def query(
         self,
         sql_query: str,
         partition_select: Optional[dict[str, Any]] = None,
@@ -532,7 +530,7 @@ class EimerDBInstance(AbstractDbInstance):
             case _:
                 raise ValueError(f"Unsupported SQL operation: {query_operation}.")
 
-    def query_changes(  # noqa: D102
+    def query_changes(
         self,
         sql_query: str,
         partition_select: Optional[dict[str, Any]] = None,
