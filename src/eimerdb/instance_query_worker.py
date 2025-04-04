@@ -252,17 +252,22 @@ class QueryWorker:
 
     def _cast_if_arrow(
         self,
-        table: Optional[Union[pd.DataFrame, pa.Table]],
+        table: Optional[Union[pd.DataFrame, pl.DataFrame, pa.Table]],
         table_name: str,
         output_format: str,
-    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+    ) -> Optional[Union[pd.DataFrame, pl.DataFrame, pa.Table]]:
         if table is None:
             return table
+    
         if output_format == PANDAS_OUTPUT_FORMAT:
-            return table.to_pandas()
+            if isinstance(table, pa.Table):
+                return table.to_pandas()
+            return table
+    
         if output_format == POLARS_OUTPUT_FORMAT:
-            return pl.from_arrow(table)
-        return table
+            if isinstance(table, pa.Table):
+                return pl.from_arrow(table)
+            return table
 
         return table.cast(self._db_instance.get_arrow_schema(table_name, True))
 

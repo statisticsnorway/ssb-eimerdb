@@ -19,7 +19,7 @@ class TestEimerDBInstanceQuery(TestEimerDBInstanceBase):
         with self.assertRaises(ValueError) as context:
             self.instance.query("SELECT * FROM table1", output_format="invalid")
         self.assertEqual(
-            "Invalid output format: invalid. Supported formats: pandas, arrow.",
+            "Invalid output format: invalid. Supported formats: pandas, polars, arrow.",
             str(context.exception),
         )
 
