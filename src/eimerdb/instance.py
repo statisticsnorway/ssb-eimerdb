@@ -17,6 +17,7 @@ from typing import Union
 from uuid import uuid4
 
 import pandas as pd
+import polars as pl
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
@@ -38,6 +39,7 @@ from .eimerdb_constants import EDITABLE_KEY
 from .eimerdb_constants import OPERATION_KEY
 from .eimerdb_constants import PANDAS_OUTPUT_FORMAT
 from .eimerdb_constants import PARTITION_COLUMNS_KEY
+from .eimerdb_constants import POLARS_OUTPUT_FORMAT
 from .eimerdb_constants import ROW_ID_DEF
 from .eimerdb_constants import SCHEMA_KEY
 from .eimerdb_constants import TABLE_PATH_KEY
@@ -125,6 +127,15 @@ class EimerDBInstance(AbstractDbInstance):
         self.query_worker = QueryWorker(self)
 
     def add_user(self, username: str, role: Any) -> None:
+        """Adds a user to the EimerDB with a role.
+
+        Args:
+            username (str): Username.
+            role (any): The role of the user.
+
+        Returns:
+            None
+        """
         if self._is_admin is not True:
             raise PermissionError("Cannot add user. You are not an admin!")
 
@@ -143,6 +154,14 @@ class EimerDBInstance(AbstractDbInstance):
         logger.info("User %s added with the role %s!", username, role)
 
     def remove_user(self, username: str) -> None:
+        """Removes a user.
+
+        Args:
+            username (str): Username.
+
+        Returns:
+            None
+        """
         if self._is_admin is not True:
             raise PermissionError("Cannot remove user. You are not an admin!")
 
@@ -166,6 +185,20 @@ class EimerDBInstance(AbstractDbInstance):
         partition_columns: Optional[list[str]] = None,
         editable: Optional[bool] = True,
     ) -> None:
+        """Create a new table with the given schema and store it in the table config.
+
+        Args:
+            table_name (str): The name of the table to create.
+            schema (list[dict[str, Any]]): The schema definition as a list of field dicts.
+            partition_columns (list[str] | None): Optional list of column names used for partitioning.
+            editable (bool | None): Whether the table is editable. Defaults to True.
+
+        Raises:
+            PermissionError: If the user is not an admin.
+
+        Returns:
+            None
+        """
         if self._is_admin is not True:
             raise PermissionError("Cannot create table. You are not an admin!")
 
@@ -198,12 +231,12 @@ class EimerDBInstance(AbstractDbInstance):
         custom_user: Optional[str] = None,
     ) -> list[str]:
         """Insert a DataFrame into an EimerDB table.
-        
+
         Args:
             table_name (str): The name of the table to insert into.
             df (DataFrame): The DataFrame to insert.
             custom_user (str | None): Overrides the current user.
-        
+
         Returns:
             list: A list containing the row IDs of the inserted rows.
         """
@@ -322,7 +355,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         prefix = source_folder.rstrip("/") + "/"
         all_blobs = list(bucket.list_blobs(prefix=prefix))
-    
+
         def match_blob(blob_name: str) -> bool:
             if not partition_select:
                 return True
@@ -330,7 +363,7 @@ class EimerDBInstance(AbstractDbInstance):
                 if not any(f"{key}={v}/" in blob_name for v in values):
                     return False
             return True
-    
+
         filtered_blobs = [blob for blob in all_blobs if match_blob(blob.name)]
         return filtered_blobs
 
@@ -342,7 +375,7 @@ class EimerDBInstance(AbstractDbInstance):
         raw: bool,
     ) -> None:
         """Write a table to a Hive-partitioned Parquet dataset, and delete matched blobs.
-    
+
         Args:
             table_name: Name of the table.
             table: PyArrow table to write.
@@ -381,7 +414,7 @@ class EimerDBInstance(AbstractDbInstance):
         """
         source_folder = self._tables[table_name][TABLE_PATH_KEY] + "_changes"
 
-        filtered_blobs=self._get_blobs(
+        filtered_blobs = self._get_blobs(
             table_name=table_name,
             source_folder=source_folder,
             partition_select=partition_select,
@@ -429,7 +462,7 @@ class EimerDBInstance(AbstractDbInstance):
         suffix = "_raw" if raw else ""
         source_folder = self._tables[table_name][TABLE_PATH_KEY] + suffix
 
-        filtered_blobs=self._get_blobs(
+        filtered_blobs = self._get_blobs(
             table_name=table_name,
             source_folder=source_folder,
             partition_select=partition_select,
@@ -464,11 +497,11 @@ class EimerDBInstance(AbstractDbInstance):
         raw: bool,
     ) -> pa.Schema:
         """Retrieve the Arrow schema of a table.
-        
+
         Args:
             table_name (str): The name of the table.
             raw (bool): Whether to include additional metadata fields.
-        
+
         Returns:
             Schema: A pyarrow schema.
         """
@@ -490,10 +523,30 @@ class EimerDBInstance(AbstractDbInstance):
         output_format: str = PANDAS_OUTPUT_FORMAT,
         timetravel: Optional[str] = None,
         custom_user: Optional[str] = None,
-    ) -> Union[pd.DataFrame, pa.Table, str]:
-        if output_format not in [PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT]:
+    ) -> Union[pd.DataFrame, pl.DataFrame, pa.Table, str]:
+        """SQL query execution.
+
+        Supports SELECT, UPDATE, and DELETE operations with optional partition filtering,
+        time travel, and output format selection.
+
+        Args:
+            sql_query (str): The SQL query to execute.
+            partition_select (dict[str, Any] | None): Optional partition filters to apply.
+            unedited (bool): If True, the output will only contain unedited, raw data from the inserts.
+            output_format (str): The format of the output. Must be 'pandas', 'arrow' or polars.
+            timetravel (str | None): Optional timestamp for time travel queries.
+            custom_user (str | None): Overrides the current user.
+
+        Returns:
+            Union[pd.DataFrame, pl.DataFrame, pa.Table, str]: The result of the query, depending on
+            the operation and selected output format.
+
+        Raises:
+            ValueError: If the SQL operation or output format is unsupported.
+        """
+        if output_format not in [PANDAS_OUTPUT_FORMAT, POLARS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT]:
             raise ValueError(
-                f"Invalid output format: {output_format}. Supported formats: pandas, arrow."
+                f"Invalid output format: {output_format}. Supported formats: pandas, polars, arrow."
             )
 
         parsed_query: dict[str, Any] = parse_sql_query(sql_query)
@@ -537,8 +590,26 @@ class EimerDBInstance(AbstractDbInstance):
         unedited: bool = False,
         output_format: str = PANDAS_OUTPUT_FORMAT,
         changes_output: str = CHANGES_ALL,
-    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
-        if output_format not in (PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT):
+    ) -> Optional[Union[pd.DataFrame, pl.DataFrame, pa.Table]]:
+        """SQL query execution for the edited data.
+
+        Supports SELECT, UPDATE, and DELETE operations with optional partition filtering,
+        time travel, and output format selection.
+
+        Args:
+            sql_query (str): The SQL query to execute.
+            partition_select (dict[str, Any] | None): Optional partition filters to apply.
+            unedited (bool): If True, the output will only contain unedited, raw data from the inserts.
+            output_format (str): The format of the output. Must be 'pandas', 'arrow' or polars.
+            changes_output (str): Whether to include the non-merged changes only or all (might be discontinued.)
+
+        Returns:
+            Union[pd.DataFrame, pl.DataFrame, pa.Table, str]: The result of the query, depending on
+            the operation and selected output format.
+        """
+        if output_format not in (
+            PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT, POLARS_OUTPUT_FORMAT
+        ):
             raise ValueError(f"Invalid output format: {output_format}")
 
         # Validate changes_output

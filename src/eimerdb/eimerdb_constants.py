@@ -21,6 +21,7 @@ DUCKDB_DEFAULT_CONFIG = {"preserve_insertion_order": False}
 ROW_ID_DEF = {"name": "row_id", "type": "string", "label": "Unique row ID"}
 PANDAS_OUTPUT_FORMAT = "pandas"
 ARROW_OUTPUT_FORMAT = "arrow"
+POLARS_OUTPUT_FORMAT = "polars"
 
 CHANGES_ALL = "all"
 CHANGES_RECENT = "recent"

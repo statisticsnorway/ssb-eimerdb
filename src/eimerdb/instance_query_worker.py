@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import duckdb
 import pandas as pd
+import polars as pl
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
@@ -23,6 +24,7 @@ from .eimerdb_constants import DEFAULT_MIN_ROWS_PER_GROUP
 from .eimerdb_constants import DUCKDB_DEFAULT_CONFIG
 from .eimerdb_constants import EDITABLE_KEY
 from .eimerdb_constants import PANDAS_OUTPUT_FORMAT
+from .eimerdb_constants import POLARS_OUTPUT_FORMAT
 from .eimerdb_constants import PARTITION_COLUMNS_KEY
 from .eimerdb_constants import SELECT_STAR_QUERY
 from .eimerdb_constants import TABLE_NAME_KEY
@@ -80,7 +82,7 @@ class QueryWorker:
         output_format: str,
         fs: GCSFileSystem,
         timetravel: Optional[str] = None,
-    ) -> Union[pd.DataFrame, pa.Table]:
+    ) -> Union[pd.DataFrame, pl.DataFrame, pa.Table]:
         """Query the database.
 
         Args:
@@ -138,6 +140,8 @@ class QueryWorker:
         return (
             query_result.df()
             if output_format == PANDAS_OUTPUT_FORMAT
+            else query_result.pl()
+            if output_format == POLARS_OUTPUT_FORMAT
             else query_result.arrow()
         )
 
@@ -250,8 +254,13 @@ class QueryWorker:
         table_name: str,
         output_format: str,
     ) -> Optional[Union[pd.DataFrame, pa.Table]]:
-        if table is None or output_format == PANDAS_OUTPUT_FORMAT:
+        if table is None:
             return table
+        if output_format == PANDAS_OUTPUT_FORMAT:
+            return table.to_pandas()
+        if output_format == POLARS_OUTPUT_FORMAT:
+            return pl.from_arrow(table)
+        return table
 
         return table.cast(self._db_instance.get_arrow_schema(table_name, True))
 
@@ -274,6 +283,8 @@ class QueryWorker:
 
         if output_format == PANDAS_OUTPUT_FORMAT:
             return pd.concat([first, second])
+        elif output_format == POLARS_OUTPUT_FORMAT:
+            return pl.concat([first, second])
 
         return self._cast_if_arrow(
             table=pa.concat_tables([first, second]),
