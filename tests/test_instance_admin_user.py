@@ -118,7 +118,7 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
     def test_get_inserts_or_changes(self, raise_file_not_found_error: bool) -> None:
         expected_source_folder = "path/to/eimer/table1_changes"
         expected_table = self._get_expected_table(False)
-        mock_blob = make_mock_blob()
+        mock_blob = self.make_mock_blob()
 
         with patch("eimerdb.instance.ds.dataset") as mock_dataset:
             if raise_file_not_found_error:
@@ -291,5 +291,5 @@ def test_write_to_table_and_delete_blobs(self) -> None:
                     table_name="table1",
                     table=expected_table,
                     source_folder=expected_source_folder,
-                    raw=raw
+                    raw=raw,
                 )
