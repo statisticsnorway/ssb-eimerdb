@@ -128,11 +128,11 @@ class EimerDBInstance(AbstractDbInstance):
 
     def add_user(self, username: str, role: Any) -> None:
         """Add a user to the EimerDB with a role.
-    
+
         Args:
             username (str): The username to add.
             role (Any): The role to assign to the user.
-    
+
         Raises:
             PermissionError: If the current user is not authorized to add users.
             ValueError: If the given role is invalid.
@@ -609,7 +609,7 @@ class EimerDBInstance(AbstractDbInstance):
             output_format (str): The format of the output. Must be 'pandas', 'arrow', or 'polars'.
             changes_output (str): Whether to include only non-merged changes or all. Must be
                 one of CHANGES_ALL or CHANGES_RECENT. May be deprecated in the future.
-    
+
         Returns:
             pd.DataFrame | pl.DataFrame | pa.Table | None: The result of the query, depending on
             the selected output format.
