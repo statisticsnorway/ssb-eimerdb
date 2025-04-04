@@ -201,7 +201,7 @@ def test_write_to_table_and_delete_blobs(self) -> None:
             "eimerdb.instance.EimerDBInstance._write_to_table_and_delete_blobs"
         ) as mock_write, patch(
             "google.cloud.storage.Client"
-        ) as mock_storage_client::
+        ) as mock_storage_client:
 
             mock_get_inserts_or_changes.return_value = (
                 expected_table if expect_table else None
@@ -281,7 +281,7 @@ def test_write_to_table_and_delete_blobs(self) -> None:
                 table_name="table1",
                 source_folder=expected_source_folder,
                 raw=raw,
-                filtered_blobs=ANY,  # <-- This fixes your test
+                filtered_blobs=ANY,
             )
 
             if not expect_table:
@@ -291,5 +291,5 @@ def test_write_to_table_and_delete_blobs(self) -> None:
                     table_name="table1",
                     table=expected_table,
                     source_folder=expected_source_folder,
-                    raw=raw,
+                    raw=raw
                 )
