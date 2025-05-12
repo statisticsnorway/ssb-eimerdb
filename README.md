@@ -96,7 +96,9 @@ prodcombasen.create_table(
 )
 ```
 
-Partitioning the table by one or more columns will help improve query performance
+Partitioning a table by one or more columns can significantly improve query performance.
+To partition by columns containing numeric values such as year and month, ensure these columns have the data type int.
+A current limitation is that when updating a row, it does not move to a different partition.
 
 ### SQL Query Support
 
@@ -128,6 +130,16 @@ prodcombasen.query(
 )
 ```
 
+For each update, insert, or delete operation, a new Parquet file is generated containing the latest version of the modified or added rows.
+As the number of these change files grows, query performance can degrade — especially if the data is stored in high-latency environments.
+To maintain good performance, it's important to periodically merge these files. This is done with the methods combine_changes and combine_inserts.
+
+'''python
+prodcombasen.combine_changes("table", partition_select={"aar": [2023]})
+prodcombasen.combine_inserts("table", raw=True, partition_select={"aar": [2023]})
+prodcombasen.combine_inserts("table", raw=False, partition_select={"aar": [2023]})
+'''
+
 ### Easily access the unedited version of a table
 
 Retrieve the unedited version of your data by specifying unedited=True.
@@ -142,7 +154,7 @@ prodcombasen.query(
 
 ### Query the changes made to a table
 
-You can query alle the changes made to the table with the query_changes method.
+You can query all the changes made to the table with the query_changes method.
 
 ```python
 prodcombasen.query_changes(
