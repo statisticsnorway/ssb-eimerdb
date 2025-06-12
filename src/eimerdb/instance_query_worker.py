@@ -98,8 +98,9 @@ class QueryWorker:
             Union[pd.DataFrame, pa.Table]: Returns a pandas DataFrame if 'pandas' output format is specified,
         """
         con = duckdb.connect(config=DUCKDB_DEFAULT_CONFIG)
-        tables = parsed_query[TABLE_NAME_KEY]
-
+        parsed_table_names = parsed_query[TABLE_NAME_KEY]
+        valid_tables = list(self._db_instance.tables.keys())
+        tables = [t for t in parsed_table_names if t in valid_tables]
         for table_name in tables:
             table_config = self._db_instance.tables[table_name]
             current_partition_select = filter_partition_select_on_table(
