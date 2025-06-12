@@ -51,19 +51,22 @@ def get_partitioned_files(
     table_files: list[str] = fs.glob(
         f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_parts}/{partition_levels}"
     )
-
-    max_depth = max(obj.count("/") for obj in table_files)
-    filtered_files: list[str] = [
-        obj for obj in table_files if obj.count("/") == max_depth
-    ]
-
-    if partition_select is None:
-        return filtered_files
-
-    return filter_partitions(
-        table_files=filtered_files, partition_select=partition_select
-    )
-
+    if len(table_files) > 0:
+        max_depth = max(obj.count("/") for obj in table_files)
+        filtered_files: list[str] = [
+            obj for obj in table_files if obj.count("/") == max_depth
+        ]
+    
+        if partition_select is None:
+            return filtered_files
+    
+        return filter_partitions(
+            table_files=filtered_files, partition_select=partition_select
+        )
+    else:
+        return filter_partitions(
+            table_files=[], partition_select=partition_select
+        )
 
 def filter_partitions(
     table_files: list[str],
