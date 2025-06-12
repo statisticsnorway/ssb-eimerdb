@@ -155,9 +155,12 @@ def arrow_schema_from_json(json_schema: list[dict[str, Any]]) -> pa.Schema:
     return pa.schema(fields)
 
 
-select_pattern = re.compile(r"\bSELECT\b")
-from_pattern = re.compile(r"\bFROM\s+(\w+)")
-join_pattern = re.compile(r"JOIN\s+(\w+)\s+ON")
+select_pattern = re.compile(r"\bSELECT\b", re.IGNORECASE)
+from_pattern = re.compile(r"\bFROM\s+(\w+)", re.IGNORECASE)
+join_pattern = re.compile(
+    r"\b(?:LEFT|RIGHT|FULL(?:\s+OUTER)?|INNER|CROSS|SELF)?[\s\n\r]*JOIN[\s\n\r]+(\w+)",
+    re.IGNORECASE
+)
 where_pattern = re.compile(
     r"WHERE\s+((?!GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET|FETCH|UNION|INT"
     r"ERSECT|EXCEPT|INTO|TABLESAMPLE).*?)\s*(?:GROUP\s+BY|HAVING|ORDER\s+BY|"
