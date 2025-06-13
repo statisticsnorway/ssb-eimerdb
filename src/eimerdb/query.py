@@ -64,12 +64,15 @@ def get_partitioned_files(
             table_files=filtered_files, partition_select=partition_select
         )
     else:
+        if partition_select is None:
+            return []
+
         return filter_partitions(table_files=[], partition_select=partition_select)
 
 
 def filter_partitions(
     table_files: list[str],
-    partition_select: dict[str, Any] | None,
+    partition_select: dict[str, Any],
 ) -> list[str]:
     """Filter the list of partitioned files based on specified partition selection criteria.
 
