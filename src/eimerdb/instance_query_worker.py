@@ -138,7 +138,7 @@ class QueryWorker:
                 arrow_schema = self._db_instance.get_arrow_schema(table_name, unedited)
                 empty_table = pa.Table.from_arrays(
                     [pa.array([], type=field.type) for field in arrow_schema],
-                    schema=arrow_schema
+                    schema=arrow_schema,
                 )
                 con.register(table_name, empty_table)
                 del empty_table

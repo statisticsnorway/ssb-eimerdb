@@ -56,17 +56,15 @@ def get_partitioned_files(
         filtered_files: list[str] = [
             obj for obj in table_files if obj.count("/") == max_depth
         ]
-    
+
         if partition_select is None:
             return filtered_files
-    
+
         return filter_partitions(
             table_files=filtered_files, partition_select=partition_select
         )
     else:
-        return filter_partitions(
-            table_files=[], partition_select=partition_select
-        )
+        return filter_partitions(table_files=[], partition_select=partition_select)
 
 def filter_partitions(
     table_files: list[str],

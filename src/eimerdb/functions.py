@@ -159,7 +159,7 @@ select_pattern = re.compile(r"\bSELECT\b", re.IGNORECASE)
 from_pattern = re.compile(r"\bFROM\s+(\w+)", re.IGNORECASE)
 join_pattern = re.compile(
     r"\b(?:LEFT|RIGHT|FULL(?:\s+OUTER)?|INNER|CROSS|SELF)?[\s\n\r]*JOIN[\s\n\r]+(\w+)",
-    re.IGNORECASE
+    re.IGNORECASE,
 )
 where_pattern = re.compile(
     r"WHERE\s+((?!GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET|FETCH|UNION|INT"
