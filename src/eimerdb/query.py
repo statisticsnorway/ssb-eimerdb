@@ -51,18 +51,23 @@ def get_partitioned_files(
     table_files: list[str] = fs.glob(
         f"gs://{bucket_name}/eimerdb/{instance_name}/{table_name_parts}/{partition_levels}"
     )
+    if len(table_files) > 0:
+        max_depth = max(obj.count("/") for obj in table_files)
+        filtered_files: list[str] = [
+            obj for obj in table_files if obj.count("/") == max_depth
+        ]
 
-    max_depth = max(obj.count("/") for obj in table_files)
-    filtered_files: list[str] = [
-        obj for obj in table_files if obj.count("/") == max_depth
-    ]
+        if partition_select is None:
+            return filtered_files
 
-    if partition_select is None:
-        return filtered_files
+        return filter_partitions(
+            table_files=filtered_files, partition_select=partition_select
+        )
+    else:
+        if partition_select is None:
+            return []
 
-    return filter_partitions(
-        table_files=filtered_files, partition_select=partition_select
-    )
+        return filter_partitions(table_files=[], partition_select=partition_select)
 
 
 def filter_partitions(
@@ -129,14 +134,12 @@ def update_pyarrow_table(
             pc.less_equal(changes_table["datetime"], timetravel_datetime)
         )
 
-    # Aggregate max datetime per row_id
     row_id_max: pa.Table = changes_table.group_by("row_id").aggregate(
         [("datetime", "max")]
     )
     row_id_max = row_id_max.select(["row_id", "datetime_max"])
     row_id_max = row_id_max.rename_columns(["row_id", "datetime"])
 
-    # Join df_changes with row_id_max to get the latest changes
     changes_table = changes_table.join(
         row_id_max, ["row_id", "datetime"], join_type="inner"
     ).combine_chunks()
@@ -145,24 +148,19 @@ def update_pyarrow_table(
         _df = changes_table.filter(pa.compute.field("operation") == operation)
         return _df.drop(["datetime", "operation", "user"])
 
-    # Separate updates and deletions
     df_updates = filter_on_operation_and_drop_columns("update")
     df_deletes = filter_on_operation_and_drop_columns("delete")
 
-    # Filter out rows to be deleted
     filter_array = pa.compute.invert(
         pa.compute.is_in(target_table["row_id"], changes_table["row_id"])
     )
     df_filtered = pa.compute.filter(target_table, filter_array)
     column_order = [field.name for field in df_updates.schema]
 
-    # Select relevant columns and update schema
     df_filtered = df_filtered.select(column_order).cast(df_updates.schema)
 
-    # Combine filtered data with updates
     df_updated = pa.concat_tables([df_filtered, df_updates])
 
-    # Filter out rows marked for deletion
     filter_array_deletes = pa.compute.invert(
         pa.compute.is_in(df_updated["row_id"], df_deletes["row_id"])
     )

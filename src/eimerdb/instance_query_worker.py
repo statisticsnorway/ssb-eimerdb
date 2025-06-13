@@ -98,8 +98,9 @@ class QueryWorker:
             Union[pd.DataFrame, pa.Table]: Returns a pandas DataFrame if 'pandas' output format is specified,
         """
         con = duckdb.connect(config=DUCKDB_DEFAULT_CONFIG)
-        tables = parsed_query[TABLE_NAME_KEY]
-
+        parsed_table_names = parsed_query[TABLE_NAME_KEY]
+        valid_tables = list(self._db_instance.tables.keys())
+        tables = [t for t in parsed_table_names if t in valid_tables]
         for table_name in tables:
             table_config = self._db_instance.tables[table_name]
             current_partition_select = filter_partition_select_on_table(
@@ -133,8 +134,17 @@ class QueryWorker:
                 if changes_table is not None and changes_table.num_rows > 0:
                     table = update_pyarrow_table(table, changes_table, timetravel)
 
-            con.register(table_name, table)
-            del table
+            if table.num_columns == 0:
+                arrow_schema = self._db_instance.get_arrow_schema(table_name, unedited)
+                empty_table = pa.Table.from_arrays(
+                    [pa.array([], type=field.type) for field in arrow_schema],
+                    schema=arrow_schema,
+                )
+                con.register(table_name, empty_table)
+                del empty_table
+            else:
+                con.register(table_name, table)
+                del table
 
         query_result = con.execute(sql_query)
         return (
@@ -327,7 +337,10 @@ class QueryWorker:
                 or None if operation is different from SELECT.
         """
         parsed_query = parse_sql_query(sql_query)
-        table_name = parsed_query[TABLE_NAME_KEY][0]
+        parsed_table_names = parsed_query[TABLE_NAME_KEY]
+        valid_tables = list(self._db_instance.tables.keys())
+        tables = [t for t in parsed_table_names if t in valid_tables]
+        table_name = tables[0]
         table_config = self._db_instance.tables[table_name]
 
         def get_partition_levels() -> str:
