@@ -66,6 +66,7 @@ def get_partitioned_files(
     else:
         return filter_partitions(table_files=[], partition_select=partition_select)
 
+
 def filter_partitions(
     table_files: list[str],
     partition_select: dict[str, Any] | None,
