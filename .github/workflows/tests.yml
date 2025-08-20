@@ -7,6 +7,9 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   tests:
     name: ${{ matrix.session }} ${{ matrix.python }} / ${{ matrix.os }}
@@ -15,18 +18,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { python: "3.10", os: "ubuntu-latest", session: "pre-commit" }
+          - { python: "3.11", os: "ubuntu-latest", session: "pre-commit" }
           - { python: "3.11", os: "ubuntu-latest", session: "mypy" }
-          - { python: "3.10", os: "ubuntu-latest", session: "mypy" }
           - { python: "3.12", os: "ubuntu-latest", session: "mypy" }
-          - { python: "3.11", os: "ubuntu-latest", session: "tests" }
+          - { python: "3.13", os: "ubuntu-latest", session: "mypy" }
           - { python: "3.10", os: "ubuntu-latest", session: "tests" }
+          - { python: "3.11", os: "ubuntu-latest", session: "tests" }
           - { python: "3.12", os: "ubuntu-latest", session: "tests" }
-          - { python: "3.11", os: "windows-latest", session: "tests" }
-          - { python: "3.11", os: "macos-latest", session: "tests" }
-          - { python: "3.10", os: "ubuntu-latest", session: "typeguard" }
+          - { python: "3.13", os: "ubuntu-latest", session: "tests" }
+          - { python: "3.13", os: "windows-latest", session: "tests" }
+          - { python: "3.13", os: "macos-latest", session: "tests" }
+          - { python: "3.11", os: "ubuntu-latest", session: "typeguard" }
           - { python: "3.11", os: "ubuntu-latest", session: "xdoctest" }
-          - { python: "3.10", os: "ubuntu-latest", session: "docs-build" }
+          - { python: "3.11", os: "ubuntu-latest", session: "docs-build" }
 
     env:
       NOXSESSION: ${{ matrix.session }}
@@ -38,7 +42,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python }}
-        uses: actions/setup-python@v5.1.1
+        uses: actions/setup-python@v5.6.0
         with:
           python-version: ${{ matrix.python }}
 
@@ -59,6 +63,7 @@ jobs:
       - name: Install Poetry
         run: |
           pipx install --pip-args "-c ${{ github.workspace }}/.github/workflows/constraints.txt" poetry
+          pipx inject poetry poetry-plugin-export
           poetry --version
 
       - name: Install Nox
@@ -102,6 +107,7 @@ jobs:
         with:
           name: coverage-data-${{ matrix.os }}-${{ matrix.python }}
           path: ".coverage.*"
+          include-hidden-files: true
 
       - name: Upload documentation
         if: matrix.session == 'docs-build'
@@ -120,7 +126,7 @@ jobs:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
       - name: Set up Python
-        uses: actions/setup-python@v5.1.1
+        uses: actions/setup-python@v5.6.0
         with:
           python-version: "3.11"
 
@@ -132,6 +138,7 @@ jobs:
       - name: Install Poetry
         run: |
           pipx install --pip-args "-c ${{ github.workspace }}/.github/workflows/constraints.txt" poetry
+          pipx inject poetry poetry-plugin-export
           poetry --version
 
       - name: Install Nox
@@ -158,13 +165,12 @@ jobs:
       # Replace root path with /github/workspace (mounted in docker container).
       - name: Override coverage source paths for SonarCloud
         run: |
-          sed -i "s/<source><\/source>/<source>\/github\/workspace<\/source>/g" coverage.xml
-          sed -i "s/<source>tests/<source>\/github\/workspace\/tests/g" coverage.xml
+          sed -i "s/<source><\/source>/<source>\/home\/runner\/work\/ssb-eimerdb\/ssb-eimerdb<\/source>/g" coverage.xml
+          sed -i "s/<source>tests/<source>\/home\/runner\/work\/ssb-eimerdb\/ssb-eimerdb\/tests/g" coverage.xml
 
-      - name: SonarCloud Scan
+      - name: SonarQube Cloud Scan
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         # No need to run SonarCloud analysis if dependabot update or token not defined
         if: env.SONAR_TOKEN != '' && (github.actor != 'dependabot[bot]')
-        uses: SonarSource/sonarcloud-github-action@v2.3.0
+        uses: SonarSource/sonarqube-scan-action@v5.2.0
