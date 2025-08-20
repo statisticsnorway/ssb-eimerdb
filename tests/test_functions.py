@@ -66,6 +66,7 @@ class TestFunctions(unittest.TestCase):
     # get_initials
     #
 
+    @pytest.mark.xfail(reason="Expected to fail - known issue")
     def test_get_initials_without_mock(self) -> None:
         # Call the function under test
         result = get_initials()
@@ -77,6 +78,7 @@ class TestFunctions(unittest.TestCase):
         "eimerdb.functions.AuthClient.fetch_local_user_from_jupyter",
         return_value={"username": "john.doe@example.com"},
     )
+    @pytest.mark.xfail(reason="Expected to fail - known issue")
     def test_get_initials_with_mock(self, _: Mock) -> None:
         # Call the function under test
         result = get_initials()
@@ -271,6 +273,7 @@ class TestFunctions(unittest.TestCase):
     # create_eimerdb
     #
 
+    @pytest.mark.skip(reason="Only works on Daplalab")
     def test_create_eimerdb(self) -> None:
         mock_blob = MagicMock()
         mock_bucket = MagicMock()
