@@ -213,3 +213,5 @@ rsconnect/
 # Blaise specific ignores
 *.bdix
 *.bdbx
+
+.idea
