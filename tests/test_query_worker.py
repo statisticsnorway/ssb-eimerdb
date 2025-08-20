@@ -1,6 +1,5 @@
 import datetime
 from typing import Any
-from typing import Optional
 from unittest.mock import ANY
 from unittest.mock import MagicMock
 from unittest.mock import Mock
@@ -50,22 +49,25 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         table_name: str,
         unedited: bool,
         output_format,
-        changes_count: Optional[int],
+        changes_count: int | None,
     ) -> None:
         # Mock input parameters
         parsed_query = {"table_name": [table_name]}
         sql_query = f"SELECT * FROM {table_name}"
         partition_select = None
 
-        with patch(
-            "eimerdb.instance_query_worker.get_partitioned_files"
-        ) as mock_get_partitioned_files, patch(
-            "eimerdb.instance_query_worker.pq.read_table"
-        ) as mock_pq_read_table, patch(
-            "eimerdb.instance_query_worker.QueryWorker.query_changes"
-        ) as mock_query_changes, patch(
-            "eimerdb.instance_query_worker.update_pyarrow_table"
-        ) as mock_update_pyarrow_table:
+        with (
+            patch(
+                "eimerdb.instance_query_worker.get_partitioned_files"
+            ) as mock_get_partitioned_files,
+            patch("eimerdb.instance_query_worker.pq.read_table") as mock_pq_read_table,
+            patch(
+                "eimerdb.instance_query_worker.QueryWorker.query_changes"
+            ) as mock_query_changes,
+            patch(
+                "eimerdb.instance_query_worker.update_pyarrow_table"
+            ) as mock_update_pyarrow_table,
+        ):
             expected_df = pd.DataFrame({"row_id": [1, 2, 3]})
             expected_table = pa.Table.from_pandas(expected_df)
 
@@ -140,11 +142,14 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
     def test_query_update_success(self) -> None:
         # Setup mocks
-        with patch(
-            "eimerdb.instance_query_worker.pq.write_to_dataset"
-        ) as mock_write_to_dataset, patch(
-            "eimerdb.instance_query_worker.QueryWorker.query_select"
-        ) as mock_query_method:
+        with (
+            patch(
+                "eimerdb.instance_query_worker.pq.write_to_dataset"
+            ) as mock_write_to_dataset,
+            patch(
+                "eimerdb.instance_query_worker.QueryWorker.query_select"
+            ) as mock_query_method,
+        ):
             mock_query_method.return_value = pd.DataFrame(
                 {"field1": [1, 2, 3], "row_id": ["1", "2", "3"]}
             )
@@ -204,11 +209,14 @@ class TestQueryWorker(TestEimerDBInstanceBase):
 
     def test_query_delete_success(self) -> None:
         # Setup mocks
-        with patch(
-            "eimerdb.instance_query_worker.pq.write_to_dataset"
-        ) as mock_write_to_dataset, patch(
-            "eimerdb.instance_query_worker.QueryWorker.query_select"
-        ) as mock_query_method:
+        with (
+            patch(
+                "eimerdb.instance_query_worker.pq.write_to_dataset"
+            ) as mock_write_to_dataset,
+            patch(
+                "eimerdb.instance_query_worker.QueryWorker.query_select"
+            ) as mock_query_method,
+        ):
             mock_query_method.return_value = pd.DataFrame(
                 {"field1": [1, 2, 3], "row_id": ["1", "2", "3"]}
             )
@@ -258,7 +266,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
     def test_query_changes(
         self,
         table_name: str,
-        partition_select: Optional[dict[str, Any]],
+        partition_select: dict[str, Any] | None,
         unedited: bool,
         output_format: str,
         changes_output: str,
@@ -309,15 +317,19 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         )
 
         # Patching methods with mocks
-        with patch(
-            "eimerdb.instance_query_worker.FileClient.get_gcs_file_system",
-            return_value=mock_fs,
-        ), patch(
-            "eimerdb.instance_query_worker.pq.read_table",
-            return_value=mock_table_data,
-        ), patch(
-            "eimerdb.instance_query_worker.duckdb.DuckDBPyConnection.query",
-            return_value=mock_duckdb_query_result,
+        with (
+            patch(
+                "eimerdb.instance_query_worker.FileClient.get_gcs_file_system",
+                return_value=mock_fs,
+            ),
+            patch(
+                "eimerdb.instance_query_worker.pq.read_table",
+                return_value=mock_table_data,
+            ),
+            patch(
+                "eimerdb.instance_query_worker.duckdb.DuckDBPyConnection.query",
+                return_value=mock_duckdb_query_result,
+            ),
         ):
             result = self.worker_instance.query_changes(
                 sql_query=f"SELECT * FROM {table_name}",

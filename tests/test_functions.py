@@ -1,6 +1,5 @@
 import unittest
 from typing import Any
-from typing import Optional
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 from unittest.mock import call
@@ -45,7 +44,7 @@ class TestFunctions(unittest.TestCase):
         self,
         table_name: str,
         partition_select: dict[str, Any],
-        expected: Optional[dict[str, Any]],
+        expected: dict[str, Any] | None,
     ) -> None:
         # Call the function under test
         result = filter_partition_select_on_table(table_name, partition_select)

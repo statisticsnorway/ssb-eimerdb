@@ -150,10 +150,10 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
 
 
 def test_write_to_table_and_delete_blobs(self) -> None:
-    with patch("eimerdb.instance.storage.Client") as mock_client, patch(
-        "eimerdb.instance.pq.write_to_dataset"
-    ) as mock_write_to_dataset, patch(
-        "eimerdb.instance.uuid4", return_value="mocked_uuid"
+    with (
+        patch("eimerdb.instance.storage.Client") as mock_client,
+        patch("eimerdb.instance.pq.write_to_dataset") as mock_write_to_dataset,
+        patch("eimerdb.instance.uuid4", return_value="mocked_uuid"),
     ):
         expected_table = self._get_expected_table(False)
         mock_write_to_dataset.return_value = expected_table
@@ -196,13 +196,15 @@ def test_write_to_table_and_delete_blobs(self) -> None:
         expected_source_folder = "path/to/eimer/table1_changes"
         expected_table = self._get_expected_table(False)
 
-        with patch(
-            "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
-        ) as mock_get_inserts_or_changes, patch(
-            "eimerdb.instance.EimerDBInstance._write_to_table_and_delete_blobs"
-        ) as mock_write, patch(
-            "google.cloud.storage.Client"
-        ) as mock_storage_client:
+        with (
+            patch(
+                "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
+            ) as mock_get_inserts_or_changes,
+            patch(
+                "eimerdb.instance.EimerDBInstance._write_to_table_and_delete_blobs"
+            ) as mock_write,
+            patch("google.cloud.storage.Client") as mock_storage_client,
+        ):
 
             mock_get_inserts_or_changes.return_value = (
                 expected_table if expect_table else None
@@ -253,13 +255,15 @@ def test_write_to_table_and_delete_blobs(self) -> None:
         expected_source_folder = "path/to/eimer/table1" + suffix
         expected_table = self._get_expected_table(raw)
 
-        with patch(
-            "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
-        ) as mock_get_inserts_or_changes, patch(
-            "eimerdb.instance.EimerDBInstance._write_to_table_and_delete_blobs"
-        ) as mock_write, patch(
-            "google.cloud.storage.Client"
-        ) as mock_storage_client:
+        with (
+            patch(
+                "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
+            ) as mock_get_inserts_or_changes,
+            patch(
+                "eimerdb.instance.EimerDBInstance._write_to_table_and_delete_blobs"
+            ) as mock_write,
+            patch("google.cloud.storage.Client") as mock_storage_client,
+        ):
 
             mock_get_inserts_or_changes.return_value = (
                 expected_table if expect_table else None

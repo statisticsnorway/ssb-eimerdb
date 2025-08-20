@@ -10,7 +10,6 @@ import os
 import re
 from datetime import datetime
 from typing import Any
-from typing import Optional
 
 import pyarrow as pa
 from dapla import AuthClient
@@ -30,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 def filter_partition_select_on_table(
-    table_name: str, partition_select: Optional[dict[str, Any]]
-) -> Optional[dict[str, Any]]:
+    table_name: str, partition_select: dict[str, Any] | None
+) -> dict[str, Any] | None:
     """A function that gets the partition select for a table.
 
     Supports both:

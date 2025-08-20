@@ -12,8 +12,6 @@ Date: September 16, 2023
 import json
 import logging
 from typing import Any
-from typing import Optional
-from typing import Union
 from uuid import uuid4
 
 import pandas as pd
@@ -102,7 +100,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         initials = get_initials()
         if initials in users and users[initials] == "admin":
-            role_groups: Optional[dict[str, Any]] = get_json(
+            role_groups: dict[str, Any] | None = get_json(
                 bucket_name, f"{eimer_path}/config/role_groups.json"
             )
             is_admin: bool = True
@@ -184,8 +182,8 @@ class EimerDBInstance(AbstractDbInstance):
         self,
         table_name: str,
         schema: list[dict[str, Any]],
-        partition_columns: Optional[list[str]] = None,
-        editable: Optional[bool] = True,
+        partition_columns: list[str] | None = None,
+        editable: bool | None = True,
     ) -> None:
         """Create a new table with the given schema and store it in the table config.
 
@@ -227,7 +225,7 @@ class EimerDBInstance(AbstractDbInstance):
         self,
         table_name: str,
         df: pd.DataFrame,
-        custom_user: Optional[str] = None,
+        custom_user: str | None = None,
     ) -> list[str]:
         """Insert a DataFrame into an EimerDB table.
 
@@ -305,7 +303,7 @@ class EimerDBInstance(AbstractDbInstance):
 
     def _get_inserts_or_changes(
         self, table_name: str, source_folder: str, filtered_blobs: list[Blob], raw: bool
-    ) -> Optional[pa.Table]:
+    ) -> pa.Table | None:
         """Retrieve inserts or changes for a given table. Returns None if file not found.
 
         Args:
@@ -343,7 +341,7 @@ class EimerDBInstance(AbstractDbInstance):
         self,
         table_name: str,
         source_folder: str,
-        partition_select: Optional[dict[str, Any]],
+        partition_select: dict[str, Any] | None,
     ) -> list:
         """Retrieve a list of the parquet files for the given partition.
 
@@ -403,7 +401,7 @@ class EimerDBInstance(AbstractDbInstance):
     def combine_changes(
         self,
         table_name: str,
-        partition_select: Optional[dict[str, list[Any]]] = None,
+        partition_select: dict[str, list[Any]] | None = None,
     ) -> None:
         """Combines a set of files to one single files for the given partitions.
 
@@ -449,7 +447,7 @@ class EimerDBInstance(AbstractDbInstance):
         self,
         table_name: str,
         raw: bool,
-        partition_select: Optional[dict[str, Any]],
+        partition_select: dict[str, Any] | None,
     ) -> None:
         """Combines a set of files to one single files for the given partitions.
 
@@ -520,12 +518,12 @@ class EimerDBInstance(AbstractDbInstance):
     def query(
         self,
         sql_query: str,
-        partition_select: Optional[dict[str, Any]] = None,
+        partition_select: dict[str, Any] | None = None,
         unedited: bool = False,
         output_format: str = PANDAS_OUTPUT_FORMAT,
-        timetravel: Optional[str] = None,
-        custom_user: Optional[str] = None,
-    ) -> Union[pd.DataFrame, pl.DataFrame, pa.Table, str]:
+        timetravel: str | None = None,
+        custom_user: str | None = None,
+    ) -> pd.DataFrame | pl.DataFrame | pa.Table | str:
         """SQL query execution.
 
         Supports SELECT, UPDATE, and DELETE operations with optional partition filtering,
@@ -592,11 +590,11 @@ class EimerDBInstance(AbstractDbInstance):
     def query_changes(
         self,
         sql_query: str,
-        partition_select: Optional[dict[str, Any]] = None,
+        partition_select: dict[str, Any] | None = None,
         unedited: bool = False,
         output_format: str = PANDAS_OUTPUT_FORMAT,
         changes_output: str = CHANGES_ALL,
-    ) -> Optional[Union[pd.DataFrame, pl.DataFrame, pa.Table]]:
+    ) -> pd.DataFrame | pl.DataFrame | pa.Table | None:
         """Execute a SQL SELECT query against edited data.
 
         Supports partition filtering, output format selection, and the ability to include
