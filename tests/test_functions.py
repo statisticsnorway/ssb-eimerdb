@@ -15,6 +15,7 @@ from eimerdb.functions import filter_partition_select_on_table
 from eimerdb.functions import get_datetime
 from eimerdb.functions import get_initials
 from eimerdb.functions import get_json
+from eimerdb.functions import is_daplalab
 from eimerdb.functions import parse_sql_query
 
 
@@ -273,7 +274,7 @@ class TestFunctions(unittest.TestCase):
     # create_eimerdb
     #
 
-    @pytest.mark.skip(reason="Only works on Daplalab")
+    @pytest.mark.skipif(not is_daplalab(), reason="Only works on Daplalab")
     def test_create_eimerdb(self) -> None:
         mock_blob = MagicMock()
         mock_bucket = MagicMock()

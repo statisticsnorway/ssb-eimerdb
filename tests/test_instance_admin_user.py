@@ -12,6 +12,7 @@ from parameterized import parameterized
 
 from eimerdb.eimerdb_constants import DEFAULT_COMPRESSION
 from eimerdb.eimerdb_constants import DEFAULT_MIN_ROWS_PER_GROUP
+from eimerdb.functions import is_daplalab
 from tests.test_instance_base import TestEimerDBInstanceBase
 
 
@@ -37,7 +38,7 @@ def patch_uuid4():
 
 class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
 
-    @pytest.mark.skip(reason="Only works on Daplalab")
+    @pytest.mark.skipif(not is_daplalab(), reason="Only works on Daplalab")
     def test_insert_given_valid_data_expect_list_of_row_ids(self) -> None:
         # Sample DataFrame for testing
         df = pd.DataFrame({"field1": [1, 2]})
