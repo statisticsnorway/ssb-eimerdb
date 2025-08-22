@@ -1,54 +1,46 @@
-[tool.poetry]
+[project]
 name = "ssb-eimerdb"
 version = "0.2.4"
 description = "EimerDB"
-authors = ["Stian Elisenberg <seg@ssb.no>"]
+authors = [{ name = "Stian Elisenberg", email = "seg@ssb.no" }]
+maintainers = [{ name = "Statistics Norway, Data enablement Department (724)" }]
 license = "MIT"
 readme = "README.md"
+requires-python = ">=3.10,<4.0"
+dynamic = ["classifiers"]
+dependencies = [
+    "dapla-toolbelt>=3.0.1",
+    "docstring-inheritance>=2.2.0",
+    "duckdb>=1.0.0",
+    "gcsfs>=2025.7.0",
+    "google-cloud-storage>=2.15.0",
+    "pandas>=2.2.1",
+    "polars>=1.26.0",
+    "pyarrow>=17.0.0",
+]
+
+[project.urls]
 homepage = "https://github.com/statisticsnorway/ssb-eimerdb"
 repository = "https://github.com/statisticsnorway/ssb-eimerdb"
 documentation = "https://statisticsnorway.github.io/ssb-eimerdb"
-packages = [{ include = "eimerdb", from = "src" }]
-classifiers = ["Development Status :: 3 - Alpha"]
-
-[tool.poetry.urls]
 Changelog = "https://github.com/statisticsnorway/ssb-eimerdb/releases"
 
-[tool.poetry.dependencies]
-python = ">=3.10,<3.13"
-click = ">=8.0.1"
-duckdb = "^1.0.0"
-google-cloud-storage = "^2.15.0"
-pyarrow = "^17.0.0"
-dapla-toolbelt = ">=3.0.1, <4.0.0"
-uuid = "^1.30"
-ipykernel = "^6.29.3"
-pandas = "^2.2.1"
-parameterized = {extras = ["typed"], version = "^0.9.0"}
-docstring-inheritance = "^2.2.0"
-numpy = "^2.0.1"
-filelock = "^3.15.4"
-polars = "^1.26.0"
+[tool.poetry]
+classifiers = ["Development Status :: 4 - Beta"]
+requires-poetry = ">=2.0"
+packages = [{ include = "eimerdb", from = "src" }]
 
 [tool.poetry.group.dev.dependencies]
-Pygments = ">=2.10.0"
-bandit = ">=1.7.4"
+pygments = ">=2.10.0"
 black = { extras = ["jupyter"], version = ">=23.1.0" }
 coverage = { extras = ["toml"], version = ">=6.2" }
 darglint = ">=1.8.1"
-flake8 = ">=4.0.1"
-flake8-bugbear = ">=21.9.2"
-flake8-docstrings = ">=1.6.0"
-flake8-rst-docstrings = ">=0.2.5"
 furo = ">=2021.11.12"
-isort = ">=5.10.1"
 mypy = ">=0.930"
-pep8-naming = ">=0.12.1"
 pre-commit = ">=2.16.0"
 pre-commit-hooks = ">=4.1.0"
+ruff = ">=0.0.284"
 pytest = ">=6.2.5"
-pyupgrade = ">=2.29.1"
-safety = ">=1.10.3"
 sphinx = ">=6.2.1"
 sphinx-autobuild = ">=2021.3.14"
 sphinx-autodoc-typehints = ">=1.24.0"
@@ -56,12 +48,15 @@ sphinx-click = ">=3.0.2"
 typeguard = ">=2.13.3"
 xdoctest = { extras = ["colors"], version = ">=0.15.10" }
 myst-parser = { version = ">=0.16.1" }
+deptry = ">=0.23.0"
+pandas-stubs = ">=2.3.0.250703"
+parameterized = {extras = ["typed"], version = ">=0.9.0"}
+
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.9"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-
-[tool.poetry.scripts]
-ssb-eimerdb = "eimerdb.__main__:main"
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
@@ -75,6 +70,9 @@ relative_files = true
 [tool.coverage.report]
 show_missing = true
 fail_under = 50
+
+[tool.deptry.per_rule_ignores]
+DEP001 = ["nox", "nox_poetry"]  # packages available by default
 
 [tool.mypy]
 strict = false
@@ -99,7 +97,7 @@ ignore_missing_imports = true
 force-exclude = true  # Apply excludes to pre-commit
 show-fixes = true
 src = ["src", "tests"]
-target-version = "py39"  # Minimum Python version supported
+target-version = "py311"  # Minimum Python version supported
 include = ["*.py", "*.pyi", "**/pyproject.toml", "*.ipynb"]
 extend-exclude = [
     "__pycache__",
@@ -112,25 +110,26 @@ extend-exclude = [
 # Ruff rules may be customized as desired: https://docs.astral.sh/ruff/rules/
 [tool.ruff.lint]
 select = [
-    "A", # prevent using keywords that clobber python builtins
-    "ANN", # check type annotations
-    "B", # bugbear: security warnings
-    "D", # documentation
-    "E", # pycodestyle
-    "F", # pyflakes
-    "ISC", # implicit string concatenation
-    "I", # sort imports
-    "UP", # alert you when better syntax is available in your python version
-    "RUF", # the ruff developer's own rules
+    "A",    # prevent using keywords that clobber python builtins
+    "ANN",  # check type annotations
+    "B",    # bugbear: security warnings
+    "D",    # documentation
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "ISC",  # implicit string concatenation
+    "I",    # sort imports
+    "UP",   # alert you when better syntax is available in your python version
+    "RUF",  # the ruff developer's own rules
 ]
 ignore = [
-    "ANN101", # Supress missing-type-self.
-    "ANN102", # Supress missing-type-cls.
-    "ANN202", # Don't requiere return type annotation for private functions.
+    "ANN202", # Don't require return type annotation for private functions.
     "ANN401", # Allow type annotation with type Any.
-    "D100", # Supress undocumented-public-module. Only doc of public api required.
-    "E402", # Supress module-import-not-at-top-of-file, needed in jupyter notebooks.
-    "E501", # Supress line-too-long warnings: trust black's judgement on this one.
+    "D100",   # Supress undocumented-public-module. Only doc of public api required.
+    "FBT001", # Allow boolean positional arguments in a function.
+    "FBT002", # Allow boolean default positional arguments in a function.
+    "E402",   # Supress module-import-not-at-top-of-file, needed in jupyter notebooks.
+    "E501",   # Supress line-too-long warnings: trust black's judgement on this one.
+    "PLR2004", # Allow to compare with unnamed numerical constants.
 ]
 
 [tool.ruff.lint.isort]
@@ -142,24 +141,27 @@ max-complexity = 15
 [tool.ruff.lint.pydocstyle]
 convention = "google"  # You can also use "numpy".
 
+[tool.ruff.lint.pylint]
+max-args = 8
+
 [tool.ruff.lint.pep8-naming]
 classmethod-decorators = ["classmethod", "validator", "root_validator", "pydantic.validator"]
 
 [tool.ruff.lint.per-file-ignores]
 "*/__init__.py" = ["F401"]
 "**/tests/*" = [
-    "ANN001", # type annotations don't add value for test functions
-    "ANN002", # type annotations don't add value for test functions
-    "ANN003", # type annotations don't add value for test functions
-    "ANN201", # type annotations don't add value for test functions
-    "ANN204", # type annotations don't add value for test functions
-    "ANN205", # type annotations don't add value for test functions
-    "ANN206", # type annotations don't add value for test functions
-    "D100", # docstrings are overkill for test functions
+    "ANN001",  # type annotations don't add value for test functions
+    "ANN002",  # type annotations don't add value for test functions
+    "ANN003",  # type annotations don't add value for test functions
+    "ANN201",  # type annotations don't add value for test functions
+    "ANN204",  # type annotations don't add value for test functions
+    "ANN205",  # type annotations don't add value for test functions
+    "ANN206",  # type annotations don't add value for test functions
+    "D100",    # docstrings are overkill for test functions
     "D101",
     "D102",
     "D103",
-    "S101", # asserts are encouraged in pytest
+    "S101",    # asserts are encouraged in pytest
 ]
 
 [build-system]

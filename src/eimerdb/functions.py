@@ -10,7 +10,6 @@ import os
 import re
 from datetime import datetime
 from typing import Any
-from typing import Optional
 
 import pyarrow as pa
 from dapla import AuthClient
@@ -30,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 def filter_partition_select_on_table(
-    table_name: str, partition_select: Optional[dict[str, Any]]
-) -> Optional[dict[str, Any]]:
+    table_name: str, partition_select: dict[str, Any] | None
+) -> dict[str, Any] | None:
     """A function that gets the partition select for a table.
 
     Supports both:
@@ -79,9 +78,7 @@ def get_initials() -> str:
     Returns:
         The user's initials or "user" if the user is None.
     """
-    user: str | None = AuthClient.fetch_email_from_credentials()
-    if user is None:
-        user = os.getenv("DAPLA_USER")
+    user = os.getenv("DAPLA_USER")
     if user is None:
         return "user"
     user_split: str = user.split("@")[0]
@@ -292,3 +289,9 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
     tables_blob.upload_from_string(data=json.dumps({}), content_type=APPLICATION_JSON)
 
     logger.info("EimerDB instance %s created.", db_name)
+
+
+def is_daplalab() -> bool:
+    """True if running on DAPLA_LAB, false otherwise."""
+    region = os.getenv("DAPLA_REGION")
+    return bool(region and region == "DAPLA_LAB")

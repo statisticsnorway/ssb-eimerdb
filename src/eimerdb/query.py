@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import Any
-from typing import Optional
 
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -16,8 +15,8 @@ def get_partitioned_files(
     table_config: dict[str, Any],
     suffix: str,
     fs: GCSFileSystem,
-    timetravel: Optional[str] = None,
-    partition_select: Optional[dict[str, Any]] = None,
+    timetravel: str | None = None,
+    partition_select: dict[str, Any] | None = None,
     unedited: bool = False,
 ) -> list[str]:
     """Retrieve the paths of partitioned files for a given table.
@@ -105,7 +104,7 @@ def filter_partitions(
 
 
 def update_pyarrow_table(
-    target_table: pa.Table, changes_table: pa.Table, timetravel: Optional[str] = None
+    target_table: pa.Table, changes_table: pa.Table, timetravel: str | None = None
 ) -> pa.Table:
     """Apply changes from a PyArrow table of updates and deletions to another PyArrow table.
 

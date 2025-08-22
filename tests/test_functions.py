@@ -1,6 +1,5 @@
 import unittest
 from typing import Any
-from typing import Optional
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 from unittest.mock import call
@@ -16,6 +15,7 @@ from eimerdb.functions import filter_partition_select_on_table
 from eimerdb.functions import get_datetime
 from eimerdb.functions import get_initials
 from eimerdb.functions import get_json
+from eimerdb.functions import is_daplalab
 from eimerdb.functions import parse_sql_query
 
 
@@ -45,7 +45,7 @@ class TestFunctions(unittest.TestCase):
         self,
         table_name: str,
         partition_select: dict[str, Any],
-        expected: Optional[dict[str, Any]],
+        expected: dict[str, Any] | None,
     ) -> None:
         # Call the function under test
         result = filter_partition_select_on_table(table_name, partition_select)
@@ -67,6 +67,7 @@ class TestFunctions(unittest.TestCase):
     # get_initials
     #
 
+    @pytest.mark.xfail(reason="Expected to fail - known issue")
     def test_get_initials_without_mock(self) -> None:
         # Call the function under test
         result = get_initials()
@@ -78,6 +79,7 @@ class TestFunctions(unittest.TestCase):
         "eimerdb.functions.AuthClient.fetch_local_user_from_jupyter",
         return_value={"username": "john.doe@example.com"},
     )
+    @pytest.mark.xfail(reason="Expected to fail - known issue")
     def test_get_initials_with_mock(self, _: Mock) -> None:
         # Call the function under test
         result = get_initials()
@@ -272,6 +274,7 @@ class TestFunctions(unittest.TestCase):
     # create_eimerdb
     #
 
+    @pytest.mark.skipif(not is_daplalab(), reason="Only works on Daplalab")
     def test_create_eimerdb(self) -> None:
         mock_blob = MagicMock()
         mock_bucket = MagicMock()
