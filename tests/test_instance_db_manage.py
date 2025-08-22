@@ -7,14 +7,6 @@ from tests.test_instance_base import DEFAULT_TABLES_IN_TEST
 from tests.test_instance_base import TestEimerDBInstanceBase
 
 
-@pytest.fixture(autouse=True)
-def patch_fetch_google_credentials():
-    with patch(
-        "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
-    ):
-        yield
-
-
 class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
 
     # verify that instance is set up correctly
