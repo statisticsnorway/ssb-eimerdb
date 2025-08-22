@@ -1,6 +1,6 @@
 [project]
 name = "ssb-eimerdb"
-version = "0.2.4"
+version = "0.2.5"
 description = "EimerDB"
 authors = [{ name = "Stian Elisenberg", email = "seg@ssb.no" }]
 maintainers = [{ name = "Statistics Norway, Data enablement Department (724)" }]
