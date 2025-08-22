@@ -67,7 +67,7 @@ class TestFunctions(unittest.TestCase):
     # get_initials
     #
 
-    @pytest.mark.xfail(reason="Expected to fail - known issue")
+#    @pytest.mark.xfail(reason="Expected to fail - known issue")
     def test_get_initials_without_mock(self) -> None:
         # Call the function under test
         result = get_initials()
