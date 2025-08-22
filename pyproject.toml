@@ -9,7 +9,6 @@ readme = "README.md"
 requires-python = ">=3.10,<4.0"
 dynamic = ["classifiers"]
 dependencies = [
-    "dapla-toolbelt>=3.0.1",
     "docstring-inheritance>=2.2.0",
     "duckdb>=1.0.0",
     "gcsfs>=2025.7.0",

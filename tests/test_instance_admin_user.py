@@ -17,20 +17,6 @@ from tests.test_instance_base import TestEimerDBInstanceBase
 
 
 @pytest.fixture(autouse=True)
-def patch_get_gcs_file_system():
-    with patch("eimerdb.instance.FileClient.get_gcs_file_system"):
-        yield
-
-
-@pytest.fixture(autouse=True)
-def patch_fetch_google_credentials():
-    with patch(
-        "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
-    ):
-        yield
-
-
-@pytest.fixture(autouse=True)
 def patch_uuid4():
     with patch("eimerdb.instance.uuid4", return_value="mocked_uuid"):
         yield

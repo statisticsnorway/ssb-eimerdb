@@ -19,8 +19,7 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
-from dapla import AuthClient
-from dapla import FileClient
+from gcsfs import GCSFileSystem
 from google.cloud import storage
 from google.cloud.storage import Blob
 
@@ -141,7 +140,7 @@ class EimerDBInstance(AbstractDbInstance):
         if username in self._users:
             raise ValueError(f"User {username} already exists!")
 
-        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        client = storage.Client()
         bucket = client.bucket(self._bucket_name)
 
         self._users.update({username: role})
@@ -168,7 +167,7 @@ class EimerDBInstance(AbstractDbInstance):
         if username not in self._users:
             raise ValueError(f"User {username} does not exist.")
 
-        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        client = storage.Client()
         bucket = client.bucket(self._bucket_name)
 
         del self._users[username]
@@ -213,8 +212,7 @@ class EimerDBInstance(AbstractDbInstance):
         }
         self._tables.update(new_table)
 
-        token = AuthClient.fetch_google_credentials()
-        bucket = storage.Client(credentials=token).bucket(self._bucket_name)
+        bucket = storage.Client().bucket(self._bucket_name)
 
         tables_blob = bucket.blob(f"{self._eimer_path}/config/tables.json")
         tables_blob.upload_from_string(
@@ -275,7 +273,7 @@ class EimerDBInstance(AbstractDbInstance):
         partitions = json_data[PARTITION_COLUMNS_KEY]
         filename = f"insert_{insert_id}_{{i}}.parquet"
 
-        fs = FileClient.get_gcs_file_system()
+        fs = GCSFileSystem()
 
         # noinspection PyTypeChecker
         pq.write_to_dataset(
@@ -330,7 +328,7 @@ class EimerDBInstance(AbstractDbInstance):
                 format="parquet",
                 partitioning="hive",
                 schema=self.get_arrow_schema(table_name, raw),
-                filesystem=FileClient.get_gcs_file_system(),
+                filesystem=GCSFileSystem(),
             )
         except FileNotFoundError:
             return None
@@ -353,7 +351,7 @@ class EimerDBInstance(AbstractDbInstance):
         Returns:
             list: A list of parquet files.
         """
-        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        client = storage.Client()
         bucket = client.bucket(self._bucket_name)
 
         prefix = source_folder.rstrip("/") + "/"
@@ -395,7 +393,7 @@ class EimerDBInstance(AbstractDbInstance):
             compression=DEFAULT_COMPRESSION,
             min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
             schema=self.get_arrow_schema(table_name, raw),
-            filesystem=FileClient.get_gcs_file_system(),
+            filesystem=GCSFileSystem(),
         )
 
     def combine_changes(
@@ -555,7 +553,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         parsed_query: dict[str, Any] = parse_sql_query(sql_query)
         query_operation = parsed_query[OPERATION_KEY]
-        fs = FileClient.get_gcs_file_system()
+        fs = GCSFileSystem()
 
         match query_operation:
             case DbOperation.SELECT_QUERY_OPERATION:

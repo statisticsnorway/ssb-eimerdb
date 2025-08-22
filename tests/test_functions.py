@@ -1,7 +1,6 @@
 import unittest
 from typing import Any
 from unittest.mock import MagicMock
-from unittest.mock import Mock
 from unittest.mock import call
 from unittest.mock import patch
 
@@ -17,14 +16,6 @@ from eimerdb.functions import get_initials
 from eimerdb.functions import get_json
 from eimerdb.functions import is_daplalab
 from eimerdb.functions import parse_sql_query
-
-
-@pytest.fixture(autouse=True)
-def patch_fetch_google_credentials():
-    with patch(
-        "eimerdb.functions.AuthClient.fetch_google_credentials", return_value="token"
-    ):
-        yield
 
 
 class TestFunctions(unittest.TestCase):
@@ -67,25 +58,15 @@ class TestFunctions(unittest.TestCase):
     # get_initials
     #
 
-    @pytest.mark.xfail(reason="Expected to fail - known issue")
     def test_get_initials_without_mock(self) -> None:
         # Call the function under test
         result = get_initials()
 
         # Assert result
-        self.assertEqual("user", result)
-
-    @patch(
-        "eimerdb.functions.AuthClient.fetch_local_user_from_jupyter",
-        return_value={"username": "john.doe@example.com"},
-    )
-    @pytest.mark.xfail(reason="Expected to fail - known issue")
-    def test_get_initials_with_mock(self, _: Mock) -> None:
-        # Call the function under test
-        result = get_initials()
-
-        # Assert result
-        self.assertEqual("john.doe", result)
+        if is_daplalab():
+            self.assertNotEqual("user", result)
+        else:
+            self.assertEqual("user", result)
 
     def test_get_json(self) -> None:
         mock_blob = MagicMock()
