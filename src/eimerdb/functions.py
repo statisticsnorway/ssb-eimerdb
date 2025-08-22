@@ -12,7 +12,6 @@ from datetime import datetime
 from typing import Any
 
 import pyarrow as pa
-from dapla import AuthClient
 from google.cloud import storage
 
 from eimerdb.eimerdb_constants import APPLICATION_JSON
@@ -95,8 +94,7 @@ def get_json(bucket_name: str, blob_path: str) -> dict[str, Any]:
     Returns:
         str: The JSON content.
     """
-    token = AuthClient.fetch_google_credentials()
-    client = storage.Client(credentials=token)
+    client = storage.Client()
     bucket = client.get_bucket(bucket_name)
     blob = bucket.blob(blob_path)
 
@@ -233,7 +231,7 @@ def create_eimerdb(bucket_name: str, db_name: str) -> None:
         bucket_name: A GCP bucket.
         db_name: Name of the instance.
     """
-    storage_client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+    storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
 
     creator = get_initials()
