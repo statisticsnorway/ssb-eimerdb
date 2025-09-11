@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Poetry
         run: |
@@ -34,7 +34,7 @@ jobs:
           poetry --version
 
       - name: Set up Python
-        uses: actions/setup-python@v5.1.1
+        uses: actions/setup-python@v6.0.0
         with:
           python-version: "3.11"
           cache: "poetry"
@@ -48,7 +48,7 @@ jobs:
           poetry run sphinx-build docs docs/_build
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: "docs/_build"
 
