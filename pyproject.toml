@@ -17,7 +17,7 @@ Changelog = "https://github.com/statisticsnorway/ssb-eimerdb/releases"
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
 click = ">=8.0.1"
-duckdb = "^1.0.0"
+duckdb = "1.4.1"
 google-cloud-storage = "^2.15.0"
 pyarrow = "^17.0.0"
 dapla-toolbelt = "3.0.1"

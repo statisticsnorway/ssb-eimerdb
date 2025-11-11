@@ -71,6 +71,7 @@ class QueryWorker:
 
         return result_table.drop(["user", "operation", "datetime"])
 
+# ...existing code...
     def query_select(
         self,
         parsed_query: dict[str, Any],
@@ -135,11 +136,95 @@ class QueryWorker:
             del table
 
         query_result = con.execute(sql_query)
-        return (
-            query_result.df()
-            if output_format == PANDAS_OUTPUT_FORMAT
-            else query_result.arrow()
-        )
+
+        # Return pandas DataFrame directly when requested
+        if output_format == PANDAS_OUTPUT_FORMAT:
+            df = query_result.df()
+            con.close()
+            return df
+
+        # For arrow output, duckdb may return a RecordBatchReader; normalize to pa.Table
+        arrow_obj = query_result.arrow()
+        if hasattr(arrow_obj, "read_all"):
+            table = arrow_obj.read_all()
+        elif isinstance(arrow_obj, pa.Table):
+            table = arrow_obj
+        else:
+            # consume batches as fallback
+            table = pa.Table.from_batches(list(arrow_obj))
+
+        con.close()
+        return table
+# ...existing code...    
+    # def query_select(
+    #     self,
+    #     parsed_query: dict[str, Any],
+    #     sql_query: str,
+    #     partition_select: Optional[dict[str, Any]],
+    #     unedited: bool,
+    #     output_format: str,
+    #     fs: GCSFileSystem,
+    #     timetravel: Optional[str] = None,
+    # ) -> Union[pd.DataFrame, pa.Table]:
+    #     """Query the database.
+
+    #     Args:
+    #         parsed_query (dict): The parsed query.
+    #         sql_query (str): The SQL query to execute.
+    #         partition_select (dict, optional): Dictionary containing partition selection criteria. Defaults to None.
+    #         unedited (bool): Flag indicating whether to retrieve unedited data. Defaults to False.
+    #         output_format (str): Desired output format ('pandas' or 'arrow'). Defaults to PANDAS_OUTPUT_FORMAT.
+    #         timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
+    #         fs (GCSFileSystem): The GCSFileSystem instance.
+
+    #     Returns:
+    #         Union[pd.DataFrame, pa.Table]: Returns a pandas DataFrame if 'pandas' output format is specified,
+    #     """
+    #     con = duckdb.connect(config=DUCKDB_DEFAULT_CONFIG)
+    #     tables = parsed_query[TABLE_NAME_KEY]
+
+    #     for table_name in tables:
+    #         table_config = self._db_instance.tables[table_name]
+    #         current_partition_select = filter_partition_select_on_table(
+    #             table_name=table_name, partition_select=partition_select
+    #         )
+    #         table_files = get_partitioned_files(
+    #             table_name=table_name,
+    #             instance_name=self._db_instance.eimerdb_name,
+    #             table_config=table_config,
+    #             suffix="_raw",
+    #             fs=fs,
+    #             timetravel=timetravel,
+    #             partition_select=current_partition_select,
+    #             unedited=unedited,
+    #         )
+
+    #         table = QueryWorker._timetravel_filter(
+    #             target_table=pq.read_table(table_files, filesystem=fs),
+    #             timetravel=timetravel,
+    #         )
+
+    #         if table_config[EDITABLE_KEY] is True and unedited is False:
+    #             changes_table = self.query_changes(
+    #                 sql_query=f"{SELECT_STAR_QUERY} {table_name}",
+    #                 partition_select=current_partition_select,
+    #                 output_format=ARROW_OUTPUT_FORMAT,
+    #                 changes_output=CHANGES_RECENT,
+    #                 unedited=False,
+    #             )
+
+    #             if changes_table is not None and changes_table.num_rows > 0:
+    #                 table = update_pyarrow_table(table, changes_table, timetravel)
+
+    #         con.register(table_name, table)
+    #         del table
+
+    #     query_result = con.execute(sql_query)
+    #     return (
+    #         query_result.df()
+    #         if output_format == PANDAS_OUTPUT_FORMAT
+    #         else query_result.arrow()
+    #     )
 
     @staticmethod
     def _add_meta_data(target_df: pd.DataFrame, operation: str) -> pd.DataFrame:
@@ -360,6 +445,71 @@ class QueryWorker:
 
             return dataset if dataset.num_rows > 0 else None
 
+        # def get_changes_query_result(
+        #     local_changes_output: str,
+        # ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+        #     dataset = get_change_dataset(local_changes_output)
+        #     if dataset is None:
+        #         return None
+
+        #     conn = duckdb.connect(config=DUCKDB_DEFAULT_CONFIG)
+        #     query_result = conn.query(get_duckdb_query(local_changes_output))
+        #     if output_format == PANDAS_OUTPUT_FORMAT:
+        #         return query_result.df()
+        #     else:
+        #         column_order = [
+        #             field.name
+        #             for field in self._db_instance.get_arrow_schema(table_name, True)
+        #         ]
+        #         return query_result.arrow().select(column_order)
+
+        # def get_changes_query_result(
+        #     local_changes_output: str,
+        # ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+        #     dataset = get_change_dataset(local_changes_output)
+        #     if dataset is None:
+        #         return None
+
+        #     conn = duckdb.connect(config=DUCKDB_DEFAULT_CONFIG)
+        #     try:
+        #         query_result = conn.query(get_duckdb_query(local_changes_output))
+        #         if output_format == PANDAS_OUTPUT_FORMAT:
+        #             return query_result.df()
+        #         else:
+        #             column_order = [
+        #                 field.name
+        #                 for field in self._db_instance.get_arrow_schema(table_name, True)
+        #             ]
+
+        #             # duckdb.query(...).arrow() returns a RecordBatchReader (no .select),
+        #             # so convert to a Table first and then select the desired column order.
+        #             arrow_obj = query_result.arrow()
+
+        #             # Preferred path: RecordBatchReader.read_all() -> pa.Table
+        #             if hasattr(arrow_obj, "read_all"):
+        #                 table = arrow_obj.read_all()
+        #             # If duckdb returned a Table directly (unlikely), use it
+        #             elif isinstance(arrow_obj, pa.Table):
+        #                 table = arrow_obj
+        #             else:
+        #                 # Fallback: consume batches and build a Table
+        #                 table = pa.Table.from_batches(list(arrow_obj))
+
+        #             # Select only the columns present in the expected schema (preserves order)
+        #             table = table.select(column_order)
+
+        #             # Ensure types match expected arrow schema when possible
+        #             try:
+        #                 table = table.cast(self._db_instance.get_arrow_schema(table_name, True))
+        #             except Exception:
+        #                 # If cast fails (e.g. missing/extra columns), return the selected table anyway
+        #                 pass
+
+        #             return table
+        #     finally:
+        #         conn.close()
+
+# ...existing code...
         def get_changes_query_result(
             local_changes_output: str,
         ) -> Optional[Union[pd.DataFrame, pa.Table]]:
@@ -368,16 +518,42 @@ class QueryWorker:
                 return None
 
             conn = duckdb.connect(config=DUCKDB_DEFAULT_CONFIG)
-            query_result = conn.query(get_duckdb_query(local_changes_output))
-            if output_format == PANDAS_OUTPUT_FORMAT:
-                return query_result.df()
-            else:
+            try:
+                query_result = conn.query(get_duckdb_query(local_changes_output))
+
+                if output_format == PANDAS_OUTPUT_FORMAT:
+                    return query_result.df()
+
+                # Normalize duckdb arrow result to a pyarrow.Table
+                arrow_obj = query_result.arrow()
+                if hasattr(arrow_obj, "read_all"):
+                    table = arrow_obj.read_all()
+                elif isinstance(arrow_obj, pa.Table):
+                    table = arrow_obj
+                else:
+                    # fallback: consume batches and build a Table
+                    table = pa.Table.from_batches(list(arrow_obj))
+
+                # Respect expected column order but only keep columns that actually exist
                 column_order = [
                     field.name
                     for field in self._db_instance.get_arrow_schema(table_name, True)
                 ]
-                return query_result.arrow().select(column_order)
+                existing_cols = [c for c in column_order if c in table.column_names]
+                if existing_cols:
+                    table = table.select(existing_cols)
 
+                # Try to cast to the expected schema; ignore failures to remain robust
+                try:
+                    table = table.cast(self._db_instance.get_arrow_schema(table_name, True))
+                except Exception:
+                    pass
+
+                return table
+            finally:
+                conn.close()
+# ...existing code...
+        
         # method body
         if changes_output == CHANGES_ALL:
             return self._concat_changes(
