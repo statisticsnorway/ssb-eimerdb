@@ -16,7 +16,9 @@ TABLE_PATH_KEY = "table_path"
 PARTITION_COLUMNS_KEY = "partition_columns"
 SCHEMA_KEY = "schema"
 
-DUCKDB_DEFAULT_CONFIG = {"preserve_insertion_order": False}
+DUCKDB_DEFAULT_CONFIG: dict[str, str | bool | int | float | list[str]] | None = {
+    "preserve_insertion_order": False
+}
 
 ROW_ID_DEF = {"name": "row_id", "type": "string", "label": "Unique row ID"}
 PANDAS_OUTPUT_FORMAT = "pandas"

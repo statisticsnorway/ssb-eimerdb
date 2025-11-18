@@ -12,8 +12,6 @@ Date: September 16, 2023
 import json
 import logging
 from typing import Any
-from typing import Optional
-from typing import Union
 from uuid import uuid4
 
 import pandas as pd
@@ -99,7 +97,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         initials = get_initials()
         if initials in users and users[initials] == "admin":
-            role_groups: Optional[dict[str, Any]] = get_json(
+            role_groups: dict[str, Any] | None = get_json(
                 bucket_name, f"{eimer_path}/config/role_groups.json"
             )
             is_admin: bool = True
@@ -162,8 +160,8 @@ class EimerDBInstance(AbstractDbInstance):
         self,
         table_name: str,
         schema: list[dict[str, Any]],
-        partition_columns: Optional[list[str]] = None,
-        editable: Optional[bool] = True,
+        partition_columns: list[str] | None = None,
+        editable: bool | None = True,
     ) -> None:
         if self._is_admin is not True:
             raise PermissionError("Cannot create table. You are not an admin!")
@@ -254,7 +252,7 @@ class EimerDBInstance(AbstractDbInstance):
 
     def _get_inserts_or_changes(
         self, table_name: str, source_folder: str, raw: bool
-    ) -> Optional[pa.Table]:
+    ) -> pa.Table | None:
         """Retrieve inserts or changes for a given table. Returns None if file not found.
 
         Args:
@@ -363,11 +361,11 @@ class EimerDBInstance(AbstractDbInstance):
     def query(  # noqa: D102
         self,
         sql_query: str,
-        partition_select: Optional[dict[str, Any]] = None,
+        partition_select: dict[str, Any] | None = None,
         unedited: bool = False,
         output_format: str = PANDAS_OUTPUT_FORMAT,
-        timetravel: Optional[str] = None,
-    ) -> Union[pd.DataFrame, pa.Table, str]:
+        timetravel: str | None = None,
+    ) -> pd.DataFrame | pa.Table | str:
         if output_format not in [PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT]:
             raise ValueError(
                 f"Invalid output format: {output_format}. Supported formats: pandas, arrow."
@@ -408,11 +406,11 @@ class EimerDBInstance(AbstractDbInstance):
     def query_changes(  # noqa: D102
         self,
         sql_query: str,
-        partition_select: Optional[dict[str, Any]] = None,
+        partition_select: dict[str, Any] | None = None,
         unedited: bool = False,
         output_format: str = PANDAS_OUTPUT_FORMAT,
         changes_output: str = CHANGES_ALL,
-    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+    ) -> pd.DataFrame | pa.Table | None:
         if output_format not in (PANDAS_OUTPUT_FORMAT, ARROW_OUTPUT_FORMAT):
             raise ValueError(f"Invalid output format: {output_format}")
 

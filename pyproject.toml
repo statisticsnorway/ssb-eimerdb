@@ -28,6 +28,8 @@ parameterized = {extras = ["typed"], version = "^0.9.0"}
 docstring-inheritance = "^2.2.0"
 numpy = "^2.0.1"
 filelock = "^3.15.4"
+dapla-auth-client = "^1.2.0"
+ruff = "^0.14.5"
 
 [tool.poetry.group.dev.dependencies]
 Pygments = ">=2.10.0"
@@ -98,7 +100,7 @@ ignore_missing_imports = true
 force-exclude = true  # Apply excludes to pre-commit
 show-fixes = true
 src = ["src", "tests"]
-target-version = "py39"  # Minimum Python version supported
+target-version = "py310"  # Minimum Python version supported
 include = ["*.py", "*.pyi", "**/pyproject.toml", "*.ipynb"]
 extend-exclude = [
     "__pycache__",

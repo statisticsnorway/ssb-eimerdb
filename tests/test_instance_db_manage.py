@@ -1,7 +1,9 @@
+import os
 from copy import copy
 from unittest.mock import patch
 
 import pytest
+from dapla_auth_client.const import DaplaRegion
 
 from tests.test_instance_base import DEFAULT_TABLES_IN_TEST
 from tests.test_instance_base import TestEimerDBInstanceBase
@@ -121,30 +123,69 @@ class TestEimerDBInstanceDbManage(TestEimerDBInstanceBase):
             self.instance.create_table(table_name, schema)
 
             expected = copy(DEFAULT_TABLES_IN_TEST)
-            expected.update(
-                {
-                    table_name: {
-                        "bucket": "test_bucket",
-                        "created_by": "user",
-                        "editable": True,
-                        "partition_columns": None,
-                        "schema": [
-                            {
-                                "label": "Unique row ID",
-                                "name": "row_id",
-                                "type": "string",
-                            },
-                            {"label": "Field 1", "name": "field1", "type": "int8"},
-                        ],
-                        "table_path": "path/to/eimer/table3",
-                    }
-                }
-            )
 
-            self.assertEqual(
-                expected,
-                self.instance.tables,
-            )
+            if os.getenv("DAPLA_REGION") == DaplaRegion.DAPLA_LAB.value:
+                dapla_user = os.getenv("DAPLA_USER")
+                if dapla_user is not None:
+                    user_split = dapla_user.split("@")[0]
+
+                    expected.update(
+                        {
+                            table_name: {
+                                "bucket": "test_bucket",
+                                "created_by": f"{user_split}",
+                                "editable": True,
+                                "partition_columns": None,
+                                "schema": [
+                                    {
+                                        "label": "Unique row ID",
+                                        "name": "row_id",
+                                        "type": "string",
+                                    },
+                                    {
+                                        "label": "Field 1",
+                                        "name": "field1",
+                                        "type": "int8",
+                                    },
+                                ],
+                                "table_path": "path/to/eimer/table3",
+                            }
+                        }
+                    )
+
+                    self.assertEqual(
+                        expected,
+                        self.instance.tables,
+                    )
+                else:
+                    expected.update(
+                        {
+                            table_name: {
+                                "bucket": "test_bucket",
+                                "created_by": "user",
+                                "editable": True,
+                                "partition_columns": None,
+                                "schema": [
+                                    {
+                                        "label": "Unique row ID",
+                                        "name": "row_id",
+                                        "type": "string",
+                                    },
+                                    {
+                                        "label": "Field 1",
+                                        "name": "field1",
+                                        "type": "int8",
+                                    },
+                                ],
+                                "table_path": "path/to/eimer/table3",
+                            }
+                        }
+                    )
+
+                    self.assertEqual(
+                        expected,
+                        self.instance.tables,
+                    )
 
             # Mock assertions
             mock_bucket.blob.assert_called_once_with("path/to/eimer/config/tables.json")

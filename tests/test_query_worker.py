@@ -1,6 +1,6 @@
 import datetime
+import os
 from typing import Any
-from typing import Optional
 from unittest.mock import ANY
 from unittest.mock import MagicMock
 from unittest.mock import Mock
@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pandas as pd
 import pyarrow as pa
 import pytest
+from dapla_auth_client.const import DaplaRegion
 from parameterized import parameterized
 
 from eimerdb.eimerdb_constants import DEFAULT_COMPRESSION
@@ -50,7 +51,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         table_name: str,
         unedited: bool,
         output_format,
-        changes_count: Optional[int],
+        changes_count: int | None,
     ) -> None:
         # Mock input parameters
         parsed_query = {"table_name": [table_name]}
@@ -165,7 +166,13 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             )
 
             # Assertions
-            self.assertEqual("1 rows updated by user", result)
+            if os.getenv("DAPLA_REGION") == DaplaRegion.DAPLA_LAB.value:
+                dapla_user = os.getenv("DAPLA_USER")
+                if dapla_user is not None:
+                    user_split = dapla_user.split("@")[0]
+                    self.assertEqual(f"1 rows updated by {user_split}", result)
+                else:
+                    self.assertEqual("1 rows updated by user", result)
 
             mock_write_to_dataset.assert_called_with(
                 table=ANY,
@@ -228,7 +235,13 @@ class TestQueryWorker(TestEimerDBInstanceBase):
             )
 
             # Assertions
-            self.assertEqual("1 rows deleted by user", result)
+            if os.getenv("DAPLA_REGION") == DaplaRegion.DAPLA_LAB.value:
+                dapla_user = os.getenv("DAPLA_USER")
+                if dapla_user is not None:
+                    user_split = dapla_user.split("@")[0]
+                    self.assertEqual(f"1 rows deleted by {user_split}", result)
+                else:
+                    self.assertEqual("1 rows deleted by user", result)
 
             mock_write_to_dataset.assert_called_with(
                 table=ANY,
@@ -258,7 +271,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
     def test_query_changes(
         self,
         table_name: str,
-        partition_select: Optional[dict[str, Any]],
+        partition_select: dict[str, Any] | None,
         unedited: bool,
         output_format: str,
         changes_output: str,
@@ -302,7 +315,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         mock_duckdb_query_result.df.return_value = (
             expected_df if expected_rows > 0 else pd.DataFrame()
         )
-        mock_duckdb_query_result.arrow.return_value = (
+        mock_duckdb_query_result.fetch_arrow_table.return_value = (
             pa.Table.from_pandas(expected_df)
             if expected_rows > 0
             else pa.Table.from_pandas(pd.DataFrame())

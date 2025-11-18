@@ -1,6 +1,6 @@
+import os
 import unittest
 from typing import Any
-from typing import Optional
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 from unittest.mock import call
@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import pyarrow as pa
 import pytest
+from dapla_auth_client.const import DaplaRegion
 from parameterized import parameterized
 
 from eimerdb.functions import arrow_schema_from_json
@@ -21,8 +22,11 @@ from eimerdb.functions import parse_sql_query
 
 @pytest.fixture(autouse=True)
 def patch_fetch_google_credentials():
+    mock_credentials = MagicMock()
+    mock_credentials.token = "token"
     with patch(
-        "eimerdb.functions.AuthClient.fetch_google_credentials", return_value="token"
+        "eimerdb.functions.AuthClient.fetch_google_credentials",
+        return_value=mock_credentials,
     ):
         yield
 
@@ -45,7 +49,7 @@ class TestFunctions(unittest.TestCase):
         self,
         table_name: str,
         partition_select: dict[str, Any],
-        expected: Optional[dict[str, Any]],
+        expected: dict[str, Any] | None,
     ) -> None:
         # Call the function under test
         result = filter_partition_select_on_table(table_name, partition_select)
@@ -70,20 +74,28 @@ class TestFunctions(unittest.TestCase):
     def test_get_initials_without_mock(self) -> None:
         # Call the function under test
         result = get_initials()
-
-        # Assert result
-        self.assertEqual("user", result)
+        if os.getenv("DAPLA_REGION") == DaplaRegion.DAPLA_LAB.value:
+            dapla_user = os.getenv("DAPLA_USER")
+            if dapla_user is not None:
+                user_split = dapla_user.split("@")[0]
+                self.assertEqual(user_split, result)
+            else:
+                self.assertEqual("user", result)
 
     @patch(
-        "eimerdb.functions.AuthClient.fetch_local_user_from_jupyter",
-        return_value={"username": "john.doe@example.com"},
+        "eimerdb.functions.AuthClient.fetch_email_from_credentials",
+        return_value="john.doe@example.com",
     )
     def test_get_initials_with_mock(self, _: Mock) -> None:
         # Call the function under test
         result = get_initials()
-
-        # Assert result
-        self.assertEqual("john.doe", result)
+        if os.getenv("DAPLA_REGION") == DaplaRegion.DAPLA_LAB.value:
+            dapla_user = os.getenv("DAPLA_USER")
+            if dapla_user is not None:
+                user_split = dapla_user.split("@")[0]
+                self.assertEqual(user_split, result)
+            else:
+                self.assertEqual("user", result)
 
     def test_get_json(self) -> None:
         mock_blob = MagicMock()

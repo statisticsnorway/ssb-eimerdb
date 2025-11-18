@@ -3,8 +3,6 @@ from abc import ABCMeta
 from abc import abstractmethod
 from copy import copy
 from typing import Any
-from typing import Optional
-from typing import Union
 
 import pandas as pd
 import pyarrow as pa
@@ -36,7 +34,7 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         time_created: str,
         tables: dict[str, Any],
         users: dict[str, Any],
-        role_groups: Optional[dict[str, Any]],
+        role_groups: dict[str, Any] | None,
         is_admin: bool,
     ) -> None:
         """Initialize AbstractDbInstance.
@@ -61,7 +59,7 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         self._time_created: str = time_created
         self._tables: dict[str, Any] = tables
         self._users: dict[str, Any] = users
-        self._role_groups: Optional[dict[str, Any]] = role_groups
+        self._role_groups: dict[str, Any] | None = role_groups
         self._is_admin: bool = is_admin
 
     @property
@@ -105,7 +103,7 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         return copy(self._users)
 
     @property
-    def role_groups(self) -> Optional[dict[str, Any]]:
+    def role_groups(self) -> dict[str, Any] | None:
         """Get the role groups in the EimerDB."""
         return copy(self._role_groups) if self._role_groups is not None else None
 
@@ -144,8 +142,8 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         self,
         table_name: str,
         schema: list[dict[str, Any]],
-        partition_columns: Optional[list[str]] = None,
-        editable: Optional[bool] = True,
+        partition_columns: list[str] | None = None,
+        editable: bool | None = True,
     ) -> None:
         """Create a new table in EimerDB.
 
@@ -211,10 +209,10 @@ class AbstractDbInstance(ABC, metaclass=Meta):
     def query(
         self,
         sql_query: str,
-        partition_select: Optional[dict[str, Any]] = None,
+        partition_select: dict[str, Any] | None = None,
         unedited: bool = False,
         output_format: str = PANDAS_OUTPUT_FORMAT,
-    ) -> Union[pd.DataFrame, pa.Table, str]:
+    ) -> pd.DataFrame | pa.Table | str:
         """Execute an SQL query on an EimerDB table.
 
         Args:
@@ -234,11 +232,11 @@ class AbstractDbInstance(ABC, metaclass=Meta):
     def query_changes(
         self,
         sql_query: str,
-        partition_select: Optional[dict[str, Any]] = None,
+        partition_select: dict[str, Any] | None = None,
         unedited: bool = False,
         output_format: str = PANDAS_OUTPUT_FORMAT,
         changes_output: str = CHANGES_ALL,
-    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+    ) -> pd.DataFrame | pa.Table | None:
         """Query changes made in the database table.
 
         Args:

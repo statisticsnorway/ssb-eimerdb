@@ -1,8 +1,6 @@
 import logging
 from datetime import datetime
 from typing import Any
-from typing import Optional
-from typing import Union
 from uuid import uuid4
 
 import duckdb
@@ -56,7 +54,7 @@ class QueryWorker:
     @staticmethod
     def _timetravel_filter(
         target_table: pa.Table,
-        timetravel: Optional[str],
+        timetravel: str | None,
     ) -> pa.Table:
         if timetravel is None:
             return target_table
@@ -75,12 +73,12 @@ class QueryWorker:
         self,
         parsed_query: dict[str, Any],
         sql_query: str,
-        partition_select: Optional[dict[str, Any]],
+        partition_select: dict[str, Any] | None,
         unedited: bool,
         output_format: str,
         fs: GCSFileSystem,
-        timetravel: Optional[str] = None,
-    ) -> Union[pd.DataFrame, pa.Table]:
+        timetravel: str | None = None,
+    ) -> pd.DataFrame | pa.Table:
         """Query the database.
 
         Args:
@@ -138,7 +136,7 @@ class QueryWorker:
         return (
             query_result.df()
             if output_format == PANDAS_OUTPUT_FORMAT
-            else query_result.arrow()
+            else query_result.fetch_arrow_table()
         )
 
     @staticmethod
@@ -160,8 +158,8 @@ class QueryWorker:
     def query_update_or_delete(
         self,
         parsed_query: dict[str, Any],
-        update_sql_query: Optional[str],
-        partition_select: Optional[dict[str, Any]],
+        update_sql_query: str | None,
+        partition_select: dict[str, Any] | None,
         fs: GCSFileSystem,
     ) -> str:
         """Query the database to update or delete records.
@@ -236,10 +234,10 @@ class QueryWorker:
 
     def _cast_if_arrow(
         self,
-        table: Optional[Union[pd.DataFrame, pa.Table]],
+        table: pd.DataFrame | pa.Table | None,
         table_name: str,
         output_format: str,
-    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+    ) -> pd.DataFrame | pa.Table | None:
         if table is None or output_format == PANDAS_OUTPUT_FORMAT:
             return table
 
@@ -247,11 +245,11 @@ class QueryWorker:
 
     def _concat_changes(
         self,
-        first: Optional[Union[pd.DataFrame, pa.Table]],
-        second: Optional[Union[pd.DataFrame, pa.Table]],
+        first: pd.DataFrame | pa.Table | None,
+        second: pd.DataFrame | pa.Table | None,
         table_name: str,
         output_format: str,
-    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+    ) -> pd.DataFrame | pa.Table | None:
         if first is None and second is None:
             return None
 
@@ -274,11 +272,11 @@ class QueryWorker:
     def query_changes(
         self,
         sql_query: str,
-        partition_select: Optional[dict[str, Any]],
+        partition_select: dict[str, Any] | None,
         unedited: bool,
         output_format: str,
         changes_output: str,
-    ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+    ) -> pd.DataFrame | pa.Table | None:
         """Query changes made in the database table.
 
         Args:
@@ -321,7 +319,7 @@ class QueryWorker:
 
         fs = FileClient.get_gcs_file_system()
 
-        def get_change_dataset(local_changes_output: str) -> Optional[pa.Table]:
+        def get_change_dataset(local_changes_output: str) -> pa.Table | None:
             changes_suffix = (
                 "changes_all" if local_changes_output == CHANGES_ALL else "changes"
             )
@@ -362,7 +360,7 @@ class QueryWorker:
 
         def get_changes_query_result(
             local_changes_output: str,
-        ) -> Optional[Union[pd.DataFrame, pa.Table]]:
+        ) -> pd.DataFrame | pa.Table | None:
             dataset = get_change_dataset(local_changes_output)
             if dataset is None:
                 return None
@@ -376,7 +374,7 @@ class QueryWorker:
                     field.name
                     for field in self._db_instance.get_arrow_schema(table_name, True)
                 ]
-                return query_result.arrow().select(column_order)
+                return query_result.fetch_arrow_table().select(column_order)
 
         # method body
         if changes_output == CHANGES_ALL:
