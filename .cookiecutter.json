@@ -1,4 +1,5 @@
 {
+  "_commit": "9e3c49f6680d4c400567c39d70b768f0a322c95e",
   "_copy_without_render": [
     "*.rst_t"
   ],
@@ -11,12 +12,14 @@
   "code_quality_level": "Medium",
   "copyright_owner": "Statistics Norway",
   "copyright_year": "2023",
-  "development_status": "Development Status :: 3 - Alpha",
+  "department_number": "724",
+  "dependency_manager_tool": "poetry",
+  "development_status": "Development Status :: 4 - Beta",
   "email": "seg@ssb.no",
   "friendly_name": "EimerDB",
   "github_organization": "statisticsnorway",
   "license": "MIT",
   "package_name": "eimerdb",
   "project_name": "ssb-eimerdb",
-  "version": "0.1.0"
+  "version": "0.2.2"
 }

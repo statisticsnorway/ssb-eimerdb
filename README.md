@@ -18,7 +18,6 @@
 [pypi status]: https://pypi.org/project/ssb-eimerdb/
 [documentation]: https://statisticsnorway.github.io/ssb-eimerdb
 [tests]: https://github.com/statisticsnorway/ssb-eimerdb/actions?workflow=Tests
-
 [sonarcov]: https://sonarcloud.io/summary/overall?id=statisticsnorway_ssb-eimerdb
 [sonarquality]: https://sonarcloud.io/summary/overall?id=statisticsnorway_ssb-eimerdb
 [pre-commit]: https://github.com/pre-commit/pre-commit

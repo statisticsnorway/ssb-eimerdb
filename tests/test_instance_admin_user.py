@@ -141,9 +141,10 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
                 self.assertIs(expected_table, inserts_table)
 
     def test_write_to_table_and_delete_blobs(self) -> None:
-        with patch("eimerdb.instance.storage.Client") as mock_client, patch(
-            "eimerdb.instance.pq.write_to_dataset"
-        ) as mock_write_to_dataset:
+        with (
+            patch("eimerdb.instance.storage.Client") as mock_client,
+            patch("eimerdb.instance.pq.write_to_dataset") as mock_write_to_dataset,
+        ):
             # Setup mocks
             expected_table = self._get_expected_table(False)
             mock_write_to_dataset.return_value = expected_table
@@ -189,12 +190,15 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
     def test_combine_changes(self, expect_table: bool) -> None:
         expected_source_folder = "path/to/eimer/table1_changes"
 
-        with patch(
-            "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
-        ) as mock_get_inserts_or_changes, patch(
-            "eimerdb.instance.EimerDBInstance._write_to_table_and_delete_blobs",
-            return_value=None,
-        ) as mock_write_to_table_and_delete_blobs:
+        with (
+            patch(
+                "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
+            ) as mock_get_inserts_or_changes,
+            patch(
+                "eimerdb.instance.EimerDBInstance._write_to_table_and_delete_blobs",
+                return_value=None,
+            ) as mock_write_to_table_and_delete_blobs,
+        ):
             # Setup mocks
             mock_get_inserts_or_changes.return_value = (
                 self._get_expected_table(False) if expect_table else None
@@ -233,12 +237,15 @@ class TestEimerDBInstanceAdminUser(TestEimerDBInstanceBase):
         suffix = "_raw" if raw else ""
         expected_source_folder = "path/to/eimer/table1" + suffix
 
-        with patch(
-            "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
-        ) as mock_get_inserts_or_changes, patch(
-            "eimerdb.instance.EimerDBInstance._write_to_table_and_delete_blobs",
-            return_value=None,
-        ) as mock_write_to_table_and_delete_blobs:
+        with (
+            patch(
+                "eimerdb.instance.EimerDBInstance._get_inserts_or_changes"
+            ) as mock_get_inserts_or_changes,
+            patch(
+                "eimerdb.instance.EimerDBInstance._write_to_table_and_delete_blobs",
+                return_value=None,
+            ) as mock_write_to_table_and_delete_blobs,
+        ):
             # Setup mocks
             mock_get_inserts_or_changes.return_value = (
                 self._get_expected_table(raw) if expect_table else None

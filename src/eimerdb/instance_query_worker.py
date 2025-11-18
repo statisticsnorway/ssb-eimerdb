@@ -241,7 +241,7 @@ class QueryWorker:
         if table is None or output_format == PANDAS_OUTPUT_FORMAT:
             return table
 
-        return table.cast(self._db_instance.get_arrow_schema(table_name, True))
+        return table.cast(self._db_instance.get_arrow_schema(table_name, True))  # type: ignore
 
     def _concat_changes(
         self,

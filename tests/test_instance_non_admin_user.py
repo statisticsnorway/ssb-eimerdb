@@ -8,9 +8,10 @@ from eimerdb.instance import EimerDBInstance
 
 class TestEimerDBInstanceNonAdminUser(unittest.TestCase):
     def setUp(self) -> None:
-        with patch(
-            "eimerdb.instance.get_initials", return_value="non_admin_user"
-        ), patch("eimerdb.instance.get_json") as mock_get_json:
+        with (
+            patch("eimerdb.instance.get_initials", return_value="non_admin_user"),
+            patch("eimerdb.instance.get_json") as mock_get_json,
+        ):
             mock_get_json.side_effect = [
                 {
                     "eimerdb_name": "test_eimerdb",
