@@ -1,5 +1,4 @@
 import unittest
-from typing import Optional
 from unittest.mock import Mock
 
 import pyarrow as pa
@@ -90,7 +89,7 @@ class TestGetPartitionedFiles(unittest.TestCase):
     def test_get_partitioned_files_with_partition_select_and_unedited_or_timetravel(
         self,
         unedited: bool,
-        timetravel: Optional[str],
+        timetravel: str | None,
     ) -> None:
         # Setup mocks
         self.fs.glob.return_value = [
@@ -147,7 +146,7 @@ class TestGetPartitionedFiles(unittest.TestCase):
         )
 
     @parameterized.expand([(None,), ("2023-11-13 00:00:00",)])
-    def test_update_pyarrow_table(self, timetravel: Optional[str]) -> None:
+    def test_update_pyarrow_table(self, timetravel: str | None) -> None:
         # Create the original PyArrow table
         original_schema = pa.schema(
             [pa.field("row_id", pa.string()), pa.field("value", pa.int32())]

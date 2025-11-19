@@ -41,9 +41,10 @@ DEFAULT_TABLES_IN_TEST = {
 class TestEimerDBInstanceBase(unittest.TestCase):
 
     def setUp(self) -> None:
-        with patch("eimerdb.instance.get_initials", return_value="admin_user"), patch(
-            "eimerdb.instance.get_json"
-        ) as mock_get_json:
+        with (
+            patch("eimerdb.instance.get_initials", return_value="admin_user"),
+            patch("eimerdb.instance.get_json") as mock_get_json,
+        ):
             mock_get_json.side_effect = [
                 {
                     "eimerdb_name": "test_eimerdb",

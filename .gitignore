@@ -1,33 +1,8 @@
-# This .gitignore file is based on SSB's recommended gitignore template stored
-# in: https://github.com/statisticsnorway/kvakk-git-tools
-# It contains three sections: SSB specific ignores, GitHub's Python-ignore
-# template and GitHub's R-ignore template.
-
-
-# The section below contains SSB specific ignores, not included in the Python-
-# and R-ignores from GitHub.
-*.csv
-*.db
-*.feather
-*.parquet
-*.sas7bdat
-*.xls
-*.xlsx
-*.zip
-
-# Notebooks shall be stored in .py or .R-format.
-# See https://adr.ssb.no/0020-lagringsformat-for-jupyter-notebooks/
-*.ipynb
-
-
-# The section below is from the GitHub .gitignore template for Python:
-# https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[cod]
+*.py[codz]
 *$py.class
-.poetry/cache/
+**/.poetry/cache/
 
 # C extensions
 *.so
@@ -72,7 +47,7 @@ htmlcov/
 nosetests.xml
 coverage.xml
 *.cover
-*.py,cover
+*.py.cover
 .hypothesis/
 .pytest_cache/
 cover/
@@ -108,13 +83,17 @@ target/
 profile_default/
 ipython_config.py
 
-# pdm
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/#use-with-ide
-.pdm.toml
+# pyenv
+.python-version
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/
 
 # Celery stuff
@@ -126,6 +105,7 @@ celerybeat.pid
 
 # Environments
 .env
+.envrc
 .venv
 env/
 venv/
@@ -157,59 +137,42 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# The section below is from the GitHub .gitignore template for R:
-# https://raw.githubusercontent.com/github/gitignore/main/R.gitignore
+# PyCharm
+.idea/
 
-# History files
-.Rhistory
-.Rapp.history
+# Abstra
+# Abstra is an AI-powered process automation framework.
+# Ignore directories containing user credentials, local state, and settings.
+# Learn more at https://abstra.io/docs
+.abstra/
 
-# Session Data files
-.RData
-.RDataTmp
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+# Local History for Visual Studio Code
+.history/
+# Built Visual Studio Code Extensions
+*.vsix
 
-# User-specific files
-.Ruserdata
+# Ruff stuff:
+.ruff_cache/
 
-# Example code in package build process
-*-Ex.R
+# PyPI configuration file
+.pypirc
 
-# Output files from R CMD build
-/*.tar.gz
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
 
-# Output files from R CMD check
-/*.Rcheck/
+# Streamlit
+.streamlit/secrets.toml
 
-# RStudio files
-.Rproj.user/
-
-# produced vignettes
-vignettes/*.html
-vignettes/*.pdf
-
-# OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
-.httr-oauth
-
-# knitr and R markdown default cache directories
-*_cache/
-/cache/
-
-# Temporary files created by R markdown
-*.utf8.md
-*.knit.md
-
-# R Environment Variables
-.Renviron
-
-# translation temp files
-po/*~
-
-# RStudio Connect folder
-rsconnect/
-
-# ignore poetry in .config
-.poetry/**
-
-# Blaise specific ignores
-*.bdix
-*.bdbx
+# Other
+/docs/_build/
+*.rej
+*.orig
