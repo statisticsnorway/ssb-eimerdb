@@ -1,6 +1,6 @@
 [project]
 name = "ssb-eimerdb"
-version = "0.2.2"
+version = "0.2.6"
 description = "EimerDB"
 authors = [{ name = "Stian Elisenberg", email = "seg@ssb.no" }]
 maintainers = [{ name = "Statistics Norway, Data enablement Department (724)" }]
@@ -10,7 +10,7 @@ requires-python = ">=3.10,<4.0"
 dynamic = ["classifiers"]
 dependencies = [
     "click>=8.0.1",
-    "duckdb>=1.0.0",
+    "duckdb>=1.3.2",
     "google-cloud-storage>=2.15.0",
     "pyarrow>=17.0.0",
     "dapla-toolbelt>=3.0.1",
