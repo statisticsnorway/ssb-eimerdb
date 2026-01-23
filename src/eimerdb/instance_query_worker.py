@@ -8,7 +8,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
-from dapla import FileClient
+import gcsfs
 from gcsfs import GCSFileSystem
 
 from .abstract_db_instance import AbstractDbInstance
@@ -317,7 +317,7 @@ class QueryWorker:
 
             return modified_query
 
-        fs = FileClient.get_gcs_file_system()
+        fs = gcsfs.GCSFileSystem()
 
         def get_change_dataset(local_changes_output: str) -> pa.Table | None:
             changes_suffix = (

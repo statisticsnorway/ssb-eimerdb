@@ -17,7 +17,7 @@ from tests.test_instance_base import TestEimerDBInstanceBase
 
 @pytest.fixture(autouse=True)
 def patch_get_gcs_file_system():
-    with patch("eimerdb.instance.FileClient.get_gcs_file_system"):
+    with patch("eimerdb.instance.gcsfs.GCSFileSystem"):
         yield
 
 
