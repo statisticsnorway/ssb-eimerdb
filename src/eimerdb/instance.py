@@ -14,12 +14,12 @@ import logging
 from typing import Any
 from uuid import uuid4
 
+import gcsfs
 import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 from dapla import AuthClient
-import gcsfs
 from google.cloud import storage
 
 from .abstract_db_instance import AbstractDbInstance

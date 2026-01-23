@@ -4,11 +4,11 @@ from typing import Any
 from uuid import uuid4
 
 import duckdb
+import gcsfs
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
-import gcsfs
 from gcsfs import GCSFileSystem
 
 from .abstract_db_instance import AbstractDbInstance
