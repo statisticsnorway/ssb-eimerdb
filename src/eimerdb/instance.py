@@ -14,12 +14,12 @@ import logging
 from typing import Any
 from uuid import uuid4
 
+import gcsfs
 import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 from dapla import AuthClient
-from dapla import FileClient
 from google.cloud import storage
 
 from .abstract_db_instance import AbstractDbInstance
@@ -224,7 +224,7 @@ class EimerDBInstance(AbstractDbInstance):
         partitions = json_data[PARTITION_COLUMNS_KEY]
         filename = f"insert_{insert_id}_{{i}}.parquet"
 
-        fs = FileClient.get_gcs_file_system()
+        fs = gcsfs.GCSFileSystem()
 
         # noinspection PyTypeChecker
         pq.write_to_dataset(
@@ -272,7 +272,7 @@ class EimerDBInstance(AbstractDbInstance):
                 format="parquet",
                 partitioning="hive",
                 schema=self.get_arrow_schema(table_name, raw),
-                filesystem=FileClient.get_gcs_file_system(),
+                filesystem=gcsfs.GCSFileSystem(),
             )
         except FileNotFoundError:
             return None
@@ -297,7 +297,7 @@ class EimerDBInstance(AbstractDbInstance):
             compression=DEFAULT_COMPRESSION,
             min_rows_per_group=DEFAULT_MIN_ROWS_PER_GROUP,
             schema=self.get_arrow_schema(table_name, raw),
-            filesystem=FileClient.get_gcs_file_system(),
+            filesystem=gcsfs.GCSFileSystem(),
         )
         for blob in blobs_to_delete:
             blob.delete()
@@ -373,7 +373,7 @@ class EimerDBInstance(AbstractDbInstance):
 
         parsed_query: dict[str, Any] = parse_sql_query(sql_query)
         query_operation = parsed_query[OPERATION_KEY]
-        fs = FileClient.get_gcs_file_system()
+        fs = gcsfs.GCSFileSystem()
 
         match query_operation:
             case DbOperation.SELECT_QUERY_OPERATION:

@@ -333,7 +333,7 @@ class TestQueryWorker(TestEimerDBInstanceBase):
         # Patching methods with mocks
         with (
             patch(
-                "eimerdb.instance_query_worker.FileClient.get_gcs_file_system",
+                "eimerdb.instance_query_worker.gcsfs.GCSFileSystem",
                 return_value=mock_fs,
             ),
             patch(
