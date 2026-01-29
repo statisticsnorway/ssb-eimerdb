@@ -2,7 +2,6 @@ import os
 import unittest
 from typing import Any
 from unittest.mock import MagicMock
-from unittest.mock import Mock
 from unittest.mock import call
 from unittest.mock import patch
 
@@ -25,7 +24,7 @@ def patch_fetch_google_credentials():
     mock_credentials = MagicMock()
     mock_credentials.token = "token"
     with patch(
-        "eimerdb.functions.AuthClient.fetch_google_credentials",
+        "eimerdb.functions.storage.Client",
         return_value=mock_credentials,
     ):
         yield
@@ -82,20 +81,28 @@ class TestFunctions(unittest.TestCase):
             else:
                 self.assertEqual("user", result)
 
-    @patch(
-        "eimerdb.functions.AuthClient.fetch_email_from_credentials",
-        return_value="john.doe@example.com",
-    )
-    def test_get_initials_with_mock(self, _: Mock) -> None:
-        # Call the function under test
-        result = get_initials()
-        if os.getenv("DAPLA_REGION") == DaplaRegion.DAPLA_LAB.value:
-            dapla_user = os.getenv("DAPLA_USER")
-            if dapla_user is not None:
-                user_split = dapla_user.split("@")[0]
-                self.assertEqual(user_split, result)
-            else:
-                self.assertEqual("user", result)
+    # @patch(
+    #     "eimerdb.functions.AuthClient.fetch_email_from_credentials",
+    #     return_value="john.doe@example.com",
+    # )
+    # def test_get_initials_with_mock(self, _: Mock) -> None:
+    #     # Call the function under test
+    #     result = get_initials()
+    #     if os.getenv("DAPLA_REGION") == DaplaRegion.DAPLA_LAB.value:
+    #         dapla_user = os.getenv("DAPLA_USER")
+    #         if dapla_user is not None:
+    #             user_split = dapla_user.split("@")[0]
+    #             self.assertEqual(user_split, result)
+    #         else:
+    #             self.assertEqual("user", result)
+
+    def test_get_initials_with_env_var(self) -> None:
+        with patch.dict("os.environ", {"DAPLA_USER": "john.doe@example.com"}):
+            assert get_initials() == "john.doe"
+
+    def test_get_initials_no_user(self) -> None:
+        with patch.dict("os.environ", {}, clear=True):
+            assert get_initials() == "user"
 
     def test_get_json(self) -> None:
         mock_blob = MagicMock()

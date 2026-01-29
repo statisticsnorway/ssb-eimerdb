@@ -11,9 +11,7 @@ from tests.test_instance_base import TestEimerDBInstanceBase
 
 @pytest.fixture(autouse=True)
 def patch_fetch_google_credentials():
-    with patch(
-        "eimerdb.instance.AuthClient.fetch_google_credentials", return_value="token"
-    ):
+    with patch("eimerdb.instance.storage.Client", return_value="token"):
         yield
 
 
