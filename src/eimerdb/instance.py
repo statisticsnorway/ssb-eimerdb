@@ -19,7 +19,6 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
-from dapla import AuthClient
 from google.cloud import storage
 
 from .abstract_db_instance import AbstractDbInstance
@@ -128,7 +127,7 @@ class EimerDBInstance(AbstractDbInstance):
         if username in self._users:
             raise ValueError(f"User {username} already exists!")
 
-        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        client = storage.Client()
         bucket = client.bucket(self._bucket_name)
 
         self._users.update({username: role})
@@ -146,7 +145,7 @@ class EimerDBInstance(AbstractDbInstance):
         if username not in self._users:
             raise ValueError(f"User {username} does not exist.")
 
-        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        client = storage.Client()
         bucket = client.bucket(self._bucket_name)
 
         del self._users[username]
@@ -180,8 +179,7 @@ class EimerDBInstance(AbstractDbInstance):
         }
         self._tables.update(new_table)
 
-        token = AuthClient.fetch_google_credentials()
-        bucket = storage.Client(credentials=token).bucket(self._bucket_name)
+        bucket = storage.Client().bucket(self._bucket_name)
 
         tables_blob = bucket.blob(f"{self._eimer_path}/config/tables.json")
         tables_blob.upload_from_string(
@@ -282,7 +280,7 @@ class EimerDBInstance(AbstractDbInstance):
     def _write_to_table_and_delete_blobs(
         self, table_name: str, table: pa.Table, source_folder: str, raw: bool
     ) -> None:
-        client = storage.Client(credentials=AuthClient.fetch_google_credentials())
+        client = storage.Client()
         bucket = client.bucket(self._bucket_name)
 
         partitions = self._tables[table_name][PARTITION_COLUMNS_KEY]
