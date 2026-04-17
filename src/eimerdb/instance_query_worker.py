@@ -87,8 +87,8 @@ class QueryWorker:
             partition_select: Dictionary containing partition selection criteria. Defaults to None.
             unedited: Flag indicating whether to retrieve unedited data. Defaults to False.
             output_format: Desired output format ('pandas' or 'arrow'). Defaults to PANDAS_OUTPUT_FORMAT.
-            timetravel: A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
             fs: The GCSFileSystem instance.
+            timetravel: A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
 
         Returns:
             Union[pd.DataFrame, pa.Table]: Returns a pandas DataFrame if 'pandas' output format is specified,

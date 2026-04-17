@@ -61,11 +61,6 @@ class EimerDBInstance(AbstractDbInstance):
     This class provides methods to interact with EimerDB, including
     managing users, creating tables, inserting data, and querying data.
 
-    Args:
-        bucket_name: The name of the Google Cloud Storage bucket
-            where the EimerDB database is hosted.
-        eimer_name: The name of the EimerDB instance.
-
     Methods:
         add_user(username, role): Add a user to EimerDB with a specified role.
         remove_user(username): Remove a user from EimerDB.
@@ -81,8 +76,8 @@ class EimerDBInstance(AbstractDbInstance):
         """Initialize EimerDBInstance.
 
         Args:
-            bucket_name: Name of GCS bucket.
-            eimer_name: Name of EimerDB instance.
+            bucket_name: The name of the Google Cloud Storage bucket where the EimerDB database is hosted.
+            eimer_name: The name of the EimerDB instance.
 
         Attributes:
             bucket_name (str): GCS bucket name.
