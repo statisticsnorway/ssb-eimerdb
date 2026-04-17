@@ -44,8 +44,8 @@ def filter_partition_select_on_table(
         }
 
     Args:
-        table_name (str): The name of the table.
-        partition_select (dict): The partition select.
+        table_name: The name of the table.
+        partition_select: The partition select.
 
     Returns:
         dict: The partition select for the table, or None.
@@ -89,8 +89,8 @@ def get_json(bucket_name: str, blob_path: str) -> dict[str, Any]:
     """A function that retrieves a JSON file from Google Cloud Storage.
 
     Args:
-        bucket_name (str): Name of the bucket.
-        blob_path (str): Path to the blob.
+        bucket_name: Name of the bucket.
+        blob_path: Path to the blob.
 
     Returns:
         str: The JSON content.
@@ -109,7 +109,7 @@ def _get_timestamp_data_type(data_type: str) -> pa.TimestampType:
     """A function that returns the timestamp data type.
 
     Args:
-        data_type (str): The timestamp data type.
+        data_type: The timestamp data type.
 
     Returns:
         pa.TimestampType: The PyArrow timestamp data type.
@@ -124,7 +124,7 @@ def arrow_schema_from_json(json_schema: list[dict[str, Any]]) -> pa.Schema:
     """A function that converts a JSON schema to an Arrow schema.
 
     Args:
-        json_schema (list[dict]): A JSON schema with name, type, and label.
+        json_schema: A JSON schema with name, type, and label.
 
     Returns:
         pa.Schema: The PyArrow schema.
@@ -174,7 +174,7 @@ def parse_sql_query(sql_query: str) -> dict[str, Any]:
     """A function that parses the provided SQL query.
 
     Args:
-        sql_query (str): An SQL query.
+        sql_query: An SQL query.
 
     Returns:
         dict: A dictionary with keys: Operation, columns, table_name, and sql_filter.

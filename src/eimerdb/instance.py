@@ -62,9 +62,9 @@ class EimerDBInstance(AbstractDbInstance):
     managing users, creating tables, inserting data, and querying data.
 
     Args:
-        bucket_name (str): The name of the Google Cloud Storage bucket
+        bucket_name: The name of the Google Cloud Storage bucket
             where the EimerDB database is hosted.
-        eimer_name (str): The name of the EimerDB instance.
+        eimer_name: The name of the EimerDB instance.
 
     Methods:
         add_user(username, role): Add a user to EimerDB with a specified role.
@@ -81,8 +81,8 @@ class EimerDBInstance(AbstractDbInstance):
         """Initialize EimerDBInstance.
 
         Args:
-            bucket_name (str): Name of GCS bucket.
-            eimer_name (str): Name of EimerDB instance.
+            bucket_name: Name of GCS bucket.
+            eimer_name: Name of EimerDB instance.
 
         Attributes:
             bucket_name (str): GCS bucket name.
@@ -254,9 +254,9 @@ class EimerDBInstance(AbstractDbInstance):
         """Retrieve inserts or changes for a given table. Returns None if file not found.
 
         Args:
-            table_name (str): The name of the table for which changes are to be retrieved.
-            source_folder (str): The folder where the inserts/changes are stored.
-            raw (bool): Indicates whether to retrieve the raw schema. Only in use when
+            table_name: The name of the table for which changes are to be retrieved.
+            source_folder: The folder where the inserts/changes are stored.
+            raw: Indicates whether to retrieve the raw schema. Only in use when
                 retrieving inserts.
 
         Returns:
