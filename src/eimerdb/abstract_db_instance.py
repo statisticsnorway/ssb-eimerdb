@@ -6,13 +6,12 @@ from typing import Any
 
 import pandas as pd
 import pyarrow as pa
-from docstring_inheritance import GoogleDocstringInheritanceMeta
 
 from eimerdb.eimerdb_constants import CHANGES_ALL
 from eimerdb.eimerdb_constants import PANDAS_OUTPUT_FORMAT
 
 
-class Meta(ABCMeta, GoogleDocstringInheritanceMeta):
+class Meta(ABCMeta):
     """Metaclass for AbstractDbInstance."""
 
     pass
@@ -40,16 +39,16 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """Initialize AbstractDbInstance.
 
         Args:
-            bucket_name (str): Name of the bucket.
-            eimerdb_name (str): Name of the EimerDB.
-            path (str): Path to the EimerDB configuration file.
-            eimer_path (str): Path to the EimerDB.
-            created_by (str): Name of the user who created the EimerDB.
-            time_created (str): Time when the EimerDB was created.
-            tables (dict): Dictionary containing the tables in the EimerDB.
-            users (dict): Dictionary containing the users in the EimerDB.
-            role_groups (dict, optional): Dictionary containing the role groups in the EimerDB.
-            is_admin (bool): Indicates whether the current user is an admin.
+            bucket_name: Name of the bucket.
+            eimerdb_name: Name of the EimerDB.
+            path: Path to the EimerDB configuration file.
+            eimer_path: Path to the EimerDB.
+            created_by: Name of the user who created the EimerDB.
+            time_created: Time when the EimerDB was created.
+            tables: Dictionary containing the tables in the EimerDB.
+            users: Dictionary containing the users in the EimerDB.
+            role_groups: Dictionary containing the role groups in the EimerDB.
+            is_admin: Indicates whether the current user is an admin.
         """
         self._bucket_name: str = bucket_name
         self._eimerdb_name: str = eimerdb_name
@@ -117,8 +116,8 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """Add a user with a specified role.
 
         Args:
-            username (str): Name of the user to add.
-            role (Any): Role to assign (admin or user).
+            username: Name of the user to add.
+            role: Role to assign (admin or user).
 
         Raises:
             PermissionError: If the user is not an admin.
@@ -130,7 +129,7 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """Remove a users access to the database.
 
         Args:
-            username (str): Name of the user to remove.
+            username: Name of the user to remove.
 
         Raises:
             PermissionError: If the user is not an admin.
@@ -148,10 +147,10 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """Create a new table in EimerDB.
 
         Args:
-            table_name (str): Name of the new table.
-            schema (str): JSON schema for the table.
-            partition_columns (list, optional): List of partition columns.
-            editable (bool, optional): Indicates if the table is editable.
+            table_name: Name of the new table.
+            schema: JSON schema for the table.
+            partition_columns: List of partition columns.
+            editable: Indicates if the table is editable.
 
         Raises:
             PermissionError: If the current user is not an admin.
@@ -162,8 +161,8 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """Insert unedited data into a main table.
 
         Args:
-            table_name (str): Name of the table to insert data into.
-            df (pandas.DataFrame): DataFrame containing the data to insert
+            table_name: Name of the table to insert data into.
+            df: DataFrame containing the data to insert
 
         Returns:
             list[str]: A list of row IDs for the inserted data.
@@ -177,7 +176,7 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """Combines the files containing the changes of the table into one file.
 
         Args:
-            table_name (str): The name of the table for which changes are to be merged.
+            table_name: The name of the table for which changes are to be merged.
         """
 
     @abstractmethod
@@ -185,8 +184,8 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """Combines the files containing the inserts of the table into one file.
 
         Args:
-            table_name (str): The name of the table.
-            raw (bool): Indicates whether to retrieve the raw schema.
+            table_name: The name of the table.
+            raw: Indicates whether to retrieve the raw schema.
         """
 
     @abstractmethod
@@ -198,8 +197,8 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """Get the arrow schema for a specified table.
 
         Args:
-            table_name (str): The name of the table.
-            raw (bool): Indicates whether to retrieve the raw schema.
+            table_name: The name of the table.
+            raw: Indicates whether to retrieve the raw schema.
 
         Returns:
             pa.Schema: The arrow schema for the specified table.
@@ -216,10 +215,10 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """Execute an SQL query on an EimerDB table.
 
         Args:
-            sql_query (str): SQL query to execute.
-            partition_select (dict, optional): Dictionary specifying partition filters.
-            unedited (bool): Indicates whether to include unedited data.
-            output_format (str): Desired output format ('pandas' or 'arrow').
+            sql_query: SQL query to execute.
+            partition_select: Dictionary specifying partition filters.
+            unedited: Indicates whether to include unedited data.
+            output_format: Desired output format ('pandas' or 'arrow').
 
         Returns:
             pandas.DataFrame, pyarrow.Table, str: The result of the SQL query.
@@ -240,14 +239,14 @@ class AbstractDbInstance(ABC, metaclass=Meta):
         """Query changes made in the database table.
 
         Args:
-            sql_query (str): The SQL query to execute.
-            partition_select (Dict, optional):
+            sql_query: The SQL query to execute.
+            partition_select:
                 Dictionary containing partition selection criteria. Defaults to None.
-            unedited (bool):
+            unedited:
                 Flag indicating whether to retrieve unedited changes. Defaults to False.
-            output_format (str):
+            output_format:
                 The desired output format ('pandas' or 'arrow'). Defaults to 'pandas'.
-            changes_output (str):
+            changes_output:
                 The changes that are to be retrieved ('recent' or 'all'). Defaults to 'all'.
 
         Returns:

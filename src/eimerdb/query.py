@@ -22,15 +22,15 @@ def get_partitioned_files(
     """Retrieve the paths of partitioned files for a given table.
 
     Args:
-        table_name (str): The name of the table.
-        instance_name (str): The name of the instance.
-        table_config (dict[str, Any]): Configuration details for the table.
-        suffix (str): The suffix to be appended to the table name.
-        fs (GCSFileSystem): The filesystem object.
-        timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
-        partition_select (Optional[dict[str, Any]]): Optional dictionary specifying partition
+        table_name: The name of the table.
+        instance_name: The name of the instance.
+        table_config: Configuration details for the table.
+        suffix: The suffix to be appended to the table name.
+        fs: The filesystem object.
+        timetravel: A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
+        partition_select: Optional dictionary specifying partition
             selection criteria. Defaults to None.
-        unedited (bool): Flag indicating whether the file paths should include
+        unedited: Flag indicating whether the file paths should include
             the suffix or not. Defaults to False.
 
     Returns:
@@ -71,8 +71,8 @@ def filter_partitions(
     """Filter the list of partitioned files based on specified partition selection criteria.
 
     Args:
-        table_files (list[str]): List of file paths corresponding to partitioned files.
-        partition_select (dict[str, Any]): Dictionary specifying partition selection criteria,
+        table_files: List of file paths corresponding to partitioned files.
+        partition_select: Dictionary specifying partition selection criteria,
             where keys are partition column names and values are lists of values to match.
 
     Returns:
@@ -104,9 +104,9 @@ def update_pyarrow_table(
     """Apply changes from a PyArrow table of updates and deletions to another PyArrow table.
 
     Args:
-        target_table (pa.Table): The original PyArrow table to be updated.
-        changes_table (pa.Table): The PyArrow table containing updates and deletions.
-        timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
+        target_table: The original PyArrow table to be updated.
+        changes_table: The PyArrow table containing updates and deletions.
+        timetravel: A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
 
     Returns:
         pa.Table: A new PyArrow table with the changes applied.

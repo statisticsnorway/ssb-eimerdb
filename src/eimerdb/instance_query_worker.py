@@ -82,13 +82,13 @@ class QueryWorker:
         """Query the database.
 
         Args:
-            parsed_query (dict): The parsed query.
-            sql_query (str): The SQL query to execute.
-            partition_select (dict, optional): Dictionary containing partition selection criteria. Defaults to None.
-            unedited (bool): Flag indicating whether to retrieve unedited data. Defaults to False.
-            output_format (str): Desired output format ('pandas' or 'arrow'). Defaults to PANDAS_OUTPUT_FORMAT.
-            timetravel (str, optional): A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
-            fs (GCSFileSystem): The GCSFileSystem instance.
+            parsed_query: The parsed query.
+            sql_query: The SQL query to execute.
+            partition_select: Dictionary containing partition selection criteria. Defaults to None.
+            unedited: Flag indicating whether to retrieve unedited data. Defaults to False.
+            output_format: Desired output format ('pandas' or 'arrow'). Defaults to PANDAS_OUTPUT_FORMAT.
+            fs: The GCSFileSystem instance.
+            timetravel: A string with the date and time in the format '2024-04-15 00:00:00'. Defaults to None.
 
         Returns:
             Union[pd.DataFrame, pa.Table]: Returns a pandas DataFrame if 'pandas' output format is specified,
@@ -144,8 +144,8 @@ class QueryWorker:
         """Add metadata to the DataFrame.
 
         Args:
-            target_df (pd.DataFrame): The target DataFrame.
-            operation (str): The operation.
+            target_df: The target DataFrame.
+            operation: The operation.
 
         Returns:
             pd.DataFrame: The DataFrame with added metadata.
@@ -165,10 +165,10 @@ class QueryWorker:
         """Query the database to update or delete records.
 
         Args:
-            parsed_query (dict): The parsed query.
-            update_sql_query (str): The SQL query to execute. When defines, assumes update operation.
-            partition_select (Dict, optional): Dictionary containing partition selection criteria.
-            fs (GCSFileSystem): The GCSFileSystem instance.
+            parsed_query: The parsed query.
+            update_sql_query: The SQL query to execute. When defines, assumes update operation.
+            partition_select: Dictionary containing partition selection criteria.
+            fs: The GCSFileSystem instance.
 
         Returns:
             str: String containing number of rows updated.
@@ -280,14 +280,14 @@ class QueryWorker:
         """Query changes made in the database table.
 
         Args:
-            sql_query (str): The SQL query to execute.
-            partition_select (dict):
+            sql_query: The SQL query to execute.
+            partition_select:
                 Dictionary containing partition selection criteria. Defaults to None.
-            unedited (bool):
+            unedited:
                 Flag indicating whether to retrieve unedited changes.
-            output_format (str):
+            output_format:
                 The desired output format ('pandas' or 'arrow').
-            changes_output (str):
+            changes_output:
                 The changes that are to be retrieved ('recent' or 'all').
 
         Returns:
