@@ -20,6 +20,7 @@ dependencies = [
     "numpy>=2.0.1",
     "filelock>=3.15.4",
     "dapla-auth-client>=1.2.0",
+    "gcsfs (>=2026.3.0,<2027.0.0)",
 ]
 
 [project.urls]
